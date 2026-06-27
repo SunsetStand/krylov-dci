@@ -35,8 +35,15 @@ Hamiltonian matrix construction, and model-space partitioning.
 ### 3. Partitioning (`src/partitioning.py`)
 
 - **Strategy A (CAS-based):** `partition_cas(n_orb, n_elec, n_active_orb,
-  n_active_elec, n_core_orb)` — splits determinants based on core/active/virtual
-  orbital spaces.
+  n_active_elec)` — generates the full FCI determinant space first, then
+  classifies each determinant as P or Q by checking three rules:
+  1. Core orbitals (first `n_core_orb`, auto-derived from electron count)
+     must be doubly occupied.
+  2. Active orbitals must sum to exactly `n_active_elec` electrons.
+  3. Virtual orbitals must be empty.
+  The core orbital count is derived automatically:
+  `n_core_orb = (n_elec - n_active_elec) // 2`.
+  **Test case:** H2O/STO-3G CAS(6,5) → P=100, Q=341 (out of 441 FCI dets).
 - **Strategy B (Energy-window):** `partition_energy_window(ham, dets, E_ref,
   window)` — P = determinants with |H_ii - E_ref| < window.
 - **Strategy C (Perturbation):** `partition_perturbation(ham, dets, ref_idx,
@@ -76,7 +83,7 @@ partitioning:   CAS(2,2) with 2 orb → P=4, Q=0                    ✓
 | Issue | Resolution |
 |-------|-----------|
 | `_unpack_4fold` failed with `setting an array element with a sequence` | Use `pyscf.ao2mo.restore('s1', ...)` instead of manual unpacking |
-| CAS partition test with H2O gave P=0 | Fixed test to use consistent parameters; function needs redesign for "inactive occupied" orbitals |
+| CAS partition with H2O gave P=0 | Refactored `partition_cas`: FCI-first generation, auto-derive `n_core_orb = (n_elec - n_active_elec)//2`. Now H2O/STO-3G CAS(6,5) correctly yields P=100, Q=341. |
 | Phase convention test had contradictory assert | Fixed; verified phase=-1 for a single excitation crossing one occupied orbital |
 
 ## Next Steps (Phase 2)
