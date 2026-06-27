@@ -24,77 +24,80 @@ from pyscf import gto, scf  # noqa: F401 (used in real workflows, not tests)
 # ============================================================================
 
 def partition_cas(n_orb: int, n_elec: int,
-                  n_active_orb: int, n_active_elec: int,
-                  n_core_orb: int = 0) -> Tuple[np.ndarray, np.ndarray]:
-    """Partition determinants based on a CAS(n_active_elec, n_active_orb).
+                  n_active_orb: int, n_active_elec: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Partition determinants via CAS-based filtering.
 
-    The orbital space is divided into:
-      - Core:    doubly occupied, frozen (n_core_orb orbitals)
-      - Active:  all possible occupations within n_active_elec electrons
-      - Virtual: empty, frozen (n_orb - n_core_orb - n_active_orb orbitals)
+    1. Generate the full FCI determinant space (all determinants with
+       n_elec electrons in n_orb spatial orbitals).
+    2. Classify each determinant as P or Q:
+       - Core orbitals (first n_core_orb): must be doubly occupied.
+       - Active orbitals (next n_active_orb): any occupation, total active
+         electrons must equal n_active_elec.
+       - Virtual orbitals (remaining): must be empty.
+       Everything else → Q.
 
-    P-space contains all determinants where:
-      - Core orbitals are always doubly occupied
-      - Active orbitals have any allowed occupation
-      - Virtual orbitals are always empty
-
-    Q-space contains all other determinants.
+    The number of core orbitals is derived from electron count:
+        n_core_orb = (n_elec - n_active_elec) // 2
 
     Args:
         n_orb:         Total number of spatial orbitals.
         n_elec:        Total number of electrons.
-        n_active_orb:  Number of active orbitals.
+        n_active_orb:  Number of active spatial orbitals.
         n_active_elec: Number of active electrons.
-        n_core_orb:    Number of frozen core orbitals (doubly occupied).
 
     Returns:
         (p_indices, q_indices): 0-based indices into the full determinant list.
+
+    Raises:
+        ValueError: If (n_elec - n_active_elec) is odd or n_active_elec is
+                    incompatible with n_orb.
     """
-    from determinants import generate_determinants, count_bits, bit_positions
+    from determinants import generate_determinants, count_bits
 
-    # Total alpha/beta electrons
-    n_alpha = n_elec // 2  # Assume closed-shell for now
-    n_beta = n_elec - n_alpha
-
-    # Core electrons
-    n_core_alpha = n_core_orb
-    n_core_beta = n_core_orb
-
-    # Active electrons
-    n_act_alpha = n_active_elec // 2
-    n_act_beta = n_active_elec - n_act_alpha
-
-    # Virtual starts after core + active
+    # ---- Validate inputs ----
+    n_core_elec = n_elec - n_active_elec
+    if n_core_elec < 0:
+        raise ValueError(f"n_active_elec ({n_active_elec}) > n_elec ({n_elec})")
+    if n_core_elec % 2 != 0:
+        raise ValueError(
+            f"Core electrons ({n_core_elec}) must be even (closed-shell core). "
+            f"n_elec={n_elec}, n_active_elec={n_active_elec}"
+        )
+    n_core_orb = n_core_elec // 2
     n_virt_orb = n_orb - n_core_orb - n_active_orb
+    if n_virt_orb < 0:
+        raise ValueError(
+            f"Core ({n_core_orb}) + active ({n_active_orb}) > n_orb ({n_orb})"
+        )
 
-    # Generate all determinants in the full space
+    # ---- Generate full FCI space ----
+    n_alpha = n_elec // 2
+    n_beta = n_elec - n_alpha
     all_dets = generate_determinants(n_orb, n_alpha, n_beta)
-    n_det = len(all_dets)
 
-    # Core occupation mask: first n_core_orb orbitals must be doubly occupied
-    core_mask_alpha = (1 << n_core_orb) - 1  # bits 0..n_core_orb-1 set
+    # ---- Orbital range masks ----
+    # Core:   orbitals 0 .. n_core_orb-1
+    # Active: orbitals n_core_orb .. n_core_orb + n_active_orb - 1
+    # Virtual: orbitals n_core_orb + n_active_orb .. n_orb-1
 
-    # Active orbitals: n_core_orb .. n_core_orb + n_active_orb - 1
+    core_mask = (1 << n_core_orb) - 1                      # bits 0..n_core_orb-1
     act_start = n_core_orb
     act_end = n_core_orb + n_active_orb
-
-    # Virtual orbitals: act_end .. n_orb - 1
-    virt_mask = ((1 << n_orb) - 1) ^ ((1 << act_end) - 1)
-    # Virtual should be empty: no bits set in virt range
+    virt_mask = ((1 << n_orb) - 1) ^ ((1 << act_end) - 1)  # bits >= act_end
 
     p_idx = []
     q_idx = []
 
     for idx, (a_str, b_str) in enumerate(all_dets):
-        # Check core: must be fully occupied
-        if (a_str & core_mask_alpha) != core_mask_alpha:
+        # Rule 1: Core orbitals must be doubly occupied.
+        if (a_str & core_mask) != core_mask:
             q_idx.append(idx)
             continue
-        if (b_str & core_mask_alpha) != core_mask_alpha:
+        if (b_str & core_mask) != core_mask:
             q_idx.append(idx)
             continue
 
-        # Check virtual: must be empty
+        # Rule 2: Virtual orbitals must be empty.
         if (a_str & virt_mask) != 0:
             q_idx.append(idx)
             continue
@@ -102,12 +105,10 @@ def partition_cas(n_orb: int, n_elec: int,
             q_idx.append(idx)
             continue
 
-        # Count active electrons
+        # Rule 3: Active electrons must sum to n_active_elec.
         act_a = count_bits(a_str >> act_start)
         act_b = count_bits(b_str >> act_start)
-        total_act = act_a + act_b
-
-        if total_act == n_active_elec:
+        if act_a + act_b == n_active_elec:
             p_idx.append(idx)
         else:
             q_idx.append(idx)
@@ -264,48 +265,61 @@ def compute_reference_energy(ham, dets: List[Tuple[int, int]],
 def test_cas_partitioning_h2():
     """Test CAS partitioning for H2/STO-3G (2 spatial orbitals).
     Full space: 2 orbitals, 2 electrons -> 4 determinants.
-    CAS(2,2): all 4 determinants are in P (active = full space).
+    CAS(2,2): active = full space, n_core_orb = (2-2)//2 = 0.
     """
-    # n_orb=2, CAS(2,2): active = orbitals 0,1 = all orbitals
-    p_idx, q_idx = partition_cas(
-        n_orb=2, n_elec=2,
-        n_active_orb=2, n_active_elec=2, n_core_orb=0
-    )
+    p_idx, q_idx = partition_cas(n_orb=2, n_elec=2,
+                                  n_active_orb=2, n_active_elec=2)
     assert len(p_idx) == 4, f"Expected 4 P-det, got {len(p_idx)}"
     assert len(q_idx) == 0
     print("  ✓ CAS(2,2), 2 orb: P=4, Q=0 (active = full space)")
 
-
-def test_cas_partitioning_h2o_sto3g():
-    """Test CAS partitioning: active < full space.
-
-    n_orb=4, n_elec=4, CAS(4,4): active = all orbitals.
-    Then n_orb=4, n_elec=2, CAS(2,2) with n_core_orb=0: active < full.
-    """
-    # Case 1: active = full space
-    p_idx, q_idx = partition_cas(
-        n_orb=4, n_elec=4,
-        n_active_orb=4, n_active_elec=4, n_core_orb=0
-    )
-    # C(4,2)*C(4,2) = 6*6 = 36 dets, all in P since active = full space
-    assert len(p_idx) == 36, f"Expected 36 P-det, got {len(p_idx)}"
-    assert len(q_idx) == 0
-    print(f"  ✓ 4 orb, active=full: P={len(p_idx)}, Q={len(q_idx)}")
-
-    # Case 2: active subset with core frozen
-    p_idx, q_idx = partition_cas(
-        n_orb=4, n_elec=4,
-        n_active_orb=2, n_active_elec=2, n_core_orb=1
-    )
-    # Core: 1 orbital (2 electrons frozen), Active: 2 orbitals with 2 electrons
+    # With a subset: n_orb=4, n_elec=4, CAS(2,2)
+    # n_core_orb = (4-2)//2 = 1 core orbital (doubly occupied)
     # Full: C(4,2)*C(4,2) = 36 dets
-    # P: active electrons = 2 in orbital 1,2 → C(2,1)*C(2,1) = 4
+    # P: C(2,1)*C(2,1) = 4 dets (core orbital always occupied)
+    p_idx, q_idx = partition_cas(n_orb=4, n_elec=4,
+                                  n_active_orb=2, n_active_elec=2)
     assert len(p_idx) == 4, f"Expected 4 P-det, got {len(p_idx)}"
     assert len(q_idx) == 32
-    print(f"  ✓ 4 orb, CAS(2,2)+core: P={len(p_idx)}, Q={len(q_idx)}")
+    print(f"  ✓ 4 orb, CAS(2,2): P={len(p_idx)}, Q={len(q_idx)}")
+
+
+def test_cas_validation():
+    """Test input validation."""
+    # n_active_elec > n_elec should raise
+    try:
+        partition_cas(n_orb=4, n_elec=2, n_active_orb=2, n_active_elec=4)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+    # Odd core electrons should raise
+    try:
+        partition_cas(n_orb=4, n_elec=3, n_active_orb=2, n_active_elec=2)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+    print("  ✓ Input validation works")
+
+
+def test_cas_partitioning_h2o():
+    """Test CAS partitioning for H2O/STO-3G.
+
+    H2O/STO-3G: 10 electrons, 7 orbitals.
+    CAS(6,5): n_core_orb = (10-6)//2 = 2 core orbitals (4 electrons frozen),
+              5 active orbitals with 6 electrons, no virtuals.
+    Full: C(7,5)*C(7,5) = 21*21 = 441 dets.
+    P: core orbitals 0,1 always doubly occupied,
+       active orbitals 2-6 have 6 electrons → C(5,3)*C(5,3) = 100 dets.
+    """
+    p_idx, q_idx = partition_cas(n_orb=7, n_elec=10,
+                                  n_active_orb=5, n_active_elec=6)
+    assert len(p_idx) == 100, f"Expected 100 P-det, got {len(p_idx)}"
+    assert len(q_idx) == 341, f"Expected 341 Q-det, got {len(q_idx)}"
+    print(f"  ✓ H2O/STO-3G CAS(6,5): P={len(p_idx)}, Q={len(q_idx)}")
 
 
 if __name__ == "__main__":
     test_cas_partitioning_h2()
-    test_cas_partitioning_h2o_sto3g()
+    test_cas_partitioning_h2o()
+    test_cas_validation()
     print("All partitioning tests passed.")
