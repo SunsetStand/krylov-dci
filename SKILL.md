@@ -213,18 +213,97 @@ For each test system, run all strategies and compare:
 
 ---
 
-## 7. Benchmark Systems
+## 7. Benchmark Systems & Reporting Protocol
 
-Following Li & Yang (2022) and standard quantum chemistry benchmarks:
+Following Li & Yang (JPCL 2022) and standard quantum chemistry benchmark conventions.
 
-| System | Basis | Electrons | Orbitals | Determinants | Notes |
-|--------|-------|-----------|----------|--------------|-------|
-| H₂ | STO-3G | 2 | 4 | 6 | Trivially verifiable |
-| H₂O | STO-3G | 10 | 7 | 441 | Standard test |
-| N₂ | cc-pVDZ | 14 | 28 | ~10⁷ | Multireference (stretched) |
-| C₂ | cc-pVDZ | 12 | 28 | ~10⁷ | Strong correlation |
+### Test Systems (Progressive Complexity)
 
-Progression: H₂/STO-3G → H₂O/STO-3G → N₂/cc-pVDZ → C₂/cc-pVDZ
+| # | System | Basis | n_el | n_orb | FCI dim | Physics |
+|---|--------|-------|------|-------|---------|---------|
+| 1 | H2 | STO-3G | 2 | 4 | 6 | Single-bond dissociation |
+| 2 | H2O | STO-3G | 10 | 7 | 441 | Equilibrium, closed-shell |
+| 3 | N2 | cc-pVDZ | 14 | 28 | ~1.2e7 | Triple bond, multireference at stretch |
+| 4 | C2 | cc-pVDZ | 12 | 28 | ~7.3e6 | Strong static correlation |
+
+For N2 and C2, compute full potential energy curves (PEC) at bond lengths
+R = 0.8Re, 1.0Re, 1.5Re, 2.0Re, 2.5Re, 3.0Re (Re = equilibrium bond length).
+
+### Data Recorded Per Calculation
+
+For each (system, basis, geometry, method), record:
+
+**Computational cost metrics:**
+- `N_det_P`: Number of determinants in P-space
+- `N_det_Q_layer[j]`: Raw Q-space determinants per Krylov layer j
+- `N_det_Q_svd[j]`: Retained after weighted SVD (per layer)
+- `N_det_total`: Total determinants in compressed subspace
+- `r_eff = N_det_total / N_det_FCI`: Compression ratio
+- `t_wall`: Wall-clock time (seconds)
+- `n_cores`: CPU cores used
+- `t_cpu_h = t_wall * n_cores / 3600`: CPU-hours
+
+**Accuracy metrics:**
+- `E_FCI`: FCI total energy (reference)
+- `E_corr_FCI = E_FCI - E_HF`: FCI correlation energy
+- `E_method`: Krylov-dCI total energy at Krylov order m
+- `Delta_E = E_method - E_FCI`: Absolute energy error (Hartree)
+- `Delta_E_mHartree`: Above in mHartree
+- `frac_corr = E_corr_method / E_corr_FCI * 100`: % of correlation recovered
+
+**Convergence metrics:**
+- `Delta_E(m)`: Energy error vs Krylov order m = 0, 1, 2, ...
+- `dE_dm = |E(m) - E(m-1)|`: Incremental energy improvement
+- `m_conv`: Krylov order needed for |Delta_E| < 1.6 mH (chemical accuracy)
+
+### Comparison Targets
+
+| Method | What to compare |
+|--------|----------------|
+| FCI | Gold standard: energy, PEC, N_det |
+| CASCI(m,n) | Same P-space as our initial selection |
+| dCI (Li & Yang 2022) | N_det vs accuracy tradeoff (from literature data) |
+
+### Output Tables
+
+**Table 1: Method comparison at equilibrium geometry**
+
+| Method | N_det | t_wall (s) | n_cores | E_corr (H) | Delta_E (mH) | % Corr |
+|--------|-------|-----------|---------|------------|--------------|--------|
+| FCI | ... | ... | ... | ... | 0 | 100% |
+| CASCI | ... | ... | ... | ... | ... | ... |
+| dCI | ... | ... | ... | ... | ... | ... |
+| Krylov-dCI m=0 | ... | ... | ... | ... | ... | ... |
+| Krylov-dCI m=1 | ... | ... | ... | ... | ... | ... |
+| Krylov-dCI m=2 | ... | ... | ... | ... | ... | ... |
+
+**Table 2: Convergence with Krylov order (N2, cc-pVDZ, Re)**
+
+| m | N_det_total | r_eff | Delta_E (mH) | dE_dm (mH) | t_wall (s) |
+|---|-------------|-------|-------------|-----------|-----------|
+| 0 | ... | ... | ... | - | ... |
+| 1 | ... | ... | ... | ... | ... |
+| 2 | ... | ... | ... | ... | ... |
+| ... | ... | ... | <1.6 | ... | ... |
+
+### Required Figures
+
+1. **Convergence plot**: Delta_E (log scale, mH) vs Krylov order m, with chemical accuracy line at 1.6 mH. One curve per system. Subplot per P-space selection strategy.
+
+2. **PEC plot**: Energy vs bond length for N2 and C2. Overlay: FCI, Krylov-dCI (final), CASCI. Non-parallelity error (NPE) labeled.
+
+3. **Efficiency plot**: Delta_E vs t_wall (or N_det). Compare Krylov-dCI curve with FCI point, CASCI point, dCI point. Shows the accuracy-efficiency tradeoff.
+
+4. **Subspace growth**: N_det per layer (stacked bar: raw Q vs SVD-retained) vs Krylov order m. Shows compression effectiveness.
+
+5. **Singular value decay**: sigma_i / sigma_1 vs i for each Krylov layer (semilog). Justifies SVD truncation threshold choice.
+
+### SVD Truncation Scan
+
+As a single-variable control experiment, scan theta_sigma:
+theta_sigma = [0, 1e-6, 1e-4, 1e-3, 1e-2]
+
+For each value, plot Delta_E vs N_det_total. The optimal theta_sigma balances accuracy-vs-cost.
 
 ---
 
