@@ -3,4 +3,5 @@
 from .determinants import *
 from .hamiltonian import *
 from .partitioning import *
+from .krylov import *
 from .utils import *
