@@ -105,8 +105,12 @@ def run_strategy(sysdat, name, p_idx, q_idx):
     if r > 0:
         U_comp, _ = modified_gram_schmidt(U_comp, np.zeros((M,0)))
         d = U_comp.shape[1]
-        H_QQ_t = build_H_Qtilde_Qtilde(sysdat.ham, U_comp, q_dets, H_QQ_full=H_QQ_full)
-        H_PQ_t = build_H_PQtilde(sysdat.ham, U_comp, p_dets, q_dets)
+        # Fast: H_Qtilde_Qtilde = basis.T @ H_QQ_full @ basis  (matmul)
+        sigma = H_QQ_full @ U_comp
+        H_QQ_t = U_comp.T @ sigma
+        H_QQ_t = 0.5 * (H_QQ_t + H_QQ_t.T)
+        # Fast: H_PQ_tilde = (basis.T @ H_QP_mat).T  (matmul, avoids triple loop)
+        H_PQ_t = (U_comp.T @ H_QP_mat).T
         result = self_consistent_iteration(H_PP, H_PQ_t, H_QQ_t, E0, verbose=False)
         E_final = result['E_final']; n_iter = result['n_iter']
     else:
