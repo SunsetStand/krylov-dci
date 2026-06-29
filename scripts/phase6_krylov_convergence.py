@@ -29,6 +29,7 @@ BOND_LENGTHS = [1.10, 1.65, 2.20, 2.75]
 P_TARGET = 100  # Fixed P-size for convergence test
 SVD_THRESHOLD = 1e-3
 MAX_KRYLOV = 3  # m=0,1,2,3
+LEVEL_SHIFT = 0.3  # Hartree (~6600 cm⁻¹) — stronger for stretched bonds
 
 
 # ============================================================================
@@ -300,7 +301,8 @@ def main():
         for i in range(N):
             for j in range(N): H_PP[i,j]=ham.matrix_element(p_dets[i],p_dets[j])
         E0=np.linalg.eigh(H_PP)[0][0]
-        A_diag=1.0/np.maximum(np.abs(E0-hdiag),1e-12)
+        # A = (E⁰I - H_D' + level_shift)⁻¹ — level_shift suppresses intruder states
+        A_diag=1.0/(E0 - hdiag + LEVEL_SHIFT)
 
         # Build sparse H_QQ (off-diagonal only, as adjacency list)
         print(f"  CAS(8,8), P={N}, Q={M}, E_ref={E_ref:.10f}")
@@ -382,8 +384,9 @@ def main():
             H_QQ_t = 0.5 * (H_QQ_t + H_QQ_t.T)
             H_PQ_t = (accumulated_basis.T @ H_QP).T
             
-            # Effective H at Δ=0 (correct for Krylov construction)
-            H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0, delta=0.0)
+            # Effective H at Δ=0, with level_shift in resolvent energy
+            E_shifted = E0 + LEVEL_SHIFT
+            H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E_shifted, delta=0.0)
             eigvals, _ = diagonalize_effective_H(H_eff)
             E_method = eigvals[0] + ecore
             dE_mH = (E_method - E_ref) * 1000
