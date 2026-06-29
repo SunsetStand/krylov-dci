@@ -342,7 +342,69 @@ Each phase report (`docs/phases/PhaseN_Title.md`) should follow:
 
 ---
 
-## 10. References
+## 10. PySCF Best Practices (from Phase 2.5 audit + lamp_emb study)
+
+### Integral Conventions
+
+**Basis Awareness — THE #1 RULE:** Always know what basis your integrals are in.
+
+| Integral | Source | Basis | Transform to MO |
+|----------|--------|-------|------------------|
+| h1e | `mf.get_hcore()` | AO | `mo_coeff.T @ hcore @ mo_coeff` |
+| h2e | `mol.intor('int2e')` | AO, 4D | `ao2mo.kernel()` + `ao2mo.restore('s1', ...)` |
+| h2e | `ao2mo.full(mol, mo)` | MO, 2D packed | `ao2mo.restore('s1', packed, norb)` for 4D |
+
+**Critical rule:** FCI solvers need h1e and h2e in the **same basis**. Never mix AO and MO integrals.
+
+**Chemist vs Physicist notation:**
+- `(ij|kl)` = chemist = ∫ φᵢφⱼ φₖφₗ / r₁₂ — PySCF default
+- `⟨ik|jl⟩` = physicist = ∫ φᵢφₖ φⱼφₗ / r₁₂ — used in Slater-Condon
+- Transpose: `h2e_phys = h2e_chem.transpose(0,2,1,3)`
+
+### FCI Solver Correct Pattern
+
+```python
+from pyscf import ao2mo
+from pyscf.fci.direct_nosym import FCI
+
+h1e_mo = mo_coeff.T @ mf.get_hcore() @ mo_coeff  # MO
+h2e_mo = ao2mo.restore(1, ao2mo.kernel(mol, mo_coeff), norb)  # MO, 4D
+
+solver = FCI()
+E_fci, ci = solver.kernel(h1e_mo, h2e_mo, norb,
+                          (nalpha, nbeta), ecore=mf.energy_nuc())
+```
+
+### Slater-Condon Rules Verification
+
+**Test for small systems first, then test for larger systems.** The H₂/STO-3G (2 orbitals)
+test passed because symmetry makes `(ip|ap) == (ia|pp)` for all i,p,a. Always verify
+against PySCF's CASCI for a non-trivial system (≥4 orbitals) before trusting results.
+
+### Key Patterns from lamp_emb (DMET Package)
+
+- **Fragment-wise transforms:** Only transform needed orbital blocks, never full (nmo⁴).
+  Use `ao2mo.incore.general(eri, [mo_a, mo_b, mo_c, mo_d])` for mixed blocks.
+- **X2C awareness:** Always use `mf.get_hcore()` not manual kinetic+nuclear for systems
+  with relativistic corrections.
+- **Frozen-core J/K:** Use `mf.get_jk(mol, dm_core)` for core contributions.
+- **opt_einsum:** Prefer `opt_einsum.contract` over `np.einsum` for automatic optimization.
+- **Density-fitting check:** Always check `mf.with_df` before calling `ao2mo.full()`.
+- **State-average awareness:** SA-CASSCF CI vectors need spin/nelecas fixing.
+
+### Debugging Checklist
+
+When Krylov-dCI results look wrong:
+1. ✅ FCI reference computed with MO integrals (not AO)
+2. ✅ H_PP lowest eigenvalue ≥ E_FCI (variational principle)
+3. ✅ Compare H_PP vs PySCF CASCI for CAS-based P spaces
+4. ✅ Check ||AB|| < ~1 for Neumann series convergence
+5. ✅ Verify `p_idx ∪ q_idx` covers all determinants, no overlap
+6. ✅ Diagonals of H_PP match `ham.diagonal_element()` individually
+
+---
+
+## 11. References
 
 1. Krylov, A.N. *Izvestiya AN SSSR* 1931, No. 4, 491-539.
 2. Löwdin, P.O. *J. Math. Phys.* 1962, 3, 969.
@@ -350,6 +412,7 @@ Each phase report (`docs/phases/PhaseN_Title.md`) should follow:
 4. O'Leary, T.; Anderson, L.W.; Jaksch, D.; Kiffner, M. *Quantum* 2025, 9, 1726. (PQSE)
 5. Saad, Y. *Iterative Methods for Sparse Linear Systems*, 2nd ed., SIAM 2003.
 6. Sun, Q.; et al. *WIREs Comput. Mol. Sci.* 2018, 8, e1340. (PySCF)
+7. LAMP_emb (课题组 DMET package): `/data/home/wangcx/LAMP_emb/embed_sim/`
 
 ---
 
