@@ -203,14 +203,19 @@ class Hamiltonian:
         beta_occ = bit_positions(b1)
 
         # Coulomb-exchange contributions from occupied spin-orbitals
+        # Sum over j ∈ D, j ≠ (i, σ_i): (ia|jj) - δ_{σ_i,σ_j} (ij|ja)
         for p in alpha_occ:
-            result += self.h2[i, p, a, p]  # (ip|ap) Coulomb
+            if spin_i == 'alpha' and p == i:
+                continue  # Exclude hole spin-orbital
+            result += self.h2[i, a, p, p]  # (ia|pp) Coulomb
             if spin_i == 'alpha':
-                result -= self.h2[i, p, p, a]  # (ip|pa) Exchange, same spin
+                result -= self.h2[i, p, p, a]  # (ip|pa) Exchange
         for p in beta_occ:
-            result += self.h2[i, p, a, p]
+            if spin_i == 'beta' and p == i:
+                continue  # Exclude hole spin-orbital
+            result += self.h2[i, a, p, p]  # (ia|pp) Coulomb
             if spin_i == 'beta':
-                result -= self.h2[i, p, p, a]
+                result -= self.h2[i, p, p, a]  # (ip|pa) Exchange
 
         return phase * result
 
