@@ -8,6 +8,7 @@
 
 export MODULEPATH=/data/modulefiles/softwares:/data/modulefiles/libraries
 source /etc/profile.d/modules.sh
+export PYTHONUNBUFFERED=1
 
 cd /data/home/wangcx/krylov-dci
 PYTHON=/data/home/wangcx/LiYF4_Er3+/env/bin/python
@@ -18,7 +19,7 @@ echo "Date: $(date)"
 echo "Node: $(hostname)"
 echo "============================================"
 
-PYTHONPATH=/data/home/wangcx/krylov-dci $PYTHON scripts/phase4_n2_pstrategies.py
+PYTHONPATH=/data/home/wangcx/krylov-dci $PYTHON -u scripts/phase4_n2_pstrategies.py
 
 EXIT_CODE=$?
 echo ""
