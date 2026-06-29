@@ -21,7 +21,7 @@ from pyscf.fci import selected_ci, cistring
 from hamiltonian import Hamiltonian, _unpack_4fold
 from krylov import compute_A, modified_gram_schmidt
 from svd_compression import build_weighted_coupling, svd_truncate
-from effective_h import self_consistent_iteration
+from effective_h import build_effective_H, diagonalize_effective_H
 
 np.set_printoptions(linewidth=120, precision=6, suppress=True)
 
@@ -144,11 +144,13 @@ def run_m0(ham, h1e, eri, p_dets, q_a_strs, q_b_strs, norb, nelec, E_ref, ecore)
     d=U_orth.shape[1]
     H_QQ_t=(U_orth*hdiag_q[:,None]).T@U_orth; H_QQ_t=0.5*(H_QQ_t+H_QQ_t.T)
     H_PQ_t=(U_orth.T@H_QP_mat).T
-    result=self_consistent_iteration(H_PP,H_PQ_t,H_QQ_t,E0,verbose=False)
-    E_total=result['E_final']+ecore
-    dE_mH=(E_total-E_ref)*1000
+    # m=0: no B matrix, no Δ. Single-shot effective H diagonalization at Δ=0.
+    H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0, delta=0.0)
+    eigvals, _ = diagonalize_effective_H(H_eff)
+    E_total = eigvals[0] + ecore
+    dE_mH = (E_total - E_ref) * 1000
     return {'n_p':N,'n_q':M,'d':d,'dE_mH':dE_mH,'t':time.perf_counter()-t0,
-            'sigma1':sigma[0],'sigma_last':sigma[-1],'n_iter':result['n_iter'],'nnz':nnz}
+            'sigma1':sigma[0],'sigma_last':sigma[-1],'n_iter':1,'nnz':nnz}
 
 
 # ============================================================================
