@@ -146,70 +146,83 @@ The following notation is used consistently in code and documentation, following
 
 ## 5. P-Space Selection Strategies
 
-### Strategy A: CAS-based (Primary)
+### 🔑 Core Philosophy (2026-06-29, discussion with Prof. Yang)
+
+**The method's competitiveness lies in low-level (m=0), not Krylov expansion.**
+- P-space should be SMALLER than CAS — avoid becoming "CASSCF + CASPT2"
+- P captures static correlation, Q captures dynamic correlation
+- Krylov layers (m≥1) exist only to validate convergence — NOT the selling point
+- SVD compression quality at m=0 is the critical metric
+
+**Extreme benchmark:** P = 1 determinant (HF approximation), rely entirely on the
+second term of the effective Hamiltonian for correction.
+
+### Strategy A: CAS-based (Baseline, for validation)
 Select P as the determinants within a CAS(n,m) active space.
-- $n$ electrons in $m$ active orbitals
-- Standard quantum chemistry approach
-- Easy to validate against CASCI/FCI
+- Use only for correctness validation against CASCI/FCI
+- NOT the target use case — P-space is too large, makes method look like CASPT2
 
-### Strategy B: Energy-window
+### Strategy B: Sub-CAS (Target)
+Select P as a SUBSET of the CAS space, smaller than full CAS.
+- Goal: smaller P than CAS, comparable accuracy
+- Picks most "important" CAS determinants by some criterion
+
+### Strategy C: Energy-window
 Select all determinants whose diagonal energy is within $\Delta E$ of $E_{\text{HF}}$.
-- Simpler, more systematic
-- May include irrelevant determinants if $\Delta E$ is too large
-- **Control variable**: energy window width
+- Systematic, one control variable
+- Test with narrow windows → small P
 
-### Strategy C: Perturbation-based
+### Strategy D: Perturbation-based
 Select determinants with significant first-order PT2 contribution.
-- Physically motivated
-- More expensive to set up
-- **Control variable**: PT2 threshold
+- Physically motivated selection of "important" determinants
+- Control: PT2 threshold → P size
 
-### Testing Protocol
-For each test system, run all strategies and compare:
-1. P-space size $N$
-2. Convergence rate with Krylov order $m$
-3. Final energy accuracy vs FCI
-4. Computational cost
+### Strategy E: Single-determinant (Extreme limit)
+P = HF determinant only (N=1).
+- Tests the limit of the effective Hamiltonian correction alone
+- If this works, the method is truly powerful
+
+### Testing Protocol (Revised)
+1. **Primary metric:** ΔE vs N_det_P at m=0 (accuracy per P-space size)
+2. SVD compression ratio at m=0
+3. Convergence with Krylov order (secondary, validation only)
+4. Wall-clock time vs accuracy trade-off
 
 ---
 
-## 6. Development Phases
+## 6. Development Phases (Revised 2026-06-29)
 
-### Phase 1: Core Infrastructure
-- Determinant generation and bit-string representation
-- Hamiltonian matrix construction (Slater-Condon rules)
-- P/Q partitioning with Strategy A (CAS-based)
-- Unit tests for all components
-- **Deliverable**: `Phase1_CoreInfrastructure.md` report
+**Priority shift:** P-space selection + m=0 SVD compression > Krylov expansion.
+Krylov layers exist to verify convergence, not as the main result.
 
-### Phase 2: Krylov Layer Generation
-- Compute $A = (E^{(0)}\hat{I} - H_D')^{-1}$
-- Implement $\sigma$-vector operation $H_O'|v\rangle$
-- Generate Krylov layers: $|v_p^{(j)}\rangle = (AB)^j A H_{QP}|\Phi_p\rangle$
-- Modified Gram-Schmidt orthonormalization
-- Linear dependence detection & removal
-- **Deliverable**: `Phase2_KrylovGeneration.md` report
+### Phase 1: Core Infrastructure ✓
+- Determinant generation, Hamiltonian, P/Q partitioning
+- **Deliverable**: `Phase1_CoreInfrastructure.md`
 
-### Phase 3: Weighted SVD Compression
-- Build $T^{(j)} = (E^{(0)}\hat{I} - H_D')^{-1/2} M^{(j)}$
-- SVD with truncation threshold $\theta_\sigma$
-- Compressed Krylov basis construction
-- Error analysis (Eckart-Young bound)
-- **Deliverable**: `Phase3_SVDCompression.md` report
+### Phase 2: Krylov Layer Generation ✓
+- Krylov propagator, MGS orthonormalization
+- **Deliverable**: `Phase2_KrylovGeneration.md`
 
-### Phase 4: Effective Hamiltonian & Self-Consistency
-- Construct $\tilde{H}_{\tilde{Q}\tilde{Q}}$, $\tilde{H}_{P\tilde{Q}}$
-- Self-consistent iteration for $\Delta = E - E^{(0)}$
-- Diagonalize $\tilde{H}_P^{\text{eff}}$ to get approximate energy
-- Convergence monitoring ($|E^{(m)} - E^{(m-1)}|$)
-- **Deliverable**: `Phase4_EffectiveHamiltonian.md` report
+### Phase 2.5: Debug & Audit ✓
+- Slater-Condon bug fixes, PySCF best practices, lamp_emb study
+- **Deliverable**: `Phase2.5_DebugReport.md`
+
+### Phase 3: SVD Compression ✓
+- Weighted SVD, sparse sigma-vector, H₂O analysis
+- Station's optimization idea validated
+- **Deliverable**: `Phase3_SVDCompression.md`
+
+### Phase 4: P-Space Selection Strategies 🔄 (NEW PRIORITY)
+- Implement and benchmark ALL strategies (Sub-CAS, energy-window, PT2, single-det)
+- **Primary metric:** ΔE vs N_det_P at m=0
+- Extreme limit: P = 1 (HF) determinant
+- Strongly correlated test systems: N₂/cc-pVDZ (stretched), C₂/cc-pVDZ
+- **Deliverable**: `Phase4_PSpaceStrategies.md`
 
 ### Phase 5: Benchmark & Comparison
-- Test systems: H2, H2O, N2, C2 (matching dCI benchmarks)
-- Compare against: FCI, CASCI, dCI (where available)
-- Convergence rate vs Krylov order $m$
-- CPU time vs accuracy trade-off
-- **Deliverable**: `Phase5_Benchmark.md` report
+- Compare against: FCI, CASCI, CASPT2, dCI
+- Accuracy vs N_det (the key trade-off curve)
+- Show that sub-CAS P-space + SVD compression outperforms CASPT2-like approaches
 
 ---
 
