@@ -1,0 +1,12 @@
+============================================
+Krylov-dCI Regression Tests
+Date: Sun Jun 28 11:25:54 PM EDT 2026
+============================================
+
+--- Test 1: H2/STO-3G, P=1, SCF converges to FCI ---
+  PASS: SCF dE = 0.0000 mH
+
+--- Test 2: H2O/STO-3G CAS(4,4) Hamiltonian vs PySCF CASCI ---
+✅ H2O CAS(4,4): E0=-74.9724580436, PySCF=-74.9724580436, diff=0.000 mH
+
+Tests completed with exit code: 0
