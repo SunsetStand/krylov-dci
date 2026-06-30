@@ -86,9 +86,9 @@ def main():
     solver.nroots = NROOTS
     mc_dmrg.fcisolver = solver
     mc_dmrg.kernel()
-    edmrg = mc_dmrg.e_tot
+    edmrg = mc_dmrg.e_tot[0] if hasattr(mc_dmrg.e_tot, "__len__") else mc_dmrg.e_tot
     t_dmrg = time.perf_counter() - t1
-    print(f"  DMRG-CI E₀ = {edmrg:.8f} Ha  ({t_dmrg:.1f}s)", flush=True)
+    print(f"  DMRG-CI E0 = {float(edmrg):.8f} Ha  ({t_dmrg:.1f}s)", flush=True)
     
     # ================================================================
     # 2. FCI Reference (validation)
