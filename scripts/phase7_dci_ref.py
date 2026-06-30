@@ -253,12 +253,12 @@ def main():
         H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P + LEVEL_SHIFT, delta=use_d)
         ev, evecs = diagonalize_effective_H(H_eff)
 
-        dE0 = (ev[0] + ecore - e_fci[0]) * 1000
+        dE0 = (ev[0] - e_fci[0]) * 1000
 
         # Excited states
         ex = ""
         for st in range(1, min(NROOTS, len(ev))):
-            dEs = (ev[st] + ecore - e_fci[st]) * 1000
+            dEs = (ev[st] - e_fci[st]) * 1000
             ex += f"  S{st}:{1000*(ev[st]-ev[0]):.0f}mH(Δ={dEs:+.0f})"
 
         print(f"  {m:3d}  {dt:7d}  {dl:7d}  {dE0:+10.1f}  "
@@ -272,16 +272,15 @@ def main():
     print(f"{'='*60}")
     print(f"  {'State':>6s}  {'E(FCI)':>14s}  {'E(kDCI)':>14s}  {'Δ(mH)':>8s}")
     for st in range(min(NROOTS, len(e_fci))):
-        if st == 0:
-            Ek = ev[0] + ecore
-        elif st < len(ev):
+        if st < len(ev):
             Ek = ev[st] + ecore
         else:
             Ek = np.nan
+        E_ref_tot = e_fci[st] + ecore
         if not np.isnan(Ek):
-            print(f"  {st:6d}  {e_fci[st]:14.8f}  {Ek:14.8f}  {1000*(Ek-e_fci[st]):+8.1f}")
+            print(f"  {st:6d}  {E_ref_tot:14.8f}  {Ek:14.8f}  {1000*(Ek-E_ref_tot):+8.1f}")
         else:
-            print(f"  {st:6d}  {e_fci[st]:14.8f}  {'—':>14s}  {'—':>8s}")
+            print(f"  {st:6d}  {E_ref_tot:14.8f}  {'—':>14s}  {'—':>8s}")
 
     print(f"\nPhase 7 complete.\n")
 
