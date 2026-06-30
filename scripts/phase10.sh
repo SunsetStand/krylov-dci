@@ -4,7 +4,7 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
-#SBATCH --time=02:00:00
+#SBATCH --time=06:00:00
 export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1
 export LD_LIBRARY_PATH=/data/home/wangcx/LiYF4_Er3+/env/lib:$LD_LIBRARY_PATH
 cd /data/home/wangcx/krylov-dci
