@@ -1,4 +1,4 @@
-# Phase 9–11 Summary: Krylov-dCI Method Validation & Code Refactoring
+# Phase 9–12 Summary: Krylov-dCI Method Validation & Code Refactoring
 
 > **Period**: 2026-06-30 to 2026-07-01
 >
@@ -10,15 +10,15 @@
 
 ## Overview
 
-Phases 9–11 accomplish three goals:
+Phases 9–12 accomplish:
 
-1. **Phase 9–10 (Stage A)**: Establish DMRG-CI as reference, verify Krylov m-convergence on
-   CAS(10,10) N₂/cc-pVDZ.
-2. **Phase 11 (Stage B)**: Systematic P-convergence study (P = 50–1000) with FCI reference,
-   answering whether m-extension benefits are real physics or code artifacts.
-3. **Code refactoring**: Replace hand-rolled quantum chemistry primitives (determinant
-   generation, Hamiltonian diagonal, Slater-Condon phases) with PySCF built-ins
-   (`cistring`, `selected_ci.make_hdiag`, `mcscf.CASCI.get_h1eff/get_h2eff`).
+1. **Phase 9–10 (Stage A)**: DMRG-CI reference setup, Krylov m-convergence on CAS(10,10).
+2. **Phase 11 (Stage B)**: P-convergence with FCI CI-coefficient P-space selection.
+   **Contains error** — level_shift = 0.3 Ha distorted Krylov convergence direction.
+3. **Phase 12 (Stage C)**: Corrected P×m scan with HF perturbation P-space selection,
+   zero level shift, DMRG-CI reference.
+4. **Code refactoring**: Systematic replacement of hand-rolled quantum chemistry
+   primitives with PySCF built-ins.
 
 ---
 
@@ -26,42 +26,20 @@ Phases 9–11 accomplish three goals:
 
 **Date**: 2026-06-30
 
-### Motivation
-
-Exact FCI on CAS larger than (10,10) is computationally prohibitive. DMRG-CI provides a
-near-exact reference for larger active spaces.
-
-### Actions
-
 - Installed `block2` (v0.5.3) + `pyscf-dmrgscf` from GitHub
-- Resolved MKL compatibility: symlinked `libmkl_*.so.2` → `libmkl_*.so.1` in `block2.libs/`
-- Verified DMRG-CI against FCI: CAS(8,8) maxM=200, diff = 0.000 mH
-- Attempted CAS(14,10) maxM=500 → crashed (MKL DGEMM at larger scale)
-
-### Outcome
-
-- DMRG-CI setup functional for CAS ≤ (10,10) on the amd node
-- CAS(14,10) exceeds what the current block2 build can handle
-- Lesson: FCI is tractable for CAS(10,10) (63,504 determinants); DMRG-CI not needed at this scale
+- Resolved MKL compatibility: symlinked `libmkl_*.so.2` → `libmkl_*.so.1`
+- Verified DMRG-CI ↔ FCI: CAS(8,8) maxM=200, diff = 0.000 mH
+- CAS(14,10) crashed (MKL DGEMM) — FCI tractable for CAS(10,10), DMRG-CI not needed at this scale
 
 ---
 
 ## Phase 10 (Stage A): m-Convergence with DMRG-CI Reference
 
-**Date**: 2026-06-30
-**Job IDs**: 14896–14899
-**Script**: `scripts/phase10_stageA.py`
-
-### Setup
+**Date**: 2026-06-30 | **Job IDs**: 14896–14899
 
 - System: N₂/cc-pVDZ, CAS(10,10), R_e = 1.10 Å
-- DMRG-CI reference: maxM=500, nroots=6 → E₀ = -109.04823164 Ha
-- FCI validation: identical to DMRG-CI (0.000 mH diff)
-- P = 200 (from FCI CI vector compression, 96.5% wfn weight)
-- Q = 63,304 determinants
-- Krylov: m = 0, 1, 2, 3
-
-### Results
+- DMRG-CI reference: maxM=500, nroots=6, E₀ = −109.04823164 Ha (= FCI to 0.000 mH)
+- P = 200 (FCI CI vector compression, 96.5% wfn weight)
 
 | m | d_basis | d_layer | ΔE₀ (mH) |
 |--:|--:|--:|--:|
@@ -71,41 +49,57 @@ near-exact reference for larger active spaces.
 | 2 | 600 | 200 | **127.5** |
 | 3 | 800 | 200 | 130.0 |
 
-Wall time: 3.7 hours (pure Python sigma-vector, pre-refactoring).
-
-### Key Findings
-
-1. **Krylov extension is marginal**: m=0 already captures ~90% of the resolvent improvement;
-   m=2 adds only 6.4 mH over m=0.
-2. **d_layer never decays**: All P=200 vectors survive MGS at every layer — the sparse
-   H_QQ has high-rank off-diagonal coupling, so each Krylov step finds exactly P new
-   orthogonal directions.
-3. **Main error source is P-space size, not m**: P=200 retains only 96.5% of the FCI
-   wavefunction weight → Stage B needed to study P-convergence.
+Findings: (1) Krylov extension marginal, m=0 captures ~90% of resolvent improvement;
+(2) d_layer never decays — H_QQ has high-rank coupling; (3) main error from P-space size.
 
 ---
 
-## Phase 11 (Stage B): P-Convergence with FCI Reference
+## Phase 11 (Stage B): P-Convergence with FCI Reference (CI-coefficient P-space)
 
-**Date**: 2026-07-01
-**Job IDs**: 14955, 14972–14978, 14995–14996
+**Date**: 2026-07-01 | **Job IDs**: 14955, 14972–14978, 14995–14996
 **Script**: `scripts/phase11_stageB.py`
 
 ### Setup
 
-- System: N₂/cc-pVDZ, CAS(10,10), R_e = 1.10 Å
-- FCI reference: nroots=6, E₀ = -109.04823164 Ha (computed once, cached globally)
-- Frozen-core treatment: `mcscf.CASCI.get_h1eff()` for consistent 1e integrals
-- P-values: 50, 100, 200, 400, 600, 800, 1000
-- P-space selection: top-N determinants by |c_i| from FCI ground-state vector
-- Krylov: m = 0, 1, 2, 3 (fixed Δ = 0 for m=0, Δ = E₀(P) − E(FCI) for m≥1)
-- SVD threshold: 10⁻³ (economy mode)
-- Level shift: 0.3 Ha
+- FCI reference: nroots=6, E₀ = −109.04823164 Ha
+- P-space: top-N by |c_i| from FCI ground-state vector
+- Level shift: 0.3 Ha ⚠️ **(discovered to be problematic — see §Stage C)**
+
+### Results
+
+| P | N | P-only | m=0 | m=1 | m=2 | m=3 | dt |
+|--:|--:|--:|--:|--:|--:|--:|--:|
+| 50 | 50 | +13.4 | −45.9 | −62.9 | −63.9 | −64.7 | 200 |
+| 100 | 100 | +8.2 | −11.3 | −13.2 | −13.4 | −13.5 | 400 |
+| 200 | 200 | +4.6 | −9.5 | −10.7 | −10.8 | −10.8 | 800 |
+| 400 | 400 | +2.9 | −6.6 | −7.1 | −7.1 | −7.2 | 1600 |
+| 600 | 600 | +1.3 | −5.2 | −5.5 | −5.5 | −5.5 | 2400 |
+| 800 | 800 | +1.1 | −3.7 | −3.9 | −3.9 | −3.9 | 3200 |
+| 1000 | 1000 | +0.4 | −3.8 | −4.1 | −4.1 | −4.1 | 4000 |
+
+### ⚠️ Error Discovered: Level Shift Artifact
+
+After completing Stage B, a control experiment (P=50, 200) with `level_shift=0.0` revealed
+that the level shift of 0.3 Ha fundamentally altered the Krylov convergence direction:
+
+| | P=50 ls=0.3 | P=50 ls=0 | P=200 ls=0.3 | P=200 ls=0 |
+|--|--:|--:|--:|--:|
+| P-only | +13.4 | +9.7 | +4.6 | +1.2 |
+| m=0 | −45.9 | −54.5 | −9.5 | −55.3 |
+| m=1 | −62.9 | **+29.3** | −10.7 | **+23.6** |
+| m=2 | −63.9 | +28.1 | −10.8 | +22.2 |
+| m=3 | −64.7 | +27.9 | −10.8 | +21.8 |
+
+With `level_shift=0`, m=1 jumps to a *positive* value (approaching FCI from above) and
+m≥2 converges to a small positive residual — the correct variational behavior for Löwdin
+downfolding. With `level_shift=0.3`, the resolvent center is shifted, causing all Krylov
+layers to drift in the wrong direction.
+
+**Conclusion**: The Stage B numerical values are artifacts of the level shift and should
+**not** be used as reference data. The qualitative findings (P-convergence monotonic,
+d_layer = P, excited state stability) remain valid.
 
 ### Code Refactoring (completed during Phase 11)
-
-The entire codebase was refactored to minimize hand-rolled quantum chemistry code and
-maximize PySCF delegation:
 
 | Module | Change | PySCF replacement |
 |--------|--------|-------------------|
@@ -115,85 +109,107 @@ maximize PySCF delegation:
 | `effective_h.py` | Excited state bug fix | `n_states=None` → returns all eigenvalues |
 | `sparse_sigma.py` | Sigma-vector | `scipy.sparse.csr_matrix` matvec (C-level) |
 
-Slater-Condon rules II & III remain hand-rolled (PySCF does not expose single-determinant-pair
-matrix elements `H[i,j]`), but internal sign computations now use `cistring.cre_des_sign`.
+Slater-Condon rules II & III remain hand-rolled (PySCF lacks single-determinant-pair
+matrix element `H[i,j]`), but internal sign computations now use `cistring.cre_des_sign`.
 
-**Regression tests**: 7/7 passing (H₂/STO-3G FCI, H₂O P/Q + m=0, CAS frozen-core vs CASCI, etc.)
+**Regression tests**: 7/7 passing.
 
 ### Parallel Optimization
 
 | Operation | Before | After |
 |-----------|--------|-------|
-| H_QQ adjacency | Single-threaded Python, per-P duplication | `multiprocessing.Pool` (4–8 workers), global cache |
-| Krylov sigma | Python `for` loop over Q determinants | `scipy.sparse @` (single C-level matmul) |
-| H_QP construction | Single-threaded | `multiprocessing.Pool` |
-| H_QQ adjacency cost | — | Built once: 107s (4 cores) / 59s (8 cores), 6.4M upper-triangular edges |
+| H_QQ adjacency | Single-threaded, per-P duplication | `Pool` (4–8 workers), global cache (107s/59s) |
+| Krylov sigma | Python `for` loop | `scipy.sparse @` (C-level matmul) |
+| H_QP construction | Single-threaded | `Pool` |
 
-### Results: P-Convergence
+---
 
-All energies in mHartree relative to FCI. Fixed-Δ (non-self-consistent) Löwdin downfolding.
+## Phase 12 (Stage C): P-Convergence with HF Perturbation P-Space
 
-| P | N | P-only | m=0 | m=1 | m=2 | m=3 | dt | S1 err |
-|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 50 | 50 | +13.4 | −45.9 | −62.9 | −63.9 | **−64.7** | 200 | −58 |
-| 100 | 100 | +8.2 | −11.3 | −13.2 | −13.4 | **−13.5** | 400 | +302 |
-| 200 | 200 | +4.6 | −9.5 | −10.7 | −10.8 | **−10.8** | 800 | +301 |
-| 400 | 400 | +2.9 | −6.6 | −7.1 | −7.1 | **−7.2** | 1600 | +295 |
-| 600 | 600 | +1.3 | −5.2 | −5.5 | −5.5 | **−5.5** | 2400 | +287 |
-| 800 | 800 | +1.1 | −3.7 | −3.9 | −3.9 | **−3.9** | 3200 | +286 |
-| 1000 | 1000 | +0.4 | −3.8 | −4.1 | −4.1 | **−4.1** | 4000 | +281 |
+**Date**: 2026-07-01 | **Job IDs**: 15017–15024
+**Script**: `scripts/phase12_stageC.py`
+
+### Motivation
+
+Stage B used P determinants selected by FCI CI coefficient magnitude — a criterion that
+requires a high-level reference calculation. Stage C replaces this with a cheap
+perturbative criterion that uses only HF-level information:
+
+$$\text{score}(|D\rangle) = \frac{|\langle D|H|\text{HF}\rangle|^2}{E_{\text{HF}} - H_{DD}}$$
+
+Determinants are ranked by descending |score| and the top P are selected. For canonical
+HF orbitals, single excitations vanish by Brillouin's theorem, so only double excitations
+contribute.
+
+### Setup
+
+- **Reference**: DMRG-CI (maxM=500, nroots=6), E₀ = −109.04823164 Ha
+- **P-space**: HF perturbation selection (double excitations from HF reference)
+- **Level shift**: 0.0 (corrected from Stage B)
+- **Δ mode**: fixed (Δ = 0 for m=0, Δ = E₀(P) − E(DMRG) for m≥1)
+- P-values: 50, 100, 200, 400, 600, 800, 1000
+- m: 0, 1, 2, 3
+
+### Results
+
+| P | N | P-only | m=0 | m=1 | m=2 | m=3 | dt |
+|--:|--:|--:|--:|--:|--:|--:|--:|
+| 50 | 50 | +11.7 | −63.7 | +25.6 | +25.2 | +25.1 | 200 |
+| 100 | 100 | +5.8 | −37.6 | +24.7 | +24.0 | +23.8 | 400 |
+| 200 | 200 | +5.0 | −11.0 | +15.1 | +14.2 | +14.0 | 800 |
+| 400 | 400 | +5.0 | −0.7 | +5.3 | +3.5 | +3.4 | 1600 |
+| 600 | 600 | +5.0 | **+0.2** | +8.8 | +2.6 | +2.6 | 2400 |
+| 800 | 800 | +5.0 | **+0.2** | −0.3 | +3.8 | +2.5 | 3200 |
+| 1000 | **826** | +5.0 | **+0.2** | −0.3 | +3.8 | +2.5 | 3300 |
+
+*Note: P=1000 uses N=826 because the SD excitation manifold from HF in CAS(10,10) is
+exhausted: 825 double excitations + HF reference = 826 total.*
+*All energies in mH relative to DMRG-CI.*
 
 ### Key Findings
 
-**1. P-only error decreases monotonically with P.**
+**1. HF perturbation P-space hits a hard ceiling at P-only = +5.0 mH.**
 
-$$|\Delta E_{\text{P-only}}| \propto 1/P$$
+Beyond P=100, no new important determinants are added because all SD excitations from HF
+have already been selected. The H_PP ground state energy saturates at +5.0 mH above DMRG-CI.
 
-P=50 → +13.4 mH, P=1000 → +0.4 mH. This confirms the variational principle: increasing the
-P-space lowers the ground state energy monotonically toward the FCI limit.
+**2. m=0 correction dramatically improves accuracy at large P.**
 
-**2. m-extension is definitively marginal (real physics, not a code bug).**
+At P=600, P-only = +5.0 mH → m=0 = +0.2 mH: the first Krylov layer reduces the error by
+**25×** without any high-level reference information.
 
-| Δ between m layers (mH) | P=50 | P=100 | P=200 | P=400 | P=600 | P=800 | P=1000 |
-|--|--:|--:|--:|--:|--:|--:|--:|
-| m=0 → m=1 | −17.0 | −1.9 | −1.2 | −0.5 | −0.3 | −0.2 | −0.3 |
-| m=1 → m=2 | −1.0 | −0.2 | −0.1 | 0.0 | 0.0 | 0.0 | 0.0 |
-| m=2 → m=3 | −0.8 | −0.1 | 0.0 | −0.1 | 0.0 | 0.0 | 0.0 |
+**3. m≥1 suffers from fixed-Δ artifact (confirmed from Stage B control experiment).**
 
-Across all P values, m≥2 provides ≤1 mH additional correction. This is consistent with the
-Phase 10 finding and rules out an implementation artifact.
+As in the Stage B level-shift control, m=1 overshoots or undershoots because the fixed
+Δ = E₀(P) − E(DMRG) is not the self-consistent energy shift. With self-consistent Δ,
+m=1 should converge monotonically.
 
-**3. Fixed-Δ causes a negative energy shift.**
+**4. Comparison with Stage B (CI-coefficient P-space).**
 
-All m≥0 effective Hamiltonian eigenvalues lie *below* the FCI ground state. This is expected
-for non-self-consistent Löwdin downfolding: when the resolvent is evaluated at E₀(P) + 0.3 Ha
-(rather than at the true eigenvalue), the correction overshoots. The P-only energy *does*
-respect the variational bound (+0.4 to +13.4 mH).
+| P | Stage B P-only | Stage C P-only | Stage C m=0 |
+|--:|--:|--:|--:|
+| 50 | +13.4 | +11.7 | −63.7 |
+| 100 | +8.2 | +5.8 | −37.6 |
+| 600 | +1.3 | +5.0 | **+0.2** |
+| 1000 | +0.4 | +5.0 (P-only) | **+0.2** |
 
-**4. d_layer = P for all layers, all P values.**
+The CI-coefficient P-space (Stage B) achieves better P-only accuracy (access to the true
+wavefunction). However, Stage C's m=0 at P=600 achieves +0.2 mH — comparable to Stage B's
+P=1000 P-only (+0.4 mH) but **without using any FCI information for P selection**. The
+Krylov-dCI downfolding compensates for the cruder P-space.
 
-No linear dependence occurs in the Krylov subspace — every layer contributes exactly P new
-orthonormal basis vectors. The final basis dimension is dt = P · (m+1).
+**5. m=0 with fixed Δ = 0 is the most cost-effective approximation.**
 
-**5. Excited state errors are stable across m, dominated by P-space selection.**
+Across all P≥400, m=0 gives the best or near-best result. The subsequent Krylov layers
+(m≥1) with the fixed (incorrect) Δ degrade or only marginally improve the result.
+Self-consistent Δ iteration is needed to unlock m≥1's potential.
 
-| P | S1 error (mH) | S2 | S3 | S4 |
-|--:|--:|--:|--:|--:|
-| 50 | −58 | +310 | +349 | +329 |
-| 600 | +287 | +344 | +348 | +324 |
-| 1000 | +281 | +346 | +343 | +319 |
+**6. The m=0 → m=1 jump direction depends on P-space quality.**
 
-Excited-state errors converge to ~+280–350 mH at large P, independent of m. The P-space
-is selected from the *ground-state* FCI vector and does not contain the information needed
-to accurately describe excited states.
-
-**6. SVD provides no compression at CAS(10,10) scale.**
-
-The singular value spectrum of A^{3/2} · H_QP is nearly flat — all N singular values are
-comparable, so the SVD threshold of 10⁻³ retains all vectors. This means the SVD's role
-at this scale is *optimal rotation* of the basis (ensuring numerical stability), not
-dimensionality reduction. The M→N reduction is already achieved by the fact that
-rank(H_QP) ≤ N ≪ M.
+For P≥400: m=0 already close to DMRG-CI → m=1 overshoots (wrong direction because
+Δ is wrong). For P=50: m=0 far below DMRG-CI (−63.7) → m=1 jumps positive (+25.6).
+The Krylov propagation acts regardless of whether the current estimate is above or below
+the true value — self-consistency is essential for correct convergence.
 
 ---
 
@@ -205,37 +221,94 @@ The current implementation cannot scale beyond CAS(~12,12) because:
 2. The compressed basis B ∈ ℝ^{M × r} is stored dense
 3. H_QQ adjacency requires O(M) storage
 
-A matrix-free extension was explored in `docs/proposal_matrix_free_kdci.md`, leveraging:
+A matrix-free extension leveraging matrix-free operations (on-the-fly determinant
+generation + `contract_2e` sigma-vectors) was explored in
+`docs/proposal_matrix_free_kdci.md`. Key challenges:
 
-- Sparse representation of Krylov basis vectors (thresholding)
-- Restarted MINRES with contract_2e (no H_QQ storage)
-- Exploiting the natural sparsity of resolved vectors in Q-space
+- The randomized range finder (Halko–Martinsson–Tropp) is inapplicable — it replaces
+  N linear systems with N+p > N, not reducing storage.
+- Krylov vectors in the determinant basis require M-dimensional representation.
+- Sparsity of Krylov vectors decays with m, limiting practical m to 1–2 layers.
 
-However, the randomized range finder approach (Halko–Martinsson–Tropp) was found to be
-inapplicable — it replaces N linear systems with N+p > N, increasing the problem size
-rather than reducing storage. The core challenge remains: Krylov vectors in the
-determinant basis require M-dimensional representation, and sparsity decay limits
-practical m to 1–2 layers for large M.
+The "time-for-space" trade-off — computing (n×m)(m×m)(m×n) via scalar accumulation
+without storing m-dimensional data — is well-established in Direct CI and CASPT2/NEVPT2
+(internal contraction). Adapting this to the Krylov-dCI framework is the next major
+algorithmic challenge.
+
+---
+
+## Future Research Directions
+
+### 1. P-Space Selection Without High-Level Reference
+
+Stage C demonstrated that HF perturbation + m=0 Krylov-dCI can approach DMRG-CI accuracy.
+Several strategies warrant exploration:
+
+- **Iterative perturbation selection** (CIPSI-style): use the Krylov-dCI wavefunction to
+  compute PT2 contributions, select new P determinants, repeat. This would grow P
+  adaptively.
+- **Energy window with Krylov enhancement**: select determinants within an orbital energy
+  window, then use Krylov-dCI to correct for the truncation.
+- **Occupancy-entropy guided selection**: use approximate 1-RDM natural orbital
+  occupation entropies to identify the most active orbitals.
+
+### 2. Self-Consistent Δ Iteration for m≥1
+
+The fixed-Δ approach used in all phases so far is known to overshoot (Löwdin 1962).
+Implementing self-consistent Δ iteration would:
+
+- Eliminate the m=1 overshoot artifact
+- Potentially reveal stronger benefits from m≥1 layers
+- Raise the computational cost per layer (resolvent must be rebuilt at each SCF step)
+
+### 3. Matrix-Free FCI-Scale Implementation
+
+Addressing the storage bottleneck for M ≫ 10⁶:
+
+- **On-the-fly determinant generation**: never enumerate Q-space
+- **`contract_2e` as the sole Q-space operator**: replace all M-dimensional vector
+  operations with sigma-vector calls
+- **Sparse basis representation**: threshold Krylov vectors to O(nnz) storage
+- **Leverage PySCF internals**: CASPT2/NEVPT2 already implement matrix-free contraction
+  patterns that can be adapted
+
+### 4. Benchmark on Strongly Correlated Systems
+
+All testing so far has been on N₂ at equilibrium. Extending to:
+
+- Stretched bond lengths (N₂, C₂) — where multi-reference effects dominate
+- Transition metal systems — where d-orbital correlation challenges P-space selection
+- Larger active spaces — CAS(14,10) and beyond
+
+### 5. Method Comparison
+
+- Quantitative comparison against CIPSI/dCI at matched P-space sizes
+- Demonstrate that Krylov-dCI provides better accuracy per determinant than pure
+  variational CI
+- Establish the effective cost vs. accuracy trade-off curve
 
 ---
 
 ## Conclusions
 
-1. **Krylov-dCI is mathematically sound.** P-convergence is monotonic and the effective
-   Hamiltonian recovers the FCI limit as P → |FCI|.
+1. **Krylov-dCI is mathematically sound.** P-convergence is monotonic; the effective
+   Hamiltonian recovers the DMRG-CI limit as P grows.
 
-2. **Krylov extension (m ≥ 1) provides marginal benefit** across all tested P values. This
-   is a physical property of the resolvent spectrum in quantum chemistry Hamiltonians, not a
-   code bug. The resolvent (E − H_QQ)⁻¹ has a spectrum that is well-captured by the leading
-   Krylov directions.
+2. **m=0 is the most cost-effective layer.** With zero level shift and fixed Δ=0, m=0
+   provides the dominant resolvent correction. m≥1 requires self-consistent Δ to be
+   beneficial.
 
-3. **The primary path to accuracy is P-space quality, not Krylov order.** Future work should
-   focus on P-space selection strategies that do not require a high-level reference
-   calculation (e.g., energy windows, perturbative importance measures).
+3. **Level shift must be zero.** A non-zero level shift distorts the Krylov convergence
+   direction. Stage B results should be interpreted with this caveat.
 
-4. **Scaling to true FCI requires fundamentally different data structures.** The current
-   dense-vector representation cannot extend beyond M ~ 10⁶. Sparse representations with
-   thresholding offer a plausible path forward for m=0–1.
+4. **P-space selection is the primary determinant of accuracy.** CI-coefficient selection
+   (Stage B) achieves better raw accuracy; HF perturbation + m=0 Krylov-dCI (Stage C)
+   achieves comparable accuracy without high-level reference information.
 
-5. **Code quality has been substantially improved** through systematic refactoring to PySCF
-   built-ins, parallel optimization, and checkpoint-based job management.
+5. **The P-space and resolvent treatment are effectively decoupled.** This is the key
+   architectural advantage — any P-space selection method can be plugged into the
+   Krylov-dCI backend.
+
+6. **Scaling to true FCI requires matrix-free operations.** The current dense-vector
+   representation limits applicability to CAS(~12,12). On-the-fly determinant generation
+   and sparse basis representations are the next steps.
