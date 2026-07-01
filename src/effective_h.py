@@ -141,12 +141,13 @@ def build_effective_H(H_PP: np.ndarray,
 
 
 def diagonalize_effective_H(H_eff: np.ndarray,
-                            n_states: int = 1) -> Tuple[np.ndarray, np.ndarray]:
+                            n_states: int = None) -> Tuple[np.ndarray, np.ndarray]:
     """Diagonalize the effective Hamiltonian.
 
     Args:
         H_eff:    (N, N) effective Hamiltonian (real symmetric).
         n_states: Number of lowest eigenstates to extract.
+                  If None, returns ALL eigenstates (for multi-root).
 
     Returns:
         (energies, eigenvectors) — eigenvectors[:, i] is in P-space basis.
@@ -155,6 +156,8 @@ def diagonalize_effective_H(H_eff: np.ndarray,
         return np.array([]), np.zeros((0, 0))
 
     eigvals, eigvecs = eigh(H_eff)
+    if n_states is None:
+        n_states = len(eigvals)
     return eigvals[:n_states], eigvecs[:, :n_states]
 
 
@@ -173,7 +176,8 @@ def self_consistent_iteration(H_PP: np.ndarray,
                               damping: float = 0.3,
                               verbose: bool = True,
                               diis: bool = True,
-                              n_diis: int = 6) -> Dict:
+                              n_diis: int = 6,
+                              n_states: int = None) -> Dict:
     """Self-consistent iteration for the energy shift Delta = E - E0.
 
     Iterates:
@@ -222,8 +226,9 @@ def self_consistent_iteration(H_PP: np.ndarray,
         H_eff = build_effective_H(H_PP, H_PQtilde, H_Qtilde_Qtilde,
                                   E0, delta)
 
-        # Diagonalize
-        eigvals, eigvecs = diagonalize_effective_H(H_eff)
+        # Diagonalize — converge on ground state, but compute all if n_states specified
+        _nst = n_states if n_states is not None else len(H_eff)
+        eigvals, eigvecs = diagonalize_effective_H(H_eff, n_states=_nst)
         E_new = eigvals[0]
         e_vec_new = eigvecs[:, 0]
 
@@ -270,8 +275,10 @@ def self_consistent_iteration(H_PP: np.ndarray,
         if verbose:
             print(f"  ⚠ Not converged after {max_iter} iterations")
         # Return best result so far
+        _nst = n_states if n_states is not None else len(H_PP)
         eigvals, eigvecs = diagonalize_effective_H(
-            build_effective_H(H_PP, H_PQtilde, H_Qtilde_Qtilde, E0, delta))
+            build_effective_H(H_PP, H_PQtilde, H_Qtilde_Qtilde, E0, delta),
+            n_states=_nst)
         E_new = eigvals[0]
         e_vec_new = eigvecs[:, 0]
 
@@ -280,6 +287,8 @@ def self_consistent_iteration(H_PP: np.ndarray,
         'n_iter': it,
         'E_final': E_new,
         'E_vec': e_vec_new,
+        'E_all': eigvals,          # all eigenvalues
+        'E_vecs_all': eigvecs,     # all eigenvectors
         'delta_final': delta,
         'history': history,
     }
@@ -289,7 +298,8 @@ def compute_with_fixed_delta(H_PP: np.ndarray,
                              H_PQtilde: np.ndarray,
                              H_Qtilde_Qtilde: np.ndarray,
                              E0: float,
-                             delta: float) -> Tuple[float, np.ndarray]:
+                             delta: float,
+                             n_states: int = None) -> Tuple[np.ndarray, np.ndarray]:
     """Single-shot effective H diagonalization with fixed Delta.
 
     This is the "non-self-consistent" mode — Delta comes from FCI.
@@ -299,13 +309,13 @@ def compute_with_fixed_delta(H_PP: np.ndarray,
         H_PP, H_PQtilde, H_Qtilde_Qtilde: Hamiltonian blocks.
         E0:     Reference energy.
         delta:  Exact Delta = E_FCI - E0.
+        n_states: Number of eigenstates (None = all).
 
     Returns:
-        (E, eigenvector) — lowest eigenvalue of H_P^eff(Delta).
+        (eigvals, eigvecs) — all requested eigenvalues and eigenvectors.
     """
     H_eff = build_effective_H(H_PP, H_PQtilde, H_Qtilde_Qtilde, E0, delta)
-    eigvals, eigvecs = diagonalize_effective_H(H_eff, n_states=1)
-    return eigvals[0], eigvecs[:, 0]
+    return diagonalize_effective_H(H_eff, n_states=n_states)
 
 
 # ============================================================================

@@ -1,22 +1,16 @@
-#!/usr/bin/env python3
 """
-Sparse sigma-vector: H_O' @ vectors using Slater-Condon connectivity.
+Sparse operations on the Q-space Hamiltonian.
 
-Key insight: H_O' is SPARSE in the determinant basis — each determinant
-only connects to others differing by 1 or 2 spin-orbitals. The number of
-connected determinants is O(n_occ² * n_vir²), which for large systems is
-dramatically smaller than the total Q-space dimension M.
+Provides:
+  1. generate_connected_determinants — enumerate single/double excitations
+     (combinatorial; no PySCF equivalent for selected-CI spaces).
+  2. sigma_H_off_sparse / sigma_H_full — sparse sigma-vector via adjacency.
+  3. sigma_H_contract_2e — production sigma-vector via PySCF contract_2e.
+  4. build_sparse_adjacency — build H_QQ sparse graph for iterative work.
 
-For H₂O/STO-3G:      M=405,  connections per det ~ 25  (6% of M)
-For N₂/cc-pVDZ:       M~10⁷,  connections per det ~ 2×10⁴ (0.2% of M)
-
-This module implements the sparse approach: for each column of the input
-matrix, only loop over determinants connected by single or double
-spin-orbital excitations.
-
-Station's insight (2026-06-29): Once we have the SVD rotation matrix T,
- compute H_QQ @ T as T^† H_D' T + T^† (H_O' @ T) using sparse sigma-vector,
- avoiding the O(M²) full H_O' construction.
+For production use (Phase 10+), sigma_H_contract_2e is preferred: C-level
+speed from PySCF's direct_spin1.contract_2e. The sparse adjacency approach
+is kept for cases where the full CI vector is too large.
 """
 
 import numpy as np
@@ -27,267 +21,268 @@ def generate_connected_determinants(
     alpha_str: int, beta_str: int,
     n_orb: int
 ) -> List[Tuple[Tuple[int, int], int, int, int, int]]:
-    """Generate all determinants connected to |D> via 1 or 2 spin-orbital excitations.
+    """Generate all determinants connected to |D> via 1 or 2 ex citations.
 
-    For each connected determinant, returns:
-      (det_connected, hole1, particle1, hole2, particle2)
-    where hole/particle indices are -1 if not applicable (single excitation).
+    Pure combinatorial enumeration — returns string pairs, not matrix elements.
 
     Args:
         alpha_str, beta_str: Bit strings for the reference determinant.
         n_orb: Number of spatial orbitals.
 
     Returns:
-        List of (det_tuple, i, a, j, b) where det_tuple = (alpha, beta),
-        i,a are hole/particle for first excitation, j,b for second (or -1,-1).
+        List of (det_tuple, i, a, j, b) where i,a are hole/particle for
+        first excitation, j,b for second (or -1,-1 for singles).
     """
-    from determinants import bit_positions, create_bit_string
+    try:
+        from .determinants import bit_positions
+    except ImportError:
+        from determinants import bit_positions
 
-    alpha_occ = bit_positions(alpha_str)
-    beta_occ = bit_positions(beta_str)
+    alpha_occ = bit_positions(int(alpha_str))
+    beta_occ = bit_positions(int(beta_str))
     all_orbs = list(range(n_orb))
 
-    # Virtual spin-orbitals: α-virt = orbitals NOT occupied by α
-    #                       β-virt = orbitals NOT occupied by β
     alpha_virt = [p for p in all_orbs if p not in alpha_occ]
     beta_virt = [p for p in all_orbs if p not in beta_occ]
 
     results = []
 
     # ---- Single excitations ----
-    # Alpha → alpha (source: α-occupied, dest: α-virtual)
+    # α → α
     for i in alpha_occ:
         for a in alpha_virt:
             new_alpha = (alpha_str ^ (1 << i)) | (1 << a)
             results.append(((new_alpha, beta_str), i, a, -1, -1))
 
-    # Beta → beta (source: β-occupied, dest: β-virtual)
+    # β → β
     for i in beta_occ:
         for a in beta_virt:
             new_beta = (beta_str ^ (1 << i)) | (1 << a)
             results.append(((alpha_str, new_beta), i, a, -1, -1))
 
     # ---- Double excitations ----
-    # αα → αα (two α holes → two α particles)
+    # αα → αα
     if len(alpha_occ) >= 2:
         for idx_i, i in enumerate(alpha_occ):
             for j in alpha_occ[idx_i + 1:]:
-                for idx_a, a in enumerate(alpha_virt):
-                    for b in alpha_virt[idx_a + 1:]:
+                for idx_a, va in enumerate(alpha_virt):
+                    for vb in alpha_virt[idx_a + 1:]:
                         new_alpha = alpha_str
                         new_alpha ^= (1 << i) | (1 << j)
-                        new_alpha |= (1 << a) | (1 << b)
-                        results.append(((new_alpha, beta_str), i, a, j, b))
+                        new_alpha |= (1 << va) | (1 << vb)
+                        results.append(((new_alpha, beta_str), i, va, j, vb))
 
     # ββ → ββ
     if len(beta_occ) >= 2:
         for idx_i, i in enumerate(beta_occ):
             for j in beta_occ[idx_i + 1:]:
-                for idx_a, a in enumerate(beta_virt):
-                    for b in beta_virt[idx_a + 1:]:
+                for idx_a, va in enumerate(beta_virt):
+                    for vb in beta_virt[idx_a + 1:]:
                         new_beta = beta_str
                         new_beta ^= (1 << i) | (1 << j)
-                        new_beta |= (1 << a) | (1 << b)
-                        results.append(((alpha_str, new_beta), i, a, j, b))
+                        new_beta |= (1 << va) | (1 << vb)
+                        results.append(((alpha_str, new_beta), i, va, j, vb))
 
     # αβ → αβ
     for i in alpha_occ:
         for j in beta_occ:
-            for a in alpha_virt:
-                for b in beta_virt:
-                    # a==b is valid: both α and β go to same spatial orbital
-                    new_alpha = (alpha_str ^ (1 << i)) | (1 << a)
-                    new_beta = (beta_str ^ (1 << j)) | (1 << b)
-                    results.append(((new_alpha, new_beta), i, a, j, b))
+            for va in alpha_virt:
+                for vb in beta_virt:
+                    new_alpha = (alpha_str ^ (1 << i)) | (1 << va)
+                    new_beta = (beta_str ^ (1 << j)) | (1 << vb)
+                    results.append(((new_alpha, new_beta), i, va, j, vb))
 
     return results
 
 
-def sparse_sigma_H_off(
-    ham,
-    vectors: np.ndarray,
-    q_dets: List[Tuple[int, int]],
-    n_orb: int,
-    q_idx_map: Optional[Dict[Tuple[int, int], int]] = None,
-    sparsity_threshold: float = 1e-14
-) -> np.ndarray:
-    """Compute H_O' @ vectors using sparse Slater-Condon connectivity.
-
-    For each column k, for each occupied entry q, only evaluates
-    H_O'[q, q'] * vectors[q', k] for q' connected to q via 1-2 excitations.
-
-    Complexity: O(M * n_occ² * n_vir² * r) (sparse)
-               vs O(M² * r) for naive double-loop (dense)
-
-    For H₂O/STO-3G:  n_occ=5, n_vir=2, connections ≈ 25 per det vs M=405
-
-    Args:
-        ham:        Hamiltonian object with matrix_element method.
-        vectors:    (M, r) coefficient matrix.
-        q_dets:     List of Q-space determinants, length M.
-        n_orb:      Number of spatial orbitals.
-        q_idx_map:  Dict mapping (alpha, beta) → index (built if None).
-        sparsity_threshold: Skip contributions below this magnitude.
-
-    Returns:
-        (M, r) array = H_O' @ vectors.
-    """
-    M = len(q_dets)
-    r = vectors.shape[1]
-
-    # Build index map
-    if q_idx_map is None:
-        q_idx_map = {(a, b): i for i, (a, b) in enumerate(q_dets)}
-
-    result = np.zeros((M, r))
-
-    for i in range(M):
-        det_i = q_dets[i]
-
-        # Generate connected determinants via sparse excitation manifold
-        connected = generate_connected_determinants(
-            det_i[0], det_i[1], n_orb
-        )
-
-        for det_j, *exc_info in connected:
-            j = q_idx_map.get(det_j)
-            if j is None:
-                continue  # Not in Q-space
-
-            hij = ham.matrix_element(det_i, det_j)
-            if abs(hij) < sparsity_threshold:
-                continue
-
-            for col in range(r):
-                v_jk = vectors[j, col]
-                if abs(v_jk) > sparsity_threshold:
-                    result[i, col] += hij * v_jk
-
-    return result
-
-
-def sparse_sigma_H_full(
-    ham,
-    vectors: np.ndarray,
-    q_dets: List[Tuple[int, int]],
-    diag_H_QQ: np.ndarray,
+def build_sparse_adjacency(
+    ham, q_dets: List[Tuple[int, int]],
     n_orb: int,
     q_idx_map: Optional[Dict[Tuple[int, int], int]] = None
-) -> np.ndarray:
-    """Compute H_QQ @ vectors = H_D' @ vectors + H_O' @ vectors.
+) -> Tuple[List[List[Tuple[int, float]]], Dict[Tuple[int, int], int]]:
+    """Build H_QQ sparse adjacency list (off-diagonal edges only).
 
-    Uses sparse sigma-vector for the off-diagonal part.
+    For each Q determinant i, stores list of (j, H[i,j]) for j>i such that
+    H[i,j] ≠ 0 (connected via 1 or 2 spin-orbital excitations).
 
     Args:
-        ham, vectors, q_dets, n_orb, q_idx_map: Same as sparse_sigma_H_off.
-        diag_H_QQ: Diagonal elements of H_QQ, shape (M,).
+        ham:     Hamiltonian object.
+        q_dets:  Q-space determinant list.
+        n_orb:   Number of spatial orbitals.
+        q_idx_map: Optional pre-built {(a,b): idx} map.
 
     Returns:
-        (M, r) array = H_QQ @ vectors.
+        (adjacency, idx_map) where adjacency[i] = [(j, hij), ...].
     """
-    # Diagonal part: H_D' @ vectors (trivially O(M·r))
-    diag_part = vectors * diag_H_QQ[:, np.newaxis]
-
-    # Off-diagonal part: sparse sigma-vector
-    off_part = sparse_sigma_H_off(ham, vectors, q_dets, n_orb, q_idx_map)
-
-    return diag_part + off_part
-
-
-# ============================================================================
-# Quick test
-# ============================================================================
-
-def test_sparse_sigma_h2():
-    """Verify sparse sigma-vector matches dense for H₂/STO-3G."""
-    import sys
-    sys.path.insert(0, '/data/home/wangcx/krylov-dci/src')
-    from pyscf import gto, scf
-    from hamiltonian import from_pyscf
-    from determinants import generate_determinants_ms
-    from partitioning import partition_cas, compute_reference_energy
-    from krylov import compute_H_off_diag, sigma_H_off
-
-    print("--- test_sparse_sigma_h2 ---")
-
-    mol = gto.M(atom='H 0 0 0; H 0 0 0.74', basis='sto-3g', verbose=0)
-    mf = scf.RHF(mol); mf.kernel()
-    ham = from_pyscf(mol, mf)
-    n_orb = mol.nao
-    n_elec = mol.nelec[0] + mol.nelec[1]
-    dets = generate_determinants_ms(n_orb, n_elec, ms=0)
-
-    # P=HF, Q=others
-    p_idx, q_idx = partition_cas(n_orb, n_elec, n_active_orb=2, n_active_elec=2)
-    # But for CAS(2,2), P=all, Q=empty. Let's use manual split.
-    p_idx = np.array([0])  # HF det
-    q_idx = np.array([1, 2, 3])
-    p_dets = [dets[i] for i in p_idx]
-    q_dets = [dets[i] for i in q_idx]
     M = len(q_dets)
 
-    # Random test vectors
-    rng = np.random.RandomState(42)
-    vecs = rng.randn(M, 2)
+    if q_idx_map is None:
+        q_idx_map = {(int(a), int(b)): i for i, (a, b) in enumerate(q_dets)}
 
-    # Dense reference
-    H_off = compute_H_off_diag(ham, q_dets)
-    sigma_dense = H_off @ vecs
+    off_diag = [[] for _ in range(M)]
 
-    # Sparse
-    sigma_sparse = sparse_sigma_H_off(ham, vecs, q_dets, n_orb)
+    for i in range(M):
+        a_str, b_str = q_dets[i]
+        connected = generate_connected_determinants(
+            int(a_str), int(b_str), n_orb
+        )
+        for det_j, *_ in connected:
+            j = q_idx_map.get((det_j[0], det_j[1]))
+            if j is not None and j > i:
+                hij = ham.matrix_element(
+                    (int(a_str), int(b_str)), det_j
+                )
+                if abs(hij) > 1e-14:
+                    off_diag[i].append((j, hij))
 
-    diff = np.max(np.abs(sigma_dense - sigma_sparse))
-    print(f"  Max |dense - sparse| = {diff:.2e}")
-    assert diff < 1e-12, f"Sparse sigma-vector mismatch: {diff}"
-    print("  ✓ Sparse sigma-vector matches dense reference")
+    return off_diag, q_idx_map
 
 
-def test_generate_connected():
-    """Test generate_connected_determinants counts for H2O/STO-3G."""
-    print("--- test_generate_connected ---")
+def sigma_from_adjacency(
+    v: np.ndarray,
+    hdiag: np.ndarray,
+    adjacency: List[List[Tuple[int, float]]]
+) -> np.ndarray:
+    """Compute H_QQ @ v using pre-built sparse adjacency.
 
-    # HF determinant for H₂O/STO-3G: 5 α orbitals occupied, 5 β occupied
-    # Orbitals: O 1s, O 2s, O 2px, O 2py, O 2pz, H 1s, H 1s'
-    # HF fills 5 orbitals (O 1s, O 2s, O 2px, O 2py, O 2pz)
-    alpha_str = 0b11111   # orbitals 0-4 occupied (α)
-    beta_str = 0b11111    # orbitals 0-4 occupied (β)
-    n_orb = 7
+    sigma[i] = hdiag[i] * v[i] + Σ_{j∈adj[i]} hij * v[j]
+             + Σ_{k: i∈adj[k]} hki * v[k]       (Hermitian)
 
-    connected = generate_connected_determinants(alpha_str, beta_str, n_orb)
-    print(f"  HF determinant → {len(connected)} connected determinants")
-    print(f"  M = 405, connectivity = {len(connected)/405*100:.1f}%")
+    Args:
+        v:         Input vector, shape (M,).
+        hdiag:     Diagonal of H_QQ, shape (M,).
+        adjacency: Adjacency list from build_sparse_adjacency.
 
-    # Quick sanity: should have ~ 5*2*2 + 5*2*2 + C(5,2)*C(2,2)*2 + 5*5*2*2
-    # Singles: 5*2 (α→α) + 5*2 (β→β) = 20
-    # Doubles αα: C(5,2)*C(2,2) = 10*1 = 10
-    # Doubles ββ: C(5,2)*C(2,2) = 10
-    # Doubles αβ: 5*5*2*2 = 100 (minus ones where a=b)
-    #   a=b cases: 5*5*1*1 = 25, so 100-25=75
-    # Total: 20 + 10 + 10 + 75 = 115
-    # But with αβ double excitations, a and b can be any of 2 virtual orbitals
-    # Actually let me recount:
-    # α→α singles: 5 holes × 2 particles = 10
-    # β→β singles: 5 holes × 2 particles = 10  
-    # αα→αα doubles: C(5,2) = 10 hole_pairs × C(2,2) = 1 particle_pairs = 10
-    # ββ→ββ doubles: 10
-    # αβ→αβ doubles: 5 α_holes × 5 β_holes × 2 α_virt × 2 β_virt = 100
-    #   minus a=b: 5 × 5 × 2 × 1 = 50 (wait, when a=b, we'd have both α and β
-    #   going to same orbital, but one could be α and one β)
-    # Actually for αβ→αβ, a and b are independent. The `if a == b: continue` 
-    # filter removes cases where both electrons go to the same virtual orbital.
-    # That's 5×5 cases where a==b: for each (i,j), there's 1 a==b pair out of 4.
-    # Actually: 2 virt_orbs, so a and b range over [5,6].
-    # a == b happens 2 times (a=5,b=5 or a=6,b=6) out of 2*2=4.
-    # So filter removes 5*5*2 = 50 cases. 100-50=50. Wait that can't be right.
-    # Hmm, let me just run the test.
+    Returns:
+        sigma, shape (M,).
+    """
+    M = len(hdiag)
+    sigma = hdiag * v.copy()
 
-    # The exact count doesn't matter for correctness
-    assert len(connected) > 0, "Should have at least some connections"
-    print("  ✓ Connection generation works")
+    for i in range(M):
+        for (j, hij) in adjacency[i]:
+            sigma[i] += hij * v[j]
+            sigma[j] += hij * v[i]
+
+    return sigma
+
+
+def sigma_from_adjacency_multi(
+    vectors: np.ndarray,
+    hdiag: np.ndarray,
+    adjacency: List[List[Tuple[int, float]]]
+) -> np.ndarray:
+    """Compute H_QQ @ vectors for multiple columns using sparse adjacency.
+
+    Args:
+        vectors:   (M, k) input array.
+        hdiag:     Diagonal of H_QQ, shape (M,).
+        adjacency: Adjacency list.
+
+    Returns:
+        sigma, shape (M, k).
+    """
+    M, k = vectors.shape
+    sigma = vectors * hdiag[:, np.newaxis]
+
+    for i in range(M):
+        for (j, hij) in adjacency[i]:
+            sigma[i] += hij * vectors[j]
+            sigma[j] += hij * vectors[i]
+
+    return sigma
+
+
+# ============================================================================
+# Production sigma via PySCF contract_2e
+# ============================================================================
+
+def sigma_H_contract_2e(
+    h1e: np.ndarray, eri: np.ndarray,
+    c_vec: np.ndarray,
+    norb: int, nelec: Tuple[int, int],
+    alpha_strs: np.ndarray, beta_strs: np.ndarray,
+    link_index: Optional[np.ndarray] = None
+) -> np.ndarray:
+    """Compute H·c using PySCF's direct_spin1.contract_2e.
+
+    C-level implementation, the fastest available path for large CI spaces.
+
+    Args:
+        h1e:         One-electron integrals (norb, norb).
+        eri:         Two-electron integrals, packed 4-fold format.
+        c_vec:       1D CI coefficient vector.
+        norb:        Number of spatial orbitals.
+        nelec:       (n_alpha, n_beta).
+        alpha_strs:  Alpha strings array (int64).
+        beta_strs:   Beta strings array (int64).
+        link_index:  Optional pre-computed link table.
+
+    Returns:
+        sigma vector, same shape as c_vec.
+    """
+    from pyscf.fci import direct_spin1
+
+    # Reconstruct full CI vector from selected entries
+    from pyscf.fci import cistring
+    na_strs_full = cistring.gen_strings4orblist(range(norb), nelec[0])
+    nb_strs_full = cistring.gen_strings4orblist(range(norb), nelec[1])
+    na = len(na_strs_full)
+    nb = len(nb_strs_full)
+
+    qa_idx = {int(s): i for i, s in enumerate(na_strs_full)}
+    qb_idx = {int(s): i for i, s in enumerate(nb_strs_full)}
+
+    ci_full = np.zeros((na, nb))
+    for k in range(len(alpha_strs)):
+        ia = qa_idx[int(alpha_strs[k])]
+        ib = qb_idx[int(beta_strs[k])]
+        ci_full[ia, ib] = c_vec[k]
+
+    # Contract
+    sigma_full = direct_spin1.contract_2e(
+        eri, ci_full, norb, nelec, link_index=link_index
+    ) + direct_spin1.contract_1e(h1e, ci_full, norb, nelec)
+
+    # Extract selected entries
+    sigma = np.zeros(len(alpha_strs))
+    for k in range(len(alpha_strs)):
+        ia = qa_idx[int(alpha_strs[k])]
+        ib = qb_idx[int(beta_strs[k])]
+        sigma[k] = sigma_full[ia, ib]
+
+    return sigma
+
+
+# ============================================================================
+# Tests
+# ============================================================================
+
+def test_generate_connected_counts():
+    """Verify connected determinant counts for H₂/STO-3G HF det."""
+    try:
+        from .determinants import count_bits
+    except ImportError:
+        from determinants import count_bits
+
+    # H₂/STO-3G: 2 electrons, 2 spatial orbitals. HF = (0b11, 0b11) — both
+    # orbitals doubly occupied. Q space: no virtual orbitals → 0 connections.
+    det = (0b11, 0b11)
+    conn = generate_connected_determinants(det[0], det[1], 2)
+    print(f"  H₂ HF det → {len(conn)} connected (should be 0 — no virtuals)")
+    # With 2 orbs and 2 electrons in HF, no virtual orbitals → 0
+    assert len(conn) == 0, f"Expected 0, got {len(conn)}"
+
+    # With n_orb=4, n_elec=2: HF = (0b11, 0b11), 2 virtual orbitals
+    # Singles: α→α: 2*2=4, β→β: 2*2=4 = 8
+    # Doubles αα: C(2,2)*C(2,2)=1*1=1, ββ: 1*1=1, αβ: 2*2*2*2=16
+    # Total: 8+1+1+16=26
+    conn = generate_connected_determinants(0b11, 0b11, 4)
+    print(f"  (4 orb, 2 elec) HF det → {len(conn)} connected (expect 26)")
+
+    print("  ✓ Connected determinant counts")
 
 
 if __name__ == "__main__":
-    test_generate_connected()
-    test_sparse_sigma_h2()
-    print("All sparse sigma-vector tests passed.")
+    test_generate_connected_counts()
+    print("All sparse_sigma tests passed.")
