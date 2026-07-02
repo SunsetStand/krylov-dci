@@ -1,0 +1,7 @@
+=== Phase 17: CAS Scaling Benchmark ===
+Date: Thu Jul  2 07:25:41 AM EDT 2026  Node: amd-cpu
+Free memory: 408Gi
+
+/data/home/wangcx/LiYF4_Er3+/env/bin/python: can't open file '/data/home/wangcx/krylov-dci/scripts/phase17_cas_scaling.py': [Errno 2] No such file or directory
+
+Done at Thu Jul  2 07:25:41 AM EDT 2026

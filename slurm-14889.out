@@ -1,0 +1,21 @@
+================================================================================
+Phase 7: Krylov-dCI — CASCI FCI reference, CAS(10,10)
+================================================================================
+  N₂/cc-pVDZ, R=1.1 Å, 2 frozen, CAS(10,10)
+  FCI reference energies (relative to E₀):
+    State 0: -61.10859778 Ha  (0.0 mH above gs)
+    State 1: -60.59754796 Ha  (511.0 mH above gs)
+    State 2: -60.57286139 Ha  (535.7 mH above gs)
+    State 3: -60.54215107 Ha  (566.4 mH above gs)
+    State 4: -60.50761726 Ha  (601.0 mH above gs)
+  Compressed: 200 dets, retained 99.5% of wavefunction weight
+  P=200 (from FCI compression), Q=63504, Q/P ratio=318
+  H_PP built: E0(P)=-61.08484362 Ha, 0.1s
+  H_QP built: 31045 nnz, 1.2s
+  Δ = E0(P) - E(FCI) = 23.8 mH
+  H_QQ sparse: 6555934 off-diag pairs, 263.3s
+  Setup total: 275.4s
+
+    m  d_basis  d_layer     ΔE₀(mH)     t(s)
+  ---  -------  -------  ----------  -------
+slurmstepd: error: *** JOB 14889 ON amd-cpu CANCELLED AT 2026-06-30T03:19:02 ***

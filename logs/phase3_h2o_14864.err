@@ -1,0 +1,6 @@
+/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
+  warnings.warn('direct_nosym.kernel is not able to diagonalize '
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase3_h2o_svd_analysis.py", line 201, in <module>
+    H_D_proj = (U_merged * diag_H_QQ[np.newaxis, :]).T @ U_merged
+ValueError: operands could not be broadcast together with shapes (405,108) (1,405) 

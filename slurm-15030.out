@@ -1,0 +1,5 @@
+=== Phase 17: CAS Scaling Benchmark ===
+Date: Thu Jul  2 07:28:14 AM EDT 2026  Node: amd-cpu
+Free memory: 408Gi
+
+slurmstepd: error: *** JOB 15030 ON amd-cpu CANCELLED AT 2026-07-02T07:32:43 ***

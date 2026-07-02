@@ -1,0 +1,33 @@
+============================================
+Phase 3: H2O/STO-3G SVD Compression Analysis
+Date: Mon Jun 29 12:31:03 AM EDT 2026
+Node: amd-cpu
+============================================
+======================================================================
+Phase 3: H₂O/STO-3G SVD Compression Analysis
+======================================================================
+  n_orb=7, n_elec=10, n_det=441
+  E_HF  = -74.9629466565
+  E_FCI = -75.0124374325
+  Setup time: 0.0864 s
+  P-space: 36 dets, Q-space: 405 dets
+  E0 (H_PP lowest) = -74.9703628168
+  Δ_FCI = -0.0420746157 Ha = -42.075 mH
+
+======================================================================
+Benchmark 1: H_O' computation strategies
+======================================================================
+  (A) Full H_O' (M×M, M=405): 0.2307 s  [O(M²) = 81,810 pairs]
+
+  Krylov basis (m=3): 108 orthonormal vectors
+  Krylov construction time: 0.0271 s
+
+  --- SVD compression on Krylov basis ---
+    Layer 0: 36 → 36 vectors (σ_max=1.847e-01, σ_min=3.174e-02)
+    Layer 1: 36 → 36 vectors (σ_max=5.264e-02, σ_min=3.403e-03)
+    Layer 2: 36 → 36 vectors (σ_max=1.889e-02, σ_min=4.058e-04)
+
+  --- Comparing H_QQ projection approaches ---
+  Merged compressed basis: 108 vectors (from 405 Q-dets)
+
+Job completed with exit code: 1 at Mon Jun 29 12:31:04 AM EDT 2026

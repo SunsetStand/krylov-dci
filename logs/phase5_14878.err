@@ -1,0 +1,12 @@
+/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
+  warnings.warn('direct_nosym.kernel is not able to diagonalize '
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 439, in <module>
+    main()
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 423, in main
+    result = run_krylov_dci_m0_pyscf(
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 288, in run_krylov_dci_m0_pyscf
+    H_QP_mat = compute_h_qp_via_contract(
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 243, in compute_h_qp_via_contract
+    sci_vec = selected_ci.SCIvector(ci_vec, (np.asarray(all_a, dtype=np.int64),
+ValueError: maximum supported dimension for an ndarray is 32, found 220

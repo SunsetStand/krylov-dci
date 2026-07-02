@@ -1,0 +1,27 @@
+================================================================================
+Phase 6b: Krylov Convergence — FIXED+full-CAS Q, sparse H_QQ, CAS(8,8)
+================================================================================
+
+============================================================
+R=1.10 Re
+============================================================
+/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
+  warnings.warn('direct_nosym.kernel is not able to diagonalize '
+  H_D' computed for 4900 dets: -49.301778 ~ -36.880150 Ha
+  H_QP built: 3282 nnz, 0.1s
+  CAS(8,8), P=73, Q=4900, E_ref=-109.0334500619
+  H_QQ sparse: 201606 off-diag pairs (7.7s)
+  Setup total: 8.2s
+
+    m  d_basis  d_layer      ΔE(mH)     t(s)
+  ---  -------  -------  ----------  -------
+    0       72       72       +17.5     10.6
+    1      144       72        +6.0     32.1
+    2      216       72       +30.9     43.2
+    3      288       72        +9.8     53.7
+    4      360       72        +9.5     64.8
+    5      432       72        +9.4     75.9
+
+================================================================================
+Phase 6b complete.
+================================================================================

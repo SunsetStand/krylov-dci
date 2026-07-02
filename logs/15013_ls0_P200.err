@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 430, in <module>
+    main()
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 424, in main
+    setup_p_blocks(a.ckpt_dir, a.P, a.force, nproc)
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 265, in setup_p_blocks
+    gd = _cp_load(ckpt_dir, 0, 'global_data')
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 68, in _cp_load
+    return dict(np.load(_cp_path(ckpt_dir, P_target, name), allow_pickle=True))
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/numpy/lib/npyio.py", line 256, in __getitem__
+    return format.read_array(bytes,
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/numpy/lib/format.py", line 831, in read_array
+    data = _read_bytes(fp, read_size, "array data")
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/numpy/lib/format.py", line 966, in _read_bytes
+    r = fp.read(size - len(data))
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/zipfile.py", line 946, in read
+    data = self._read1(n)
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/zipfile.py", line 1036, in _read1
+    self._update_crc(data)
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/zipfile.py", line 964, in _update_crc
+    raise BadZipFile("Bad CRC-32 for file %r" % self.name)
+zipfile.BadZipFile: Bad CRC-32 for file 'hdiag.npy'

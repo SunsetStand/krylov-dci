@@ -1,0 +1,14 @@
+/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
+  warnings.warn('direct_nosym.kernel is not able to diagonalize '
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 438, in <module>
+    main()
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 422, in main
+    result = run_krylov_dci_m0_pyscf(
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 287, in run_krylov_dci_m0_pyscf
+    H_QP_mat = compute_h_qp_via_contract(
+  File "/data/home/wangcx/krylov-dci/scripts/phase5_pyscf_native.py", line 224, in compute_h_qp_via_contract
+    link_index = selected_ci.gen_cre_linkstr(all_strs_flat, norb, nelec[:2])
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/selected_ci.py", line 269, in gen_cre_linkstr
+    nvir = norb - nelec
+TypeError: unsupported operand type(s) for -: 'int' and 'tuple'

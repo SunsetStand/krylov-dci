@@ -32,7 +32,7 @@ from effective_h import build_effective_H, diagonalize_effective_H
 np.set_printoptions(linewidth=140, precision=6, suppress=True)
 
 N_CORE = 3; N_ACT = 10; N_ELEC = 10; BOND_LENGTH = 1.10
-SVD_THRESHOLD = 1e-3; LEVEL_SHIFT = 0.3; NROOTS = 6
+SVD_THRESHOLD = 1e-3; LEVEL_SHIFT_DEFAULT = 0.3; NROOTS = 6
 
 
 def parse_args():
@@ -40,6 +40,8 @@ def parse_args():
     p.add_argument('--P', type=int, required=True)
     p.add_argument('--m-max', type=int, default=3)
     p.add_argument('--nroots', type=int, default=NROOTS)
+    p.add_argument('--level-shift', type=float, default=LEVEL_SHIFT_DEFAULT,
+                   help='Level shift for resolvent (default: 0.3)')
     p.add_argument('--nproc', type=int, default=None)
     p.add_argument('--ckpt-dir', type=str, default='./checkpoints_stageB')
     p.add_argument('--force', action='store_true')
@@ -301,7 +303,7 @@ def setup_p_blocks(ckpt_dir, P_target, force, nproc):
 
 # ── Krylov iteration (sparse-accelerated) ────────────────────────────
 
-def run_krylov(P_target, ckpt_dir, m_max, force, nroots):
+def run_krylov(P_target, ckpt_dir, m_max, force, nroots, level_shift):
     gd = _cp_load(ckpt_dir, 0, 'global_data')
     M = int(gd['M']); e_fci_bare = gd['e_fci_bare']; hdiag = gd['hdiag']
     ecore = float(gd['ecore'])
@@ -314,7 +316,7 @@ def run_krylov(P_target, ckpt_dir, m_max, force, nroots):
         (pb['H_QP_data'], pb['H_QP_indices'], pb['H_QP_indptr']), shape=(M,N))
 
     delta_ref = E0_P - e_fci_bare[0]
-    A_diag = 1.0/(E0_P - hdiag + LEVEL_SHIFT)
+    A_diag = 1.0/(E0_P - hdiag + level_shift)
     dE0_P = (E0_P - e_fci_bare[0])*1000
 
     def sigma(X):
@@ -365,7 +367,7 @@ def run_krylov(P_target, ckpt_dir, m_max, force, nroots):
         H_PQ_t = (H_QP.T @ basis)  # sparse.T @ dense → dense (N, dt)
 
         use_d = 0.0 if m==0 else delta_ref
-        H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P+LEVEL_SHIFT, delta=use_d)
+        H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P+level_shift, delta=use_d)
         ev, _ = diagonalize_effective_H(H_eff, n_states=None)
         ev = ev[:min(nroots, len(ev))]
         ef_sub = e_fci_bare[:len(ev)]
@@ -420,7 +422,7 @@ def main():
         get_global_data(mol, mf, a.ckpt_dir, a.force, a.nroots, nproc)
     setup_p_space(c_flat, qa, qb, a.P, a.ckpt_dir, a.force)
     setup_p_blocks(a.ckpt_dir, a.P, a.force, nproc)
-    run_krylov(a.P, a.ckpt_dir, a.m_max, a.force, a.nroots)
+    run_krylov(a.P, a.ckpt_dir, a.m_max, a.force, a.nroots, a.level_shift)
 
     print(f"\n{'='*70}\nDone. {time.perf_counter()-t0:.0f}s\n{'='*70}")
 

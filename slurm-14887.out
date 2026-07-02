@@ -1,0 +1,19 @@
+================================================================================
+Phase 6b: Krylov Convergence — FIXED propagation, sparse H_QQ, CAS(8,8)
+================================================================================
+
+============================================================
+R=1.10 Re
+============================================================
+/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
+  warnings.warn('direct_nosym.kernel is not able to diagonalize '
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase6b_krylov_fix.py", line 391, in <module>
+    main()
+  File "/data/home/wangcx/krylov-dci/scripts/phase6b_krylov_fix.py", line 269, in main
+    hdiag=selected_ci.make_hdiag(h1_act,eri_packed,ci_strs,norb,nelec[:2])
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/selected_ci.py", line 302, in make_hdiag
+    occslsta = cistring._strs2occslst(ci_strs[0], norb)
+  File "/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/cistring.py", line 117, in _strs2occslst
+    occslst = numpy.where(occ_masks)[1].reshape(na,-1)
+ValueError: cannot reshape array of size 424 into shape (118,newaxis)

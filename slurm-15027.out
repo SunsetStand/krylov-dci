@@ -1,0 +1,64 @@
+=== Phase 16: Matrix-Free Krylov-dCI (N2, CAS(10,10)) ===
+Date: Thu Jul  2 05:46:29 AM EDT 2026
+Node: amd-cpu
+
+Phase 16: Matrix-Free Krylov-dCI
+  N2 cc-pVDZ CAS(10,10) P=200  nroots=6
+
+  FCI E₀ = -109.04823164 Ha  M = 63,504
+
+  P = 200 dets  E₀(P)−E(FCI) = +5.0 mH
+
+────────────────────────────────────────────────────────────
+Matrix-Free Krylov-dCI (m=0)
+────────────────────────────────────────────────────────────
+  [1/3] Building basis via streaming MGS...
+    Streaming MGS: 200 columns → basis...
+      col 40/200, basis=40 (1s)
+      col 80/200, basis=80 (5s)
+      col 120/200, basis=120 (14s)
+      col 160/200, basis=160 (28s)
+      col 200/200, basis=200 (46s)
+    Streaming MGS: 200 → 200 vectors, 783607 total nnz, 46s
+    Basis: 200 → 200 vectors, 783607 nnz, 46s
+  [2/3] Sparse projected Hamiltonian blocks...
+    Projecting 200 basis vectors (sparse)...
+      basis 40/200 (23s)
+      basis 80/200 (46s)
+      basis 120/200 (71s)
+      basis 160/200 (98s)
+      basis 200/200 (125s)
+    Sparse projection done in 125s (0.62s/vector)
+    H_QQ_tilde (200,200)  H_PQ_tilde (200,200)  125s
+  [3/3] Effective Hamiltonian...
+
+  Matrix-free wall: 170s (46s basis, 125s proj, 0.0s effH)
+
+────────────────────────────────────────────────────────────
+Results
+────────────────────────────────────────────────────────────
+   State         E(FCI)/Ha        E(kDCI)/Ha       Δ(mH)
+       0     -109.04823164     -109.04807758       +0.15
+       1     -108.75059301     -108.44134702     +309.25
+       2     -108.73420109     -108.36950586     +364.70
+       3     -108.73118608     -108.36921590     +361.97
+       4     -108.70463091     -108.36909939     +335.53
+       5     -108.70420891     -108.31936384     +384.85
+
+  Memory estimate: ~69 MB (basis) + ~0.5 MB (temp)
+  Total wall: 174s
+
+────────────────────────────────────────────────────────────
+Dense comparison (Phase 15)
+────────────────────────────────────────────────────────────
+  Dense wall: 6s  d=200
+  Sparse wall: 170s  d=200
+   State         Sparse/Ha          Dense/Ha     diff/nH
+       0     -109.04807758     -109.04807758         0.0
+       1     -108.44134702     -108.44134702         0.0
+       2     -108.36950586     -108.36950586         0.0
+       3     -108.36921590     -108.36921590         0.0
+       4     -108.36909939     -108.36909939         0.0
+       5     -108.31936384     -108.31936384         0.0
+
+Done at Thu Jul  2 05:49:29 AM EDT 2026

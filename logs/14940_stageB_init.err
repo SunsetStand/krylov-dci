@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 426, in <module>
+    main()
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 421, in main
+    run_krylov(a.P, a.ckpt_dir, a.m_max, a.force, a.nroots)
+  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 363, in run_krylov
+    H_PQ_t = (H_QP.T @ basis).toarray()
+AttributeError: 'numpy.ndarray' object has no attribute 'toarray'

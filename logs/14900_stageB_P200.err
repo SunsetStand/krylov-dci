@@ -1,0 +1,2 @@
+/var/spool/slurmd/job14900/slurm_script: 4: source: not found
+slurmstepd: error: *** JOB 14900 ON amd-cpu CANCELLED AT 2026-07-01T01:51:11 ***

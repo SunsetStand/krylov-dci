@@ -1,0 +1,88 @@
+============================================
+Phase 3: H2O/STO-3G SVD Compression Analysis
+Date: Mon Jun 29 12:32:02 AM EDT 2026
+Node: amd-cpu
+============================================
+======================================================================
+Phase 3: H₂O/STO-3G SVD Compression Analysis
+======================================================================
+  n_orb=7, n_elec=10, n_det=441
+  E_HF  = -74.9629466565
+  E_FCI = -75.0124374325
+  Setup time: 0.1840 s
+  P-space: 36 dets, Q-space: 405 dets
+  E0 (H_PP lowest) = -74.9703628168
+  Δ_FCI = -0.0420746157 Ha = -42.075 mH
+
+======================================================================
+Benchmark 1: H_O' computation strategies
+======================================================================
+  (A) Full H_O' (M×M, M=405): 0.2342 s  [O(M²) = 81,810 pairs]
+
+  Krylov basis (m=3): 108 orthonormal vectors
+  Krylov construction time: 0.0276 s
+
+  --- SVD compression on Krylov basis ---
+    Layer 0: 36 → 36 vectors (σ_max=1.847e-01, σ_min=3.174e-02)
+    Layer 1: 36 → 36 vectors (σ_max=5.264e-02, σ_min=3.403e-03)
+    Layer 2: 36 → 36 vectors (σ_max=1.889e-02, σ_min=4.058e-04)
+
+  --- Comparing H_QQ projection approaches ---
+  Merged compressed basis: 108 vectors (from 405 Q-dets)
+
+  Approach A (full H_O' → project): 0.0012 s
+    incl. Full H_O' build:          0.2342 s
+    incl. Matrix projection:         0.0012 s
+  Approach B (sigma-vector H_O'·U):  1.1983 s
+  Max |A - B|: 5.68e-14
+  ✓ Approaches A and B produce identical H_QQ̃ (numerically equivalent)
+  Speedup (B vs A total): 0.00×
+  Speedup (B vs A projection only): 0.00×
+
+======================================================================
+Benchmark 2: Convergence with Krylov order (SCF, no SVD)
+======================================================================
+  m=0: d_basis= 36, E=-75.0113638142, ΔE=+1.074 mH, 9 SCF iters, 0.425 s
+  m=1: d_basis= 72, E=-75.0124302410, ΔE=+0.007 mH, 9 SCF iters, 0.935 s
+  m=2: d_basis=108, E=-75.0124370304, ΔE=+0.000 mH, 7 SCF iters, 1.466 s
+  m=3: d_basis=144, E=-75.0124372967, ΔE=+0.000 mH, 9 SCF iters, 2.012 s
+  m=4: d_basis=180, E=-75.0124373470, ΔE=+0.000 mH, 7 SCF iters, 2.654 s
+
+======================================================================
+Benchmark 3: SVD truncation threshold scan (m=3)
+======================================================================
+         θ   n_vecs                 E     ΔE (mH)     t (s)
+  --------  -------  ----------------  ----------  --------
+     0e+00      108    -75.0122041106      +0.233    1.5690
+     1e-03      108    -75.0122041106      +0.233    1.5708
+     1e-02      108    -75.0122041106      +0.233    1.5680
+     5e-02      102    -75.0121916927      +0.246    1.4772
+     1e-01       89    -75.0121552748      +0.282    1.2828
+     2e-01       66    -75.0120792787      +0.358    0.9201
+
+======================================================================
+Benchmark 4: Singular value spectrum
+======================================================================
+  Layer 0: 36 singular values, σ₁=1.846943e-01, σ_last=3.173979e-02
+    σ_i/σ₁: 1.0000  0.8302  0.8228  0.7859  0.7334  0.7192  0.7062  0.6785
+  Layer 1: 36 singular values, σ₁=5.263566e-02, σ_last=3.403178e-03
+    σ_i/σ₁: 1.0000  0.6989  0.5943  0.5587  0.4948  0.4797  0.4247  0.4064
+  Layer 2: 36 singular values, σ₁=1.888554e-02, σ_last=4.057757e-04
+    σ_i/σ₁: 1.0000  0.5700  0.5571  0.4493  0.3983  0.3860  0.3247  0.2996
+
+======================================================================
+Summary
+======================================================================
+  Best θ = 0.2: 66 vectors, ΔE = 0.358 mH (chemical accuracy ✓)
+  Compression ratio: 66/405 = 16.3% of Q-space
+
+  Total wall times:
+    Setup + FCI:                      0.1840 s
+    Full H_O' build (O(M²)):          0.2342 s
+    Krylov construction (m=3, no SVD): 0.0276 s
+    Total (no SVD):                    0.4458 s
+
+======================================================================
+Phase 3 analysis complete.
+
+Job completed with exit code: 0 at Mon Jun 29 12:32:28 AM EDT 2026

@@ -1,0 +1,8 @@
+======================================================================
+Phase 11 Stage B: P-Convergence (sparse-optimized)
+  P=5  m_max=0  nroots=6  nproc=8
+  N₂/cc-pVDZ CAS(10,10) R=1.1 Å
+======================================================================
+Loading FCI from old cache (fci_reference.npz)...
+  FCI E₀ = -109.04823164 Ha (cached)
+Building H_QQ sparse adjacency (63,504 determinants)...
