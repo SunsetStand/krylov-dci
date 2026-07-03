@@ -286,97 +286,55 @@ class KDCIBackend:
     def propagate_basis(self, basis: np.ndarray, E0_P: float,
                         delta: float = 0.0,
                         lindep_threshold: float = 1e-10,
+                        svd_threshold: float = 1e-3,
                         verbose: bool = True) -> Tuple[np.ndarray, int]:
-        """Propagate existing Krylov basis by one layer: B <- AB · B.
+        """Propagate Krylov basis: B_{m+1} = MGS([B_m, U_trunc]).
 
-        Implements the Krylov subspace propagation:
-          K_{m+1} = span(K_m, (AB) · K_m)
+        1. X = A * B * B_m  where B = H_QQ - D_QQ - delta*I
+        2. T = A * X  (A-reweight for resolvent importance)
+        3. SVD(T), keep left singular vectors with sigma > threshold
+        4. MGS(U_trunc) against existing basis
 
-        where:
-          A = (E0_P - D_QQ)^{-1}            (diagonal resolvent)
-          B = H_O' - Delta·I = H_QQ - D_QQ - Delta·I
-        Krylov subspace = span{A^{1/2}·H_QP, (AB)·A^{1/2}·H_QP, ...}
-        with A and B as defined in the original decomposition.
-
-        For each basis vector b_k:
-          1. sigma = H_QQ · b_k            (contract_2e, C-level)
-          2. x_k  = A · (sigma - (D_QQ + delta·I) · b_k)
-                  = A · B · b_k
-
-        The x_k vectors are MGS-orthogonalized against the existing basis.
-        Only linearly independent new directions are appended.
-
-        Args:
-            basis:  (M, r) existing orthonormal Krylov basis.
-            E0_P:   Reference energy (lowest eigenvalue of H_PP).
-            delta:  Energy shift Delta = E - E0_P.
-            lindep_threshold: MGS linear independence threshold.
-            verbose: Print progress.
-
-        Returns:
-            (basis_new, d_new): expanded basis (M, d_new) and new count.
+        Mirrors the original build_weighted_coupling + svd_truncate
+        pipeline (phase6b/7). The A-reweighting coupled with SVD
+        filtering removes near-singular directions that cause
+        resolvent ill-conditioning.
         """
         M, r = basis.shape
 
-        # A = (E0_P - D_QQ)^{-1}  (Delta enters via B = H_O' − ΔI)
-        # Propagation uses full A (not A^{1/2}) per proposal Eq. 6
+        # A = (E0_P - D_QQ)^{-1}
         denom = E0_P - self.q_idx.hdiag
-        mask = np.abs(denom) > 1e-10
-        A_q = np.zeros(M)
-        A_q[mask] = 1.0 / denom[mask]
+        A_q = np.where(np.abs(denom) > 1e-10, 1.0 / denom, 0.0)
 
         if verbose:
             t0 = time.perf_counter()
             print(f"    Propagate: r={r}, delta={delta:.6f}...", flush=True)
 
+        # Step 1: X = A * B * B_m
         propagated = []
         for k in range(r):
             b_k = basis[:, k]
-
-            # sigma = H_QQ · b_k  (1e already absorbed in h2e_eff)
             sigma_k = self.sigma_full(
                 self.q_idx.to_ci_matrix(b_k)
             ).reshape(-1)
-
-            # B · b_k = H_QQ·b_k - D_QQ·b_k - delta·b_k
-            #        = (H_O' - Delta·I) · b_k
-            # B carries the energy shift per the decomposition:
-            # (E I - H_QQ)^{-1} = (A^{-1} - B)^{-1}, B = H_O' - Delta*I
             residual = sigma_k - (self.q_idx.hdiag + delta) * b_k
-
-            # x_k = A · residual  (diagonal resolvent applied)
             x_k = A_q * residual
             propagated.append(x_k)
 
-        # ── A-weighted SVD truncation (before MGS) ──
-        # Re-apply A-weighting to the propagated vectors: T = A · propagated.
-        # This amplifies low-energy Q-space directions that couple strongly
-        # to P, and suppresses high-energy noise. SVD on T identifies the
-        # dominant resolvent-relevant subspace.
-        # Threshold ~1e-3 mirrors the original Krylov-dCI implementation.
-        if len(propagated) > 0:
-            prop_mat = np.column_stack(propagated)  # (M, count)
-            # Re-weight: T[:,k] = A_q * prop_mat[:,k]
-            T = A_q[:, np.newaxis] * prop_mat
-            _, s_prop, Vt = np.linalg.svd(T, full_matrices=False)
-            svd_threshold = 1e-3  # matches original implementation
-            keep = s_prop > svd_threshold * max(1.0, s_prop[0])
-            n_keep = int(np.sum(keep))
-            if n_keep < len(propagated):
-                # Compress to significant directions only
-                prop_compressed = T @ Vt[:n_keep, :].T  # (M, n_keep)
-            else:
-                prop_compressed = prop_mat
-        else:
-            prop_compressed = np.zeros((M, 0))
-            n_keep = 0
+        prop_mat = np.column_stack(propagated)  # (M, r)
 
-        # MGS orthogonalization: compressed propagated vectors against
-        # existing basis and against each other
+        # Step 2-3: T = A * X, SVD, keep dominant left singular vectors
+        T = A_q[:, np.newaxis] * prop_mat
+        U_svd, s, _ = np.linalg.svd(T, full_matrices=False)
+        keep = s > svd_threshold * max(1.0, s[0])
+        n_keep = int(np.sum(keep))
+        U_trunc = U_svd[:, keep]  # (M, n_keep)
+
+        # Step 4: MGS against existing basis
         basis_list = [basis[:, j] for j in range(r)]
         new_count = 0
-        for k in range(prop_compressed.shape[1]):
-            v = prop_compressed[:, k].copy()
+        for k in range(U_trunc.shape[1]):
+            v = U_trunc[:, k].copy()
             for b in basis_list:
                 v -= np.dot(b, v) * b
             nrm = np.linalg.norm(v)
@@ -391,12 +349,9 @@ class KDCIBackend:
         if verbose:
             elapsed = time.perf_counter() - t0
             added = d_new - r
-            removed = len(propagated) - n_keep
-            msg = f"    Propagate: {r} -> {d_new} vectors (+{added} new"
-            if removed > 0:
-                msg += f", {removed} kept from SVD"
-            msg += f") in {elapsed:.0f}s"
-            print(msg, flush=True)
+            print(f"    Propagate: {r} -> {d_new} vectors "
+                  f"(+{added} new, SVD {n_keep}/{r}) in {elapsed:.0f}s",
+                  flush=True)
 
         return basis_new, d_new
 
