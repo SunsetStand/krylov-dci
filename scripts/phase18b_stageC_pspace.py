@@ -27,6 +27,13 @@ NROOTS = 6; M_MAX = 3; P_TARGET = 400
 print("Building N2/cc-pVDZ CAS(10,10)...", flush=True)
 mol = gto.M(atom='N 0 0 0; N 0 0 1.1', basis='cc-pVDZ', verbose=0)
 mf = scf.RHF(mol).run(verbose=0)
+# ── Load Stage C global data ──
+print("Loading Stage C global data...", flush=True)
+gd = np.load(os.path.join(PROJECT_ROOT, "checkpoints_stageC",
+             "P0000", "global_data.npz"), allow_pickle=True)
+e_dmrg = [float(e) for e in gd["e_dmrg_bare"][:NROOTS]]
+print(f"  DMRG-CI E0 = {e_dmrg[0]:.8f} Ha", flush=True)
+
 # Load Stage C active space integrals from checkpoint
 h1e_act = gd['h1eff']
 from src.hamiltonian import _unpack_4fold
@@ -42,12 +49,6 @@ M = q_idx.M
 print(f"  Active: {nelec[0]}a+{nelec[1]}b in {N_ACT} orbs, M={M:,}", flush=True)
 
 # ── DMRG-CI reference ──
-print("Loading DMRG-CI reference from Stage C...", flush=True)
-gd = np.load(os.path.join(PROJECT_ROOT, 'checkpoints_stageC',
-                           'P0000', 'global_data.npz'), allow_pickle=True)
-e_dmrg = [float(e) for e in gd['e_dmrg_bare'][:NROOTS]]
-print(f"  DMRG-CI E0 = {e_dmrg[0]:.8f} Ha", flush=True)
-
 # ── Load Stage C P-space ──
 print(f"\nLoading Stage C P={P_TARGET}...", flush=True)
 ps = np.load(os.path.join(PROJECT_ROOT, 'checkpoints_stageC',
