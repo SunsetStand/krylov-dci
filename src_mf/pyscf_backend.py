@@ -227,33 +227,27 @@ class KDCIBackend:
     # ═══════════════════════════════════════════════════════════════
 
     def build_basis(self, H_QP: np.ndarray, E0_P: float,
-                    delta: float = 0.0,
                     lindep_threshold: float = 1e-10,
                     verbose: bool = True) -> Tuple[np.ndarray, int]:
-        """Build orthonormal basis from A-weighted H_QP.
+        """Build orthonormal basis from A_weighted H_QP.
 
-        1. Weight: H_QP_w[q,p] = A_q^{1/2} · H_QP[q,p],
-           A_q^{1/2} = 1/|E0_P - H_QQ[q,q]|^{1/2} · sgn(E0_P - H_QQ).
-           Uses A^{1/2} (not A) for numerical stability (proposal Eq. 4).
-           Propagation uses A = (A^{1/2})^2 (proposal Eq. 6).
+        1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p], A_q = 1/(E0_P - H_QQ[q,q]).
         2. Modified Gram-Schmidt → orthonormal basis (M, d), d ≤ N.
 
         Args:
             H_QP: (M, N) unweighted H_QP matrix.
-            E0_P: Reference energy (lowest eigenvalue of H_PP).
-            delta: Energy shift Delta = E - E0_P.
+            E0_P: Reference energy.
         Returns:
             (basis, d): basis is (M, d), d is count of linearly independent cols.
         """
         M, N = H_QP.shape
 
-        # A^{1/2}-weighting: T^{(0)}_qp = A^{1/2}_q · H_QP_{qp}
-        # A^{1/2} = |E0_P - D_QQ|^{-1/2} · sgn(E0_P - D_QQ)
+        # A-weighting
         denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
-        A_sqrt = np.zeros(M)
-        A_sqrt[mask] = 1.0 / np.sqrt(np.abs(denom[mask])) * np.sign(denom[mask])
-        H_QP_w = H_QP * A_sqrt[:, np.newaxis]
+        A_q = np.zeros(M)
+        A_q[mask] = 1.0 / denom[mask]
+        H_QP_w = H_QP * A_q[:, np.newaxis]
 
         # Dense MGS
         if verbose:
@@ -278,135 +272,6 @@ class KDCIBackend:
             print(f"    MGS: {N} → {d} vectors in {elapsed:.0f}s", flush=True)
 
         return basis, d
-
-    # ═══════════════════════════════════════════════════════════════
-    # Krylov propagation: (AB)^m · A^{1/2} H_QP
-    # ═══════════════════════════════════════════════════════════════
-
-    def propagate_basis(self, basis: np.ndarray, E0_P: float,
-                        delta: float = 0.0,
-                        lindep_threshold: float = 1e-10,
-                        svd_threshold: float = 1e-3,
-                        verbose: bool = True) -> Tuple[np.ndarray, int]:
-        """Propagate Krylov basis: B_{m+1} = MGS([B_m, U_trunc]).
-
-        1. X = A * B * B_m  where B = H_QQ - D_QQ - delta*I
-        2. T = A * X  (A-reweight for resolvent importance)
-        3. SVD(T), keep left singular vectors with sigma > threshold
-        4. MGS(U_trunc) against existing basis
-
-        Mirrors the original build_weighted_coupling + svd_truncate
-        pipeline (phase6b/7). The A-reweighting coupled with SVD
-        filtering removes near-singular directions that cause
-        resolvent ill-conditioning.
-        """
-        M, r = basis.shape
-
-        # A = (E0_P - D_QQ)^{-1}
-        denom = E0_P - self.q_idx.hdiag
-        A_q = np.where(np.abs(denom) > 1e-10, 1.0 / denom, 0.0)
-
-        if verbose:
-            t0 = time.perf_counter()
-            print(f"    Propagate: r={r}, delta={delta:.6f}...", flush=True)
-
-        # Step 1: X = A * B * B_m
-        propagated = []
-        for k in range(r):
-            b_k = basis[:, k]
-            sigma_k = self.sigma_full(
-                self.q_idx.to_ci_matrix(b_k)
-            ).reshape(-1)
-            residual = sigma_k - (self.q_idx.hdiag + delta) * b_k
-            x_k = A_q * residual
-            propagated.append(x_k)
-
-        prop_mat = np.column_stack(propagated)  # (M, r)
-
-        # Step 2-3: T = A * X, SVD, keep dominant left singular vectors
-        T = A_q[:, np.newaxis] * prop_mat
-        U_svd, s, _ = np.linalg.svd(T, full_matrices=False)
-        keep = s > svd_threshold * max(1.0, s[0])
-        n_keep = int(np.sum(keep))
-        U_trunc = U_svd[:, keep]  # (M, n_keep)
-
-        # Step 4: MGS against existing basis
-        basis_list = [basis[:, j] for j in range(r)]
-        new_count = 0
-        for k in range(U_trunc.shape[1]):
-            v = U_trunc[:, k].copy()
-            for b in basis_list:
-                v -= np.dot(b, v) * b
-            nrm = np.linalg.norm(v)
-            if nrm > lindep_threshold:
-                v /= nrm
-                basis_list.append(v)
-                new_count += 1
-
-        basis_new = np.column_stack(basis_list)
-        d_new = len(basis_list)
-
-        if verbose:
-            elapsed = time.perf_counter() - t0
-            added = d_new - r
-            print(f"    Propagate: {r} -> {d_new} vectors "
-                  f"(+{added} new, SVD {n_keep}/{r}) in {elapsed:.0f}s",
-                  flush=True)
-
-        return basis_new, d_new
-
-    def build_krylov_layers(self, H_QP: np.ndarray, E0_P: float,
-                            delta: float = 0.0, m_max: int = 0,
-                            lindep_threshold: float = 1e-10,
-                            verbose: bool = True
-                            ) -> Tuple[np.ndarray, int, List[int]]:
-        """Build Krylov basis up to order m_max.
-
-        Layer 0: B_0 = MGS(A^{1/2} · H_QP)
-        Layer m:  B_m = MGS([B_{m-1}, (AB) · B_{m-1}])
-
-        This is the main entry point for multi-layer Krylov-dCI.
-
-        Args:
-            H_QP:   (M, N) unweighted H_QP matrix.
-            E0_P:   Reference energy.
-            delta:  Energy shift.
-            m_max:  Maximum Krylov order (m=0 is single-layer).
-            lindep_threshold: Linear independence threshold.
-
-        Returns:
-            (basis, d_total, d_per_layer): final basis, total dim,
-                                           dimensions per layer.
-        """
-        if verbose and m_max > 0:
-            t0 = time.perf_counter()
-            print(f"Building Krylov layers m=0..{m_max} "
-                  f"(delta={delta:.6f})...", flush=True)
-
-        # Layer 0: A^{1/2} · H_QP  (no sqrt in original; using A-weighted)
-        basis, d0 = self.build_basis(H_QP, E0_P, delta=delta,
-                                     lindep_threshold=lindep_threshold,
-                                     verbose=verbose)
-        d_per_layer = [d0]
-
-        for m in range(1, m_max + 1):
-            basis, d_m = self.propagate_basis(
-                basis, E0_P, delta=delta,
-                lindep_threshold=lindep_threshold,
-                verbose=verbose)
-            d_per_layer.append(d_m)
-            if d_m == d_per_layer[-2]:
-                if verbose:
-                    print(f"  Layer m={m}: no new directions, stopping.",
-                          flush=True)
-                break
-
-        if verbose and m_max > 0:
-            elapsed = time.perf_counter() - t0
-            print(f"Krylov layers done: {d_per_layer} "
-                  f"in {elapsed:.0f}s", flush=True)
-
-        return basis, d_per_layer[-1], d_per_layer
 
     # ═══════════════════════════════════════════════════════════════
     # Projected Hamiltonian blocks
@@ -518,9 +383,130 @@ class KDCIBackend:
     # Matrix-free sparse operations (no persistent M-dimensional storage)
     # ═══════════════════════════════════════════════════════════════
 
-    def build_basis_streaming(self, p_dets: List[Tuple[int, int]],
+    
+    # ═══════════════════════════════════════════════════════════════
+    # Krylov propagation: B_{m+1} = MGS([B_m, compressed(AB_m)])
+    # ═══════════════════════════════════════════════════════════════
+
+    def propagate_basis(self, basis: np.ndarray, E0_P: float,
+                        lindep_threshold: float = 1e-10,
+                        svd_threshold: float = 1e-3,
+                        verbose: bool = True) -> Tuple[np.ndarray, int]:
+        """Propagate Krylov basis: B_{m+1} = MGS([B_m, SVD(A*H_O'*B_m)]).
+
+        1. X_k = A * H_O' * b_k = A * (H_QQ * b_k - D_QQ * b_k)
+        2. T = A * X  (re-weight for resolvent importance)
+        3. SVD(T), keep sigma > svd_threshold * sigma_max
+        4. MGS(U_trunc) against existing basis
+
+        Delta is NOT used in the propagation (B = H_O'). The energy
+        shift enters only in the final H^eff resolvent and the
+        self-consistent iteration. This avoids numerical instability
+        from the A * Delta product amplification.
+        """
+        M, r = basis.shape
+
+        # A = (E0_P - D_QQ)^{-1}
+        denom = E0_P - self.q_idx.hdiag
+        A_q = np.where(np.abs(denom) > 1e-10, 1.0 / denom, 0.0)
+
+        if verbose:
+            t0 = time.perf_counter()
+            print(f"    Propagate: r={r}...", flush=True)
+
+        # Step 1: X = A * H_O' * B_m
+        propagated = []
+        for k in range(r):
+            b_k = basis[:, k]
+            sigma_k = self.sigma_full(
+                self.q_idx.to_ci_matrix(b_k)
+            ).reshape(-1)
+            # H_O' * b_k = H_QQ * b_k - D_QQ * b_k
+            residual = sigma_k - self.q_idx.hdiag * b_k
+            x_k = A_q * residual
+            propagated.append(x_k)
+
+        prop_mat = np.column_stack(propagated)  # (M, r)
+
+        # Step 2-3: T = A * X, SVD truncation
+        T = A_q[:, np.newaxis] * prop_mat
+        U_svd, s, _ = np.linalg.svd(T, full_matrices=False)
+        keep = s > svd_threshold * max(1.0, s[0])
+        n_keep = int(np.sum(keep))
+        U_trunc = U_svd[:, keep]  # (M, n_keep)
+
+        # Step 4: MGS against existing basis
+        basis_list = [basis[:, j] for j in range(r)]
+        new_count = 0
+        for k in range(U_trunc.shape[1]):
+            v = U_trunc[:, k].copy()
+            for b in basis_list:
+                v -= np.dot(b, v) * b
+            nrm = np.linalg.norm(v)
+            if nrm > lindep_threshold:
+                v /= nrm
+                basis_list.append(v)
+                new_count += 1
+
+        basis_new = np.column_stack(basis_list)
+        d_new = len(basis_list)
+
+        if verbose:
+            elapsed = time.perf_counter() - t0
+            added = d_new - r
+            print(f"    Propagate: {r} -> {d_new} vectors "
+                  f"(+{added} new, SVD {n_keep}/{r}) in {elapsed:.0f}s",
+                  flush=True)
+
+        return basis_new, d_new
+
+    def build_krylov_layers(self, H_QP: np.ndarray, E0_P: float,
+                            m_max: int = 0,
+                            lindep_threshold: float = 1e-10,
+                            svd_threshold: float = 1e-3,
+                            verbose: bool = True
+                            ) -> Tuple[np.ndarray, int, List[int]]:
+        """Build Krylov basis up to order m_max.
+
+        Layer 0: B_0 = MGS(A * H_QP)
+        Layer m:  B_m = MGS([B_{m-1}, SVD(A * H_O' * B_{m-1})])
+
+        Returns:
+            (basis, d_total, d_per_layer): final basis, total dim,
+                                           dimensions per layer.
+        """
+        if verbose and m_max > 0:
+            t0 = time.perf_counter()
+            print(f"Building Krylov layers m=0..{m_max}...", flush=True)
+
+        # Layer 0
+        basis, d0 = self.build_basis(H_QP, E0_P,
+                                     lindep_threshold=lindep_threshold,
+                                     verbose=verbose)
+        d_per_layer = [d0]
+
+        for m in range(1, m_max + 1):
+            basis, d_m = self.propagate_basis(
+                basis, E0_P,
+                lindep_threshold=lindep_threshold,
+                svd_threshold=svd_threshold,
+                verbose=verbose)
+            d_per_layer.append(d_m)
+            if d_m == d_per_layer[-2]:
+                if verbose:
+                    print(f"  Layer m={m}: no new directions, stopping.",
+                          flush=True)
+                break
+
+        if verbose and m_max > 0:
+            elapsed = time.perf_counter() - t0
+            print(f"Krylov layers done: {d_per_layer} "
+                  f"in {elapsed:.0f}s", flush=True)
+
+        return basis, d_per_layer[-1], d_per_layer
+
+def build_basis_streaming(self, p_dets: List[Tuple[int, int]],
                               E0_P: float,
-                              delta: float = 0.0,
                               lindep_threshold: float = 1e-10,
                               verbose: bool = True
                               ) -> Tuple[List, int]:
@@ -533,8 +519,6 @@ class KDCIBackend:
           4. If linearly independent: normalize, add to basis
           5. Discard dense sigma
 
-        A-weighting: A^{1/2}_q = |E0_P - H_QQ[q,q]|^{-1/2} · sgn(E0_P - H_QQ).
-
         Persistent storage: only d SparseQVector objects.
         Temporary: one (na, nb) dense CI matrix per iteration.
         """
@@ -544,11 +528,10 @@ class KDCIBackend:
         na = self.q_idx.n_alpha
         nb = self.q_idx.n_beta
 
-        # A^{1/2}-weighting for streaming build
         denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
-        A_sqrt_stream = np.zeros(self.q_idx.M)
-        A_sqrt_stream[mask] = 1.0 / np.sqrt(np.abs(denom[mask])) * np.sign(denom[mask])
+        A_q = np.zeros(self.q_idx.M)
+        A_q[mask] = 1.0 / denom[mask]
 
         p_indices = set()
         for pa, pb in p_dets:
@@ -577,7 +560,7 @@ class KDCIBackend:
             for q in nnz:
                 if q in p_indices:
                     continue
-                val = A_sqrt_stream[q] * sigma_flat[q]
+                val = A_q[q] * sigma_flat[q]
                 if abs(val) > 1e-14:
                     a_str = int(self.q_idx.alpha_strs[q // nb])
                     b_str = int(self.q_idx.beta_strs[q % nb])
@@ -917,11 +900,7 @@ def test_build_projected_blocks():
     H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, verbose=False)
 
     # Effective Hamiltonian
-    # delta = E(FCI) - E0_P provides the exact shift for the ground state.
-    # For production use, delta is obtained from DMRG-CI reference
-    # and will eventually be determined self-consistently.
-    delta = e_fci[0] - E0_P  # exact Delta from FCI reference
-    H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=delta)
+    H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=0.0)
     ev_kdci, _ = diagonalize_effective_H(H_eff, n_states=None)
 
     dE0 = (ev_kdci[0] - e_fci[0]) * 1000

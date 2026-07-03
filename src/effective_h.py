@@ -130,9 +130,7 @@ def build_effective_H(H_PP: np.ndarray,
 
     # Resolvent: (E I - H_QQ)^{-1} where E = E0 + Delta
     E = E0 + delta
-    # Regularization: tiny shift (1e-8 Ha ~ 0.002 cm^{-1}) prevents
-    # near-singular resolvent from ill-conditioned basis vectors.
-    resolvent = inv(E * np.eye(d) - H_QQ + 1e-8 * np.eye(d))
+    resolvent = inv(E * np.eye(d) - H_QQ)
 
     # Correction: H_PQ @ resolvent @ H_QP
     H_QP = H_PQtilde.T
