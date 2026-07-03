@@ -20,7 +20,7 @@ from pyscf import gto, scf, ao2mo
 from pyscf.fci import cistring, direct_spin1
 from scipy import sparse
 
-N_CORE = 3; N_ACT = 10; BOND_LENGTH = 1.10
+N_CORE = 3; N_ACT = 10; N_ELEC_ACT = 8; BOND_LENGTH = 1.10
 NROOTS = 6; M_MAX = 3; P_TARGET = 400
 
 # ── Build N2 CAS(10,10) system ──
@@ -36,7 +36,7 @@ eri_mo = ao2mo.full(eri_ao, mf.mo_coeff, compact=False)
 eri_mo = eri_mo.reshape(norb, norb, norb, norb)
 h1e_act = h1e_mo[np.ix_(n_act_orbs, n_act_orbs)]
 eri_act = eri_mo[np.ix_(n_act_orbs, n_act_orbs, n_act_orbs, n_act_orbs)]
-nelec = (mol.nelec[0] - N_CORE, mol.nelec[1] - N_CORE)
+nelec = (N_ELEC_ACT//2, N_ELEC_ACT - N_ELEC_ACT//2)
 alpha_strs = cistring.gen_strings4orblist(range(N_ACT), nelec[0])
 beta_strs = cistring.gen_strings4orblist(range(N_ACT), nelec[1])
 
