@@ -232,9 +232,10 @@ class KDCIBackend:
                     verbose: bool = True) -> Tuple[np.ndarray, int]:
         """Build orthonormal basis from A-weighted H_QP.
 
-        1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p],
-           A_q = 1/(E0_P - H_QQ[q,q]).
-           where A = (E0 I - D_QQ)^{-1} (Delta enters through B, not A).
+        1. Weight: H_QP_w[q,p] = A_q^{1/2} · H_QP[q,p],
+           A_q^{1/2} = 1/|E0_P - H_QQ[q,q]|^{1/2} · sgn(E0_P - H_QQ).
+           Uses A^{1/2} (not A) for numerical stability (proposal Eq. 4).
+           Propagation uses A = (A^{1/2})^2 (proposal Eq. 6).
         2. Modified Gram-Schmidt → orthonormal basis (M, d), d ≤ N.
 
         Args:
@@ -246,12 +247,13 @@ class KDCIBackend:
         """
         M, N = H_QP.shape
 
-        # A-weighting: A = (E0_P - D_QQ)^{-1}  (Delta enters via B, not A)
+        # A^{1/2}-weighting: T^{(0)}_qp = A^{1/2}_q · H_QP_{qp}
+        # A^{1/2} = |E0_P - D_QQ|^{-1/2} · sgn(E0_P - D_QQ)
         denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
-        A_q = np.zeros(M)
-        A_q[mask] = 1.0 / denom[mask]
-        H_QP_w = H_QP * A_q[:, np.newaxis]
+        A_sqrt = np.zeros(M)
+        A_sqrt[mask] = 1.0 / np.sqrt(np.abs(denom[mask])) * np.sign(denom[mask])
+        H_QP_w = H_QP * A_sqrt[:, np.newaxis]
 
         # Dense MGS
         if verbose:
@@ -291,8 +293,10 @@ class KDCIBackend:
           K_{m+1} = span(K_m, (AB) · K_m)
 
         where:
-          A = (E0_P + delta - D_QQ)^{-1}   (diagonal resolvent)
-          B = H_O' - delta·I = H_QQ - D_QQ - delta·I
+          A = (E0_P - D_QQ)^{-1}            (diagonal resolvent, Δ=0)
+          B = H_O' = H_QQ - D_QQ            (off-diagonal coupling)
+        The Krylov subspace is built at E=E0_P. Delta shifts the
+        final effective Hamiltonian resolvent only.
 
         For each basis vector b_k:
           1. sigma = H_QQ · b_k            (contract_2e, C-level)
@@ -315,6 +319,7 @@ class KDCIBackend:
         M, r = basis.shape
 
         # A = (E0_P - D_QQ)^{-1}  (Delta enters via B = H_O' − ΔI)
+        # Propagation uses full A (not A^{1/2}) per proposal Eq. 6
         denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(M)
@@ -333,9 +338,10 @@ class KDCIBackend:
                 self.q_idx.to_ci_matrix(b_k)
             ).reshape(-1)
 
-            # B · b_k = H_QQ·b_k - D_QQ·b_k - delta·b_k
-            #        = (H_O') · b_k - delta · b_k
-            residual = sigma_k - (self.q_idx.hdiag + delta) * b_k
+            # B · b_k = H_QQ·b_k - D_QQ·b_k = H_O' · b_k
+            # Delta enters only in final H^eff resolvent, not in Krylov
+            # subspace generation (proposal Eq. 6 uses A=(E0-D)^{-1}).
+            residual = sigma_k - self.q_idx.hdiag * b_k
 
             # x_k = A · residual  (diagonal resolvent applied)
             x_k = A_q * residual
@@ -544,7 +550,7 @@ class KDCIBackend:
           4. If linearly independent: normalize, add to basis
           5. Discard dense sigma
 
-        A-weighting: A_q = 1/(E0_P - H_QQ[q,q])  (Delta enters via B).
+        A-weighting: A^{1/2}_q = |E0_P - H_QQ[q,q]|^{-1/2} · sgn(E0_P - H_QQ).
 
         Persistent storage: only d SparseQVector objects.
         Temporary: one (na, nb) dense CI matrix per iteration.
@@ -555,11 +561,11 @@ class KDCIBackend:
         na = self.q_idx.n_alpha
         nb = self.q_idx.n_beta
 
-        # A-weighting: A = (E0_P - D_QQ)^{-1}  (Delta enters via B, not A)
+        # A^{1/2}-weighting for streaming build
         denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
-        A_q = np.zeros(self.q_idx.M)
-        A_q[mask] = 1.0 / denom[mask]
+        A_sqrt_stream = np.zeros(self.q_idx.M)
+        A_sqrt_stream[mask] = 1.0 / np.sqrt(np.abs(denom[mask])) * np.sign(denom[mask])
 
         p_indices = set()
         for pa, pb in p_dets:
@@ -588,7 +594,7 @@ class KDCIBackend:
             for q in nnz:
                 if q in p_indices:
                     continue
-                val = A_q[q] * sigma_flat[q]
+                val = A_sqrt_stream[q] * sigma_flat[q]
                 if abs(val) > 1e-14:
                     a_str = int(self.q_idx.alpha_strs[q // nb])
                     b_str = int(self.q_idx.beta_strs[q % nb])
