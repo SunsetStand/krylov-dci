@@ -229,56 +229,43 @@ class KDCIBackend:
     def build_basis(self, H_QP: np.ndarray, E0_P: float,
                     lindep_threshold: float = 1e-10,
                     verbose: bool = True) -> Tuple[np.ndarray, int]:
-        """Build orthonormal basis from A_weighted H_QP.
+        """Build orthonormal basis via SVD on A^2-weighted H_QP.
 
-        1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p], A_q = 1/(E0_P - H_QQ[q,q]).
-        2. Modified Gram-Schmidt → orthonormal basis (M, d), d ≤ N.
+        Layer 0 of the Krylov-dCI pipeline:
+          1. L0 = A * H_QP,  A_q = 1/(E0_P - D_qq)
+          2. T = A * L0 = A^2 * H_QP
+          3. SVD(T), keep sigma > 1e-3 * sigma_max
+          4. Return U (left singular vectors, orthonormal)
 
-        Args:
-            H_QP: (M, N) unweighted H_QP matrix.
-            E0_P: Reference energy.
-        Returns:
-            (basis, d): basis is (M, d), d is count of linearly independent cols.
+        This matches the original Krylov-dCI build_weighted_coupling +
+        svd_truncate pipeline (phase6b/7/12).
         """
         M, N = H_QP.shape
 
-        # A-weighting
         denom = E0_P - self.q_idx.hdiag
-        mask = np.abs(denom) > 1e-10
-        A_q = np.zeros(M)
-        A_q[mask] = 1.0 / denom[mask]
-        H_QP_w = H_QP * A_q[:, np.newaxis]
+        A_q = np.where(np.abs(denom) > 1e-10, 1.0 / denom, 0.0)
+        L0 = H_QP * A_q[:, np.newaxis]
+        T = A_q[:, np.newaxis] * L0
 
-        # Dense MGS
         if verbose:
             t0 = time.perf_counter()
-            print(f"    MGS: {N} cols × {M} rows...", flush=True)
 
-        basis_cols = []
-        for p in range(N):
-            v = H_QP_w[:, p].copy()
-            for b in basis_cols:
-                v -= np.dot(b, v) * b
-            nrm = np.linalg.norm(v)
-            if nrm > lindep_threshold:
-                v /= nrm
-                basis_cols.append(v)
-
-        basis = np.column_stack(basis_cols) if basis_cols else np.zeros((M, 0))
-        d = basis.shape[1]
+        U_svd, s, _ = np.linalg.svd(T, full_matrices=False)
+        svd_threshold = 1e-3
+        keep = s > svd_threshold * max(1.0, s[0])
+        d = int(np.sum(keep))
+        basis = U_svd[:, keep]
 
         if verbose:
             elapsed = time.perf_counter() - t0
-            print(f"    MGS: {N} → {d} vectors in {elapsed:.0f}s", flush=True)
+            print("    SVD: %d -> %d vectors in %ds" % (N, d, int(elapsed)),
+                  flush=True)
 
         return basis, d
 
-    # ═══════════════════════════════════════════════════════════════
-    # Projected Hamiltonian blocks
-    # ═══════════════════════════════════════════════════════════════
-
     def build_projected_blocks(self, basis: np.ndarray,
                                p_dets: List[Tuple[int, int]],
+                               H_QP: np.ndarray = None,
                                n_workers: int = 1,
                                verbose: bool = True
                                ) -> Tuple[np.ndarray, np.ndarray]:
@@ -321,9 +308,17 @@ class KDCIBackend:
         # ── Step 2: H_{Q̃Q̃} = basis^T @ sigma_all  (single BLAS matmul) ──
         H_QQ_tilde = basis.T @ sigma_all  # (d, M) @ (M, d) → (d, d)
 
-        # ── Step 3: H_{PQ̃} = slice P-det rows from sigma_all ──
-        H_PQ_tilde = np.zeros((N, d))
-        H_PQ_tilde[p_valid, :] = sigma_all[p_flat, :]
+        # ── Step 3: H_{PQ̃} = H_QP^T @ basis (excludes P-P coupling) ──
+        # sigma_all at P-det rows contains P-P contributions for
+        # propagated basis vectors that have P-space components.
+        # H_QP has zero P-det rows by construction, so H_QP^T @ basis
+        # correctly isolates P-Q coupling only.
+        if H_QP is not None:
+            H_PQ_tilde = H_QP.T @ basis
+        else:
+            # Fallback: slice from sigma_all (legacy, may be wrong)
+            H_PQ_tilde = np.zeros((N, d))
+            H_PQ_tilde[p_valid, :] = sigma_all[p_flat, :]
 
         if verbose:
             elapsed = time.perf_counter() - t0
@@ -897,7 +892,7 @@ def test_build_projected_blocks():
     # Build via backend
     H_QP = backend.build_hqp(p_dets, verbose=False)
     basis, d = backend.build_basis(H_QP, E0_P, verbose=False)
-    H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, verbose=False)
+    H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, H_QP=H_QP, verbose=False)
 
     # Effective Hamiltonian
     H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=0.0)

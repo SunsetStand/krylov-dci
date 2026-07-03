@@ -199,7 +199,7 @@ def run_kdci_layers(q_idx, p_dets, E0_vals, delta_vals, m_max, e_dmrg, nroots=6)
             H_QP, E0_ground, m_max=m, verbose=False)
         
         # Build projected blocks (basis-independent of E0/delta)
-        H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, verbose=False)
+        H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, H_QP=H_QP, verbose=False)
         
         # State-specific effective Hamiltonians
         ev_total = []
