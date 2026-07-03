@@ -362,14 +362,45 @@ class KDCIBackend:
                 basis_list.append(v)
                 new_count += 1
 
-        basis_new = np.column_stack(basis_list)
-        d_new = len(basis_list)
+        basis_mgs = np.column_stack(basis_list)
+        d_mgs = len(basis_list)
+        added_mgs = d_mgs - r
+
+        # SVD truncation: remove near-singular directions in the new
+        # (propagated) block that would make the projected resolvent
+        # ill-conditioned. This mirrors the SVD step in the original
+        # Krylov-dCI pipeline that was critical for numerical stability.
+        if added_mgs > 0:
+            new_vecs = basis_mgs[:, r:]  # (M, added_mgs)
+            # Gram matrix of the new (already orthonormal) vectors
+            gram = new_vecs.T @ new_vecs
+            U_s, s, _ = np.linalg.svd(gram)
+            svd_threshold = lindep_threshold * d_mgs
+            keep = s > svd_threshold
+            n_keep = int(np.sum(keep))
+
+            if n_keep < added_mgs:
+                # Rotate: compress new_vecs to n_keep-dimensional subspace
+                rot = U_s[:, keep] @ np.diag(1.0 / np.sqrt(s[keep]))
+                new_vecs_trunc = new_vecs @ rot  # (M, n_keep)
+                basis_new = np.column_stack([basis_mgs[:, :r], new_vecs_trunc])
+                d_new = r + n_keep
+            else:
+                basis_new = basis_mgs
+                d_new = d_mgs
+        else:
+            basis_new = basis_mgs
+            d_new = d_mgs
 
         if verbose:
             elapsed = time.perf_counter() - t0
             added = d_new - r
-            print(f"    Propagate: {r} -> {d_new} vectors "
-                  f"(+{added} new) in {elapsed:.0f}s", flush=True)
+            removed = added_mgs - added
+            parts = [f"    Propagate: {r} -> {d_new} vectors (+{added} new"]
+            if removed > 0:
+                parts.append(f", {removed} removed by SVD")
+            parts.append(f") in {elapsed:.0f}s")
+            print("".join(parts), flush=True)
 
         return basis_new, d_new
 
