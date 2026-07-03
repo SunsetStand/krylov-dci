@@ -293,10 +293,10 @@ class KDCIBackend:
           K_{m+1} = span(K_m, (AB) · K_m)
 
         where:
-          A = (E0_P - D_QQ)^{-1}            (diagonal resolvent, Δ=0)
-          B = H_O' = H_QQ - D_QQ            (off-diagonal coupling)
-        The Krylov subspace is built at E=E0_P. Delta shifts the
-        final effective Hamiltonian resolvent only.
+          A = (E0_P - D_QQ)^{-1}            (diagonal resolvent)
+          B = H_O' - Delta·I = H_QQ - D_QQ - Delta·I
+        Krylov subspace = span{A^{1/2}·H_QP, (AB)·A^{1/2}·H_QP, ...}
+        with A and B as defined in the original decomposition.
 
         For each basis vector b_k:
           1. sigma = H_QQ · b_k            (contract_2e, C-level)
@@ -338,10 +338,11 @@ class KDCIBackend:
                 self.q_idx.to_ci_matrix(b_k)
             ).reshape(-1)
 
-            # B · b_k = H_QQ·b_k - D_QQ·b_k = H_O' · b_k
-            # Delta enters only in final H^eff resolvent, not in Krylov
-            # subspace generation (proposal Eq. 6 uses A=(E0-D)^{-1}).
-            residual = sigma_k - self.q_idx.hdiag * b_k
+            # B · b_k = H_QQ·b_k - D_QQ·b_k - delta·b_k
+            #        = (H_O' - Delta·I) · b_k
+            # B carries the energy shift per the decomposition:
+            # (E I - H_QQ)^{-1} = (A^{-1} - B)^{-1}, B = H_O' - Delta*I
+            residual = sigma_k - (self.q_idx.hdiag + delta) * b_k
 
             # x_k = A · residual  (diagonal resolvent applied)
             x_k = A_q * residual
