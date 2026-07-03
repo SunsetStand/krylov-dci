@@ -227,23 +227,27 @@ class KDCIBackend:
     # ═══════════════════════════════════════════════════════════════
 
     def build_basis(self, H_QP: np.ndarray, E0_P: float,
+                    delta: float = 0.0,
                     lindep_threshold: float = 1e-10,
                     verbose: bool = True) -> Tuple[np.ndarray, int]:
-        """Build orthonormal basis from A_weighted H_QP.
+        """Build orthonormal basis from A-weighted H_QP.
 
-        1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p], A_q = 1/(E0_P - H_QQ[q,q]).
+        1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p],
+           A_q = 1/(E0_P + delta - H_QQ[q,q]).
+           where A = (E I - D_QQ)^{-1} with E = E0_P + delta.
         2. Modified Gram-Schmidt → orthonormal basis (M, d), d ≤ N.
 
         Args:
             H_QP: (M, N) unweighted H_QP matrix.
-            E0_P: Reference energy.
+            E0_P: Reference energy (lowest eigenvalue of H_PP).
+            delta: Energy shift Delta = E - E0_P.
         Returns:
             (basis, d): basis is (M, d), d is count of linearly independent cols.
         """
         M, N = H_QP.shape
 
-        # A-weighting
-        denom = E0_P - self.q_idx.hdiag
+        # A-weighting: A = (E0_P + delta - D_QQ)^{-1}
+        denom = E0_P + delta - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(M)
         A_q[mask] = 1.0 / denom[mask]
@@ -272,6 +276,148 @@ class KDCIBackend:
             print(f"    MGS: {N} → {d} vectors in {elapsed:.0f}s", flush=True)
 
         return basis, d
+
+    # ═══════════════════════════════════════════════════════════════
+    # Krylov propagation: (AB)^m · A^{1/2} H_QP
+    # ═══════════════════════════════════════════════════════════════
+
+    def propagate_basis(self, basis: np.ndarray, E0_P: float,
+                        delta: float = 0.0,
+                        lindep_threshold: float = 1e-10,
+                        verbose: bool = True) -> Tuple[np.ndarray, int]:
+        """Propagate existing Krylov basis by one layer: B <- AB · B.
+
+        Implements the Krylov subspace propagation:
+          K_{m+1} = span(K_m, (AB) · K_m)
+
+        where:
+          A = (E0_P + delta - D_QQ)^{-1}   (diagonal resolvent)
+          B = H_O' - delta·I = H_QQ - D_QQ - delta·I
+
+        For each basis vector b_k:
+          1. sigma = H_QQ · b_k            (contract_2e, C-level)
+          2. x_k  = A · (sigma - (D_QQ + delta·I) · b_k)
+                  = A · B · b_k
+
+        The x_k vectors are MGS-orthogonalized against the existing basis.
+        Only linearly independent new directions are appended.
+
+        Args:
+            basis:  (M, r) existing orthonormal Krylov basis.
+            E0_P:   Reference energy (lowest eigenvalue of H_PP).
+            delta:  Energy shift Delta = E - E0_P.
+            lindep_threshold: MGS linear independence threshold.
+            verbose: Print progress.
+
+        Returns:
+            (basis_new, d_new): expanded basis (M, d_new) and new count.
+        """
+        M, r = basis.shape
+
+        # A = (E0_P + delta - D_QQ)^{-1}
+        denom = E0_P + delta - self.q_idx.hdiag
+        mask = np.abs(denom) > 1e-10
+        A_q = np.zeros(M)
+        A_q[mask] = 1.0 / denom[mask]
+
+        if verbose:
+            t0 = time.perf_counter()
+            print(f"    Propagate: r={r}, delta={delta:.6f}...", flush=True)
+
+        propagated = []
+        for k in range(r):
+            b_k = basis[:, k]
+
+            # sigma = H_QQ · b_k  (1e already absorbed in h2e_eff)
+            sigma_k = self.sigma_full(
+                self.q_idx.to_ci_matrix(b_k)
+            ).reshape(-1)
+
+            # B · b_k = H_QQ·b_k - D_QQ·b_k - delta·b_k
+            #        = (H_O') · b_k - delta · b_k
+            residual = sigma_k - (self.q_idx.hdiag + delta) * b_k
+
+            # x_k = A · residual  (diagonal resolvent applied)
+            x_k = A_q * residual
+            propagated.append(x_k)
+
+        # MGS orthogonalization: first against existing basis, then
+        # against previously accepted new vectors
+        basis_list = [basis[:, j] for j in range(r)]
+        new_count = 0
+        for x_k in propagated:
+            v = x_k.copy()
+            for b in basis_list:
+                v -= np.dot(b, v) * b
+            nrm = np.linalg.norm(v)
+            if nrm > lindep_threshold:
+                v /= nrm
+                basis_list.append(v)
+                new_count += 1
+
+        basis_new = np.column_stack(basis_list)
+        d_new = len(basis_list)
+
+        if verbose:
+            elapsed = time.perf_counter() - t0
+            added = d_new - r
+            print(f"    Propagate: {r} -> {d_new} vectors "
+                  f"(+{added} new) in {elapsed:.0f}s", flush=True)
+
+        return basis_new, d_new
+
+    def build_krylov_layers(self, H_QP: np.ndarray, E0_P: float,
+                            delta: float = 0.0, m_max: int = 0,
+                            lindep_threshold: float = 1e-10,
+                            verbose: bool = True
+                            ) -> Tuple[np.ndarray, int, List[int]]:
+        """Build Krylov basis up to order m_max.
+
+        Layer 0: B_0 = MGS(A^{1/2} · H_QP)
+        Layer m:  B_m = MGS([B_{m-1}, (AB) · B_{m-1}])
+
+        This is the main entry point for multi-layer Krylov-dCI.
+
+        Args:
+            H_QP:   (M, N) unweighted H_QP matrix.
+            E0_P:   Reference energy.
+            delta:  Energy shift.
+            m_max:  Maximum Krylov order (m=0 is single-layer).
+            lindep_threshold: Linear independence threshold.
+
+        Returns:
+            (basis, d_total, d_per_layer): final basis, total dim,
+                                           dimensions per layer.
+        """
+        if verbose and m_max > 0:
+            t0 = time.perf_counter()
+            print(f"Building Krylov layers m=0..{m_max} "
+                  f"(delta={delta:.6f})...", flush=True)
+
+        # Layer 0: A^{1/2} · H_QP  (no sqrt in original; using A-weighted)
+        basis, d0 = self.build_basis(H_QP, E0_P, delta=delta,
+                                     lindep_threshold=lindep_threshold,
+                                     verbose=verbose)
+        d_per_layer = [d0]
+
+        for m in range(1, m_max + 1):
+            basis, d_m = self.propagate_basis(
+                basis, E0_P, delta=delta,
+                lindep_threshold=lindep_threshold,
+                verbose=verbose)
+            d_per_layer.append(d_m)
+            if d_m == d_per_layer[-2]:
+                if verbose:
+                    print(f"  Layer m={m}: no new directions, stopping.",
+                          flush=True)
+                break
+
+        if verbose and m_max > 0:
+            elapsed = time.perf_counter() - t0
+            print(f"Krylov layers done: {d_per_layer} "
+                  f"in {elapsed:.0f}s", flush=True)
+
+        return basis, d_per_layer[-1], d_per_layer
 
     # ═══════════════════════════════════════════════════════════════
     # Projected Hamiltonian blocks
@@ -385,6 +531,7 @@ class KDCIBackend:
 
     def build_basis_streaming(self, p_dets: List[Tuple[int, int]],
                               E0_P: float,
+                              delta: float = 0.0,
                               lindep_threshold: float = 1e-10,
                               verbose: bool = True
                               ) -> Tuple[List, int]:
@@ -397,6 +544,8 @@ class KDCIBackend:
           4. If linearly independent: normalize, add to basis
           5. Discard dense sigma
 
+        A-weighting: A_q = 1/(E0_P + delta - H_QQ[q,q]).
+
         Persistent storage: only d SparseQVector objects.
         Temporary: one (na, nb) dense CI matrix per iteration.
         """
@@ -406,7 +555,8 @@ class KDCIBackend:
         na = self.q_idx.n_alpha
         nb = self.q_idx.n_beta
 
-        denom = E0_P - self.q_idx.hdiag
+        # A-weighting: A = (E0_P + delta - D_QQ)^{-1}
+        denom = E0_P + delta - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(self.q_idx.M)
         A_q[mask] = 1.0 / denom[mask]
@@ -778,7 +928,11 @@ def test_build_projected_blocks():
     H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, verbose=False)
 
     # Effective Hamiltonian
-    H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=0.0)
+    # delta = E(FCI) - E0_P provides the exact shift for the ground state.
+    # For production use, delta is obtained from DMRG-CI reference
+    # and will eventually be determined self-consistently.
+    delta = e_fci[0] - E0_P  # exact Delta from FCI reference
+    H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=delta)
     ev_kdci, _ = diagonalize_effective_H(H_eff, n_states=None)
 
     dE0 = (ev_kdci[0] - e_fci[0]) * 1000
