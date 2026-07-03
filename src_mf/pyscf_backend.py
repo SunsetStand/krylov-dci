@@ -505,7 +505,7 @@ class KDCIBackend:
 
         return basis, d_per_layer[-1], d_per_layer
 
-def build_basis_streaming(self, p_dets: List[Tuple[int, int]],
+    def build_basis_streaming(self, p_dets: List[Tuple[int, int]],
                               E0_P: float,
                               lindep_threshold: float = 1e-10,
                               verbose: bool = True
