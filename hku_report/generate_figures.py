@@ -107,11 +107,18 @@ ax1.legend()
 for i, (b, p, t) in enumerate(zip(wall_basis, wall_proj, wall_total)):
     ax1.text(i, t + 20, f'{t}s', ha='center', fontsize=9, fontweight='bold')
 
-# Right: Memory + theoretical sublinear scaling
-ax2_ = ax2.twinx()
-ax2.plot(CAS_labels, memory_mb, 'o-', color='#d62728', linewidth=2, markersize=8, label='Memory (MB)')
+# Right: Memory + theoretical sublinear scaling (both axes share numeric x)
+ax2.set_xscale('log')
+ax2.plot(M_vals, memory_mb, 'o-', color='#d62728', linewidth=2, markersize=8, label='Memory (MB)')
 ax2.set_ylabel('Memory (MB)', color='#d62728')
 ax2.tick_params(axis='y', labelcolor='#d62728')
+ax2.set_xticks(M_vals)
+ax2.set_xticklabels(CAS_labels)
+ax2.set_xlabel('CAS (|Q| determinants)')
+ax2.set_title('CAS Scaling: Sublinear Wall Time, M 185× → Time 22×')
+
+ax2_ = ax2.twinx()
+ax2_.set_yscale('log')
 
 # Sublinear: time ∝ M^0.6 reference line
 M_ref = np.logspace(np.log10(6e4), np.log10(1.2e7), 100)
@@ -122,11 +129,7 @@ ax2_.plot(M_ref, time_linear, 'grey', linestyle=':', linewidth=1, alpha=0.4, lab
 ax2_.plot(M_vals, wall_total, 's-', color='#1f77b4', linewidth=2, markersize=8, label='Total wall (s)')
 ax2_.set_ylabel('Wall Time (s)', color='#1f77b4')
 ax2_.tick_params(axis='y', labelcolor='#1f77b4')
-ax2_.set_yscale('log')
-ax2_.set_xscale('log')
 
-ax2.set_xlabel('|Q| (determinants)')
-ax2.set_title('CAS Scaling: Sublinear Wall Time, M 185× → Time 22×')
 lines1, labels1 = ax2.get_legend_handles_labels()
 lines2, labels2 = ax2_.get_legend_handles_labels()
 ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=9)
@@ -216,6 +219,7 @@ ax2.axhline(y=0, color='black', linewidth=0.5)
 ax2.set_xlabel('State index')
 ax2.set_ylabel('ΔE vs DMRG-CI (mH)')
 ax2.set_title(f'Per-State Error: kDCI P=600 m=2\n(ground: {delta_mH[0]:.1f} mH)')
+ax2.set_xticks(range(6))
 ax2.set_xticklabels(states)
 
 # Annotate
