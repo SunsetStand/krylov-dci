@@ -1,1 +1,18 @@
+# Checkpoints (large .npz files)
 checkpoints_*/
+
+# SLURM output
+slurm-*.out
+slurm-*.err
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
