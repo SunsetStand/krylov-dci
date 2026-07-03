@@ -1,3 +1,0 @@
-/data/home/wangcx/LiYF4_Er3+/env/lib/python3.10/site-packages/pyscf/fci/direct_nosym.py:209: UserWarning: direct_nosym.kernel is not able to diagonalize non-Hermitian Hamiltonian. If h1e and h2e is not hermtian, calling symmetric diagonalization in eig can lead to wrong results.
-  warnings.warn('direct_nosym.kernel is not able to diagonalize '
-slurmstepd: error: *** JOB 14871 ON amd-cpu CANCELLED AT 2026-06-29T03:48:40 ***

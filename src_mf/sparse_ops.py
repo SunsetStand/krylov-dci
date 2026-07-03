@@ -279,55 +279,32 @@ def project_hqq(
     n_orb: int,
     diag_func=None
 ) -> np.ndarray:
-    """Compute H_{Q̃Q̃} via streaming double-sum (no full sigma stored).
+    """Compute H_{Q̃Q̃}[j,k] = ⟨b_j|H_QQ|b_k⟩.
 
-    H_{Q̃Q̃}[j,k] = Σ_{q ∈ supp(B_j)} Σ_{r ∈ conn(q)} B[j,q] · H_QQ[q,r] · B[k,r]
+    For each basis column, computes σ = H_QQ · b_k via sigma_sparse,
+    then projects: H_{Q̃Q̃}[j,k] = b_j · σ_k.
 
-    The outer loop iterates over each basis vector's support; for each
-    connected Q determinant, we immediately dot with all basis vectors.
-    The full sigma vectors are never materialized.
+    Args:
+        basis:     List of r SparseQVector (orthonormal basis).
+        ham:       Hamiltonian object.
+        n_orb:     Number of spatial orbitals.
+        diag_func: Optional diagonal function for H_QQ.
+
+    Returns:
+        (r, r) symmetric matrix H_{Q̃Q̃}.
     """
     r = len(basis)
     if r == 0:
         return np.zeros((0, 0))
 
     H_tilde = np.zeros((r, r))
-
-    # Build fast-lookup dicts for each basis vector: {det → coefficient}
-    basis_dicts = [dict(b.items()) for b in basis]
-
     for k in range(r):
-        b_k = basis[k]
-        b_k_dict = basis_dicts[k]
+        sigma_k = sigma_sparse(basis[k], ham, n_orb, diag_func)
+        for j in range(k, r):
+            H_tilde[j, k] = basis[j].dot(sigma_k)
+            H_tilde[k, j] = H_tilde[j, k]
 
-        # Diagonal contribution: Σ_q B[j,q] · H_QQ[q,q] · B[k,q]
-        if diag_func is not None:
-            for det_q, coef_k in b_k.items():
-                h_qq = diag_func(det_q[0], det_q[1])
-                contrib = coef_k * h_qq
-                for j in range(r):
-                    coef_j = basis_dicts[j].get(det_q, 0.0)
-                    if abs(coef_j) > 1e-16:
-                        H_tilde[j, k] += coef_j * contrib
-
-        # Off-diagonal: generate connected determinants for each q in supp(B_k)
-        for det_q, coef_k in b_k.items():
-            connected = generate_connected_determinants(
-                det_q[0], det_q[1], n_orb)
-            for det_r, *_ in connected:
-                h_qr = ham.matrix_element(det_q, det_r)
-                if abs(h_qr) < 1e-14:
-                    continue
-                contrib = coef_k * h_qr
-                # Dot with all basis vectors that have det_r in support
-                for j in range(r):
-                    coef_j = basis_dicts[j].get(det_r, 0.0)
-                    if abs(coef_j) > 1e-16:
-                        H_tilde[j, k] += coef_j * contrib
-
-    # Symmetrize
-    H_tilde = 0.5 * (H_tilde + H_tilde.T)
-    return H_tilde
+    return 0.5 * (H_tilde + H_tilde.T)
 
 
 def project_hpq(

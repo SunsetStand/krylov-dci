@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 488, in <module>
-    main()
-  File "/data/home/wangcx/krylov-dci/scripts/phase11_stageB.py", line 479, in main
-    e_fci, c_flat, qa, qb, ecore, na, nb, hdiag, hqq_d, hqq_i, hqq_p, M = \
-TypeError: cannot unpack non-iterable NoneType object
