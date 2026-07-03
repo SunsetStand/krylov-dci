@@ -27,15 +27,11 @@ NROOTS = 6; M_MAX = 3; P_TARGET = 400
 print("Building N2/cc-pVDZ CAS(10,10)...", flush=True)
 mol = gto.M(atom='N 0 0 0; N 0 0 1.1', basis='cc-pVDZ', verbose=0)
 mf = scf.RHF(mol).run(verbose=0)
-n_core_orbs = list(range(N_CORE))
-n_act_orbs = list(range(N_CORE, N_CORE + N_ACT))
-norb = mf.mo_coeff.shape[1]
-h1e_mo = mf.mo_coeff.T @ mf.get_hcore() @ mf.mo_coeff
-eri_ao = mol.intor('int2e')
-eri_mo = ao2mo.full(eri_ao, mf.mo_coeff, compact=False)
-eri_mo = eri_mo.reshape(norb, norb, norb, norb)
-h1e_act = h1e_mo[np.ix_(n_act_orbs, n_act_orbs)]
-eri_act = eri_mo[np.ix_(n_act_orbs, n_act_orbs, n_act_orbs, n_act_orbs)]
+# Load Stage C active space integrals from checkpoint
+h1e_act = gd['h1eff']
+from src.hamiltonian import _unpack_4fold
+h2eff_packed = gd['h2eff_packed']
+eri_act = _unpack_4fold(h2eff_packed, N_ACT)
 nelec = (N_ELEC_ACT//2, N_ELEC_ACT - N_ELEC_ACT//2)
 alpha_strs = cistring.gen_strings4orblist(range(N_ACT), nelec[0])
 beta_strs = cistring.gen_strings4orblist(range(N_ACT), nelec[1])
@@ -46,10 +42,10 @@ M = q_idx.M
 print(f"  Active: {nelec[0]}a+{nelec[1]}b in {N_ACT} orbs, M={M:,}", flush=True)
 
 # ── DMRG-CI reference ──
-print("Computing DMRG-CI reference...", flush=True)
-e_fci, _ = direct_spin1.FCI().kernel(h1e_act, eri_act, N_ACT, nelec,
-                                      nroots=NROOTS, verbose=0)
-e_dmrg = [float(e) for e in np.atleast_1d(e_fci)[:NROOTS]]
+print("Loading DMRG-CI reference from Stage C...", flush=True)
+gd = np.load(os.path.join(PROJECT_ROOT, 'checkpoints_stageC',
+                           'P0000', 'global_data.npz'), allow_pickle=True)
+e_dmrg = [float(e) for e in gd['e_dmrg_bare'][:NROOTS]]
 print(f"  DMRG-CI E0 = {e_dmrg[0]:.8f} Ha", flush=True)
 
 # ── Load Stage C P-space ──
