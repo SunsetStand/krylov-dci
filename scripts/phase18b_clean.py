@@ -118,7 +118,7 @@ H_PP = 0.5 * (H_PP + H_PP.T)
 E0_vals, _ = eigh(H_PP)
 E0_vals = E0_vals[:NROOTS]
 E0_P = float(E0_vals[0])
-# delta_vals not used (delta=0 for fair comparison)([e_dmrg[k] - E0_vals[k] for k in range(NROOTS)])
+delta_vals = np.array([e_dmrg[k] - E0_vals[k] for k in range(NROOTS)])
 dE0_P_mH = (E0_P - e_dmrg[0]) * 1000
 
 print(f"  E0(P) = {E0_P:.8f} Ha, P-only dE0 = {dE0_P_mH:+.3f} mH")
