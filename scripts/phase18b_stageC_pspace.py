@@ -20,7 +20,7 @@ from pyscf import gto, scf, ao2mo
 from pyscf.fci import cistring, direct_spin1
 from scipy import sparse
 
-N_CORE = 3; N_ACT = 10; N_ELEC_ACT = 8; BOND_LENGTH = 1.10
+N_CORE = 2; N_ACT = 10; N_ELEC_ACT = 10; BOND_LENGTH = 1.10
 NROOTS = 6; M_MAX = 3; P_TARGET = 400
 
 # ── Build N2 CAS(10,10) system ──
