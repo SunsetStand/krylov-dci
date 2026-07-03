@@ -158,8 +158,16 @@ def select_p_space_hf_pt(q_idx, N_target):
     return selected[:N_target]
 
 
-def run_kdci_layers(q_idx, p_dets, E0_P, delta, m_max, e_dmrg, nroots=6):
-    """Run Krylov-dCI with multi-layer propagation."""
+def run_kdci_layers(q_idx, p_dets, E0_vals, delta_vals, m_max, e_dmrg, nroots=6):
+    """Run Krylov-dCI with multi-layer propagation.
+    
+    Uses state-specific effective Hamiltonians: for each target state k,
+    H^eff is built with E0^(k) + Delta^(k) in the resolvent, where
+    E0^(k) = k-th eigenvalue of H_PP and Delta^(k) = E_DMRG[k] - E0^(k).
+    
+    The Krylov basis is built once at E0^(0) (ground state) and reused;
+    only the resolvent shift differs per state.
+    """
     backend = KDCIBackend(q_idx)
     
     # Build H_PP
@@ -181,38 +189,49 @@ def run_kdci_layers(q_idx, p_dets, E0_P, delta, m_max, e_dmrg, nroots=6):
     t_hqp = time.perf_counter() - t0
     
     results = []
+    E0_ground = E0_vals[0]  # for Krylov basis construction
     
     for m in range(m_max + 1):
         t_layer = time.perf_counter()
         
-        # Build Krylov basis up to layer m
+        # Build Krylov basis up to layer m (at E0_ground)
         basis, d_total, d_layers = backend.build_krylov_layers(
-            H_QP, E0_P, delta=delta, m_max=m, verbose=False)
+            H_QP, E0_ground, m_max=m, verbose=False)
         
-        # Build projected blocks
+        # Build projected blocks (basis-independent of E0/delta)
         H_QQ_t, H_PQ_t = backend.build_projected_blocks(basis, p_dets, verbose=False)
         
-        # Effective Hamiltonian
-        H_eff = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_P, delta=delta)
-        ev, _ = diagonalize_effective_H(H_eff, n_states=nroots)
+        # State-specific effective Hamiltonians
+        ev_total = []
+        for k in range(nroots):
+            E0_k = E0_vals[k]
+            delta_k = delta_vals[k]
+            # Build H^eff with state-specific resolvent shift
+            H_eff_k = build_effective_H(H_PP, H_PQ_t, H_QQ_t, E0_k, delta=delta_k)
+            ev_k, _ = diagonalize_effective_H(H_eff_k, n_states=1)
+            ev_total.append(float(ev_k[0]))
         
         t_elapsed = time.perf_counter() - t_layer
         
-        dE0_mH = (ev[0] - e_dmrg[0]) * 1000
-        ex_dE_mH = [(ev[i] - e_dmrg[i]) * 1000 for i in range(1, min(nroots, len(ev)))]
+        dE0_mH = (ev_total[0] - e_dmrg[0]) * 1000
+        ex_dE_mH = [(ev_total[i] - e_dmrg[i]) * 1000 for i in range(1, min(nroots, len(ev_total)))]
         
         results.append({
             'm': m,
             'd_basis': d_total,
             'd_layers': d_layers,
             'dE0_mH': dE0_mH,
-            'ev_total': [float(e) for e in ev[:nroots]],
+            'ev_total': ev_total,
             'ex_dE_mH': ex_dE_mH,
             'wall_s': t_elapsed,
+            'per_state_E0': [float(e) for e in E0_vals[:nroots]],
+            'per_state_delta': [float(d) for d in delta_vals[:nroots]],
         })
         
+        # Print per-state errors
+        ex_str = '  '.join(f'S{s+1}:{ex_dE_mH[s]:+.0f}' for s in range(len(ex_dE_mH)))
         print(f"  m={m}: d={d_total} layers={d_layers}, "
-              f"dE0={dE0_mH:+.3f} mH, wall={t_elapsed:.0f}s", flush=True)
+              f"dE0={dE0_mH:+.3f} mH, {ex_str}, wall={t_elapsed:.0f}s", flush=True)
     
     return results
 
@@ -259,21 +278,24 @@ def main():
         for j in range(N):
             H_PP[i, j] = ham.matrix_element(p_dets[i], p_dets[j])
     H_PP = 0.5 * (H_PP + H_PP.T)
-    E0_P = float(eigh(H_PP)[0][0])
+    E0_vals, _ = eigh(H_PP)
+    E0_vals = E0_vals[:NROOTS]  # first nroots eigenvalues of H_PP
+    E0_P = float(E0_vals[0])
     
-    # Exact delta from FCI reference
-    delta = e_dmrg[0] - E0_P
+    # Per-state delta from DMRG-CI reference
+    delta_vals = np.array([e_dmrg[k] - E0_vals[k] for k in range(NROOTS)])
     dE0_P_mH = (E0_P - e_dmrg[0]) * 1000
     
     print(f"  E0(P)   = {E0_P:.8f} Ha")
-    print(f"  Delta   = {delta:.8f} Ha ({delta*1000:.3f} mH)")
+    print(f"  E0(P) per state: {[f'{e:.4f}' for e in E0_vals[:NROOTS]]}")
+    print(f"  Delta per state (mH): {[f'{d*1000:.1f}' for d in delta_vals]}")
     print(f"  P-only dE0 = {dE0_P_mH:+.3f} mH")
     
     # Run Krylov-dCI
     print(f"\nRunning Krylov-dCI layers m=0..{M_MAX}...", flush=True)
     t_start = time.perf_counter()
     
-    results = run_kdci_layers(q_idx, p_dets, E0_P, delta, M_MAX, e_dmrg, nroots=NROOTS)
+    results = run_kdci_layers(q_idx, p_dets, E0_vals, delta_vals, M_MAX, e_dmrg, nroots=NROOTS)
     
     t_total = time.perf_counter() - t_start
     
