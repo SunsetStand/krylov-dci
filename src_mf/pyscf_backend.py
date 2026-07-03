@@ -233,8 +233,8 @@ class KDCIBackend:
         """Build orthonormal basis from A-weighted H_QP.
 
         1. Weight: H_QP_w[q,p] = A_q · H_QP[q,p],
-           A_q = 1/(E0_P + delta - H_QQ[q,q]).
-           where A = (E I - D_QQ)^{-1} with E = E0_P + delta.
+           A_q = 1/(E0_P - H_QQ[q,q]).
+           where A = (E0 I - D_QQ)^{-1} (Delta enters through B, not A).
         2. Modified Gram-Schmidt → orthonormal basis (M, d), d ≤ N.
 
         Args:
@@ -246,8 +246,8 @@ class KDCIBackend:
         """
         M, N = H_QP.shape
 
-        # A-weighting: A = (E0_P + delta - D_QQ)^{-1}
-        denom = E0_P + delta - self.q_idx.hdiag
+        # A-weighting: A = (E0_P - D_QQ)^{-1}  (Delta enters via B, not A)
+        denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(M)
         A_q[mask] = 1.0 / denom[mask]
@@ -314,8 +314,8 @@ class KDCIBackend:
         """
         M, r = basis.shape
 
-        # A = (E0_P + delta - D_QQ)^{-1}
-        denom = E0_P + delta - self.q_idx.hdiag
+        # A = (E0_P - D_QQ)^{-1}  (Delta enters via B = H_O' − ΔI)
+        denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(M)
         A_q[mask] = 1.0 / denom[mask]
@@ -544,7 +544,7 @@ class KDCIBackend:
           4. If linearly independent: normalize, add to basis
           5. Discard dense sigma
 
-        A-weighting: A_q = 1/(E0_P + delta - H_QQ[q,q]).
+        A-weighting: A_q = 1/(E0_P - H_QQ[q,q])  (Delta enters via B).
 
         Persistent storage: only d SparseQVector objects.
         Temporary: one (na, nb) dense CI matrix per iteration.
@@ -555,8 +555,8 @@ class KDCIBackend:
         na = self.q_idx.n_alpha
         nb = self.q_idx.n_beta
 
-        # A-weighting: A = (E0_P + delta - D_QQ)^{-1}
-        denom = E0_P + delta - self.q_idx.hdiag
+        # A-weighting: A = (E0_P - D_QQ)^{-1}  (Delta enters via B, not A)
+        denom = E0_P - self.q_idx.hdiag
         mask = np.abs(denom) > 1e-10
         A_q = np.zeros(self.q_idx.M)
         A_q[mask] = 1.0 / denom[mask]
