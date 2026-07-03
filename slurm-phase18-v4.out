@@ -1,0 +1,23 @@
+============================================================
+Phase 18: m-convergence with correct A/B decomposition
+N2/cc-pVDZ CAS(10,10) P=400 m=0..3
+Date: Fri Jul  3 05:04:58 2026
+============================================================
+
+Building N2/cc-pVDZ CAS(10,10)...
+  Active: 5a + 5b electrons in 10 orbitals
+  M = 63,504 determinants
+
+Computing DMRG-CI reference...
+  DMRG-CI E0 = -61.10859778 Ha
+
+Selecting P=400 via HF perturbation...
+  N = 400 determinants
+  E0(P)   = -61.02030830 Ha
+  Delta   = -0.08828948 Ha (-88.289 mH)
+  P-only dE0 = +88.289 mH
+
+Running Krylov-dCI layers m=0..3...
+  m=0: d=399 layers=[399], dE0=+15.048 mH, wall=22s
+  m=1: d=798 layers=[399, 798], dE0=-2500701.306 mH, wall=100s
+  m=2: d=1197 layers=[399, 798, 1197], dE0=-6126273.389 mH, wall=288s

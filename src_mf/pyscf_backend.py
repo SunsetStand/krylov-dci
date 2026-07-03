@@ -348,12 +348,35 @@ class KDCIBackend:
             x_k = A_q * residual
             propagated.append(x_k)
 
-        # MGS orthogonalization: first against existing basis, then
-        # against previously accepted new vectors
+        # ── A-weighted SVD truncation (before MGS) ──
+        # Re-apply A-weighting to the propagated vectors: T = A · propagated.
+        # This amplifies low-energy Q-space directions that couple strongly
+        # to P, and suppresses high-energy noise. SVD on T identifies the
+        # dominant resolvent-relevant subspace.
+        # Threshold ~1e-3 mirrors the original Krylov-dCI implementation.
+        if len(propagated) > 0:
+            prop_mat = np.column_stack(propagated)  # (M, count)
+            # Re-weight: T[:,k] = A_q * prop_mat[:,k]
+            T = A_q[:, np.newaxis] * prop_mat
+            _, s_prop, Vt = np.linalg.svd(T, full_matrices=False)
+            svd_threshold = 1e-3  # matches original implementation
+            keep = s_prop > svd_threshold * max(1.0, s_prop[0])
+            n_keep = int(np.sum(keep))
+            if n_keep < len(propagated):
+                # Compress to significant directions only
+                prop_compressed = T @ Vt[:n_keep, :].T  # (M, n_keep)
+            else:
+                prop_compressed = prop_mat
+        else:
+            prop_compressed = np.zeros((M, 0))
+            n_keep = 0
+
+        # MGS orthogonalization: compressed propagated vectors against
+        # existing basis and against each other
         basis_list = [basis[:, j] for j in range(r)]
         new_count = 0
-        for x_k in propagated:
-            v = x_k.copy()
+        for k in range(prop_compressed.shape[1]):
+            v = prop_compressed[:, k].copy()
             for b in basis_list:
                 v -= np.dot(b, v) * b
             nrm = np.linalg.norm(v)
@@ -362,45 +385,18 @@ class KDCIBackend:
                 basis_list.append(v)
                 new_count += 1
 
-        basis_mgs = np.column_stack(basis_list)
-        d_mgs = len(basis_list)
-        added_mgs = d_mgs - r
-
-        # SVD truncation: remove near-singular directions in the new
-        # (propagated) block that would make the projected resolvent
-        # ill-conditioned. This mirrors the SVD step in the original
-        # Krylov-dCI pipeline that was critical for numerical stability.
-        if added_mgs > 0:
-            new_vecs = basis_mgs[:, r:]  # (M, added_mgs)
-            # Gram matrix of the new (already orthonormal) vectors
-            gram = new_vecs.T @ new_vecs
-            U_s, s, _ = np.linalg.svd(gram)
-            svd_threshold = lindep_threshold * d_mgs
-            keep = s > svd_threshold
-            n_keep = int(np.sum(keep))
-
-            if n_keep < added_mgs:
-                # Rotate: compress new_vecs to n_keep-dimensional subspace
-                rot = U_s[:, keep] @ np.diag(1.0 / np.sqrt(s[keep]))
-                new_vecs_trunc = new_vecs @ rot  # (M, n_keep)
-                basis_new = np.column_stack([basis_mgs[:, :r], new_vecs_trunc])
-                d_new = r + n_keep
-            else:
-                basis_new = basis_mgs
-                d_new = d_mgs
-        else:
-            basis_new = basis_mgs
-            d_new = d_mgs
+        basis_new = np.column_stack(basis_list)
+        d_new = len(basis_list)
 
         if verbose:
             elapsed = time.perf_counter() - t0
             added = d_new - r
-            removed = added_mgs - added
-            parts = [f"    Propagate: {r} -> {d_new} vectors (+{added} new"]
+            removed = len(propagated) - n_keep
+            msg = f"    Propagate: {r} -> {d_new} vectors (+{added} new"
             if removed > 0:
-                parts.append(f", {removed} removed by SVD")
-            parts.append(f") in {elapsed:.0f}s")
-            print("".join(parts), flush=True)
+                msg += f", {removed} kept from SVD"
+            msg += f") in {elapsed:.0f}s"
+            print(msg, flush=True)
 
         return basis_new, d_new
 
