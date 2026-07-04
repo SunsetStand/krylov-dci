@@ -113,10 +113,41 @@ krylov-dci/
 ```
 
 ### Git Workflow
-- Branch naming: `phase/<N>-<description>` (e.g., `phase/1-determinants`)
+
+**Branch naming:**
+- Feature/refactor branches: `feat/<description>` (e.g., `feat/dense-sparse-split`)
+- Phase branches: `phase/<N>-<description>` (e.g., `phase/1-determinants`)
 - Commit messages in English, descriptive
 - Push to GitHub after each meaningful chunk of work
 - **No force push to master**
+
+### 🔴 Branching Requirement for Backend Changes
+
+**When modifying foundational/backend code (method interfaces, numerical algorithms, data structures), you MUST:**
+
+1. **Create a new branch** BEFORE making any changes:
+   ```bash
+   git checkout -b feat/<change-description>
+   ```
+2. **Implement + test** on the branch
+3. **Verify** against existing benchmarks (smoke tests, integration tests)
+4. **Merge into main** ONLY after all tests pass
+5. **Delete** the feature branch after merge
+
+**Examples of changes requiring a branch:**
+- Delta embedding in propagation (B matrix modification)
+- Self-consistent iteration for effective Hamiltonian
+- Backend split/refactoring (e.g., dense vs sparse)
+- Changes to the effective Hamiltonian resolvent formula
+- New Krylov propagation strategies
+
+**Changes that do NOT require a branch:**
+- Script-level parameter tuning (P size, thresholds)
+- Adding new test cases
+- Report generation, plotting
+- Documentation updates
+
+**Rationale:** Prevents breaking the working codebase when experimenting with nontrivial methodological changes. Multiple Phase 18 runs were corrupted by in-place code modifications; branch-first workflow eliminates this class of errors.
 
 ---
 
