@@ -266,25 +266,26 @@ while N_p < P_MAX:
     # 4f. Save checkpoints at target P sizes
     for p_target in P_TARGETS:
         if N_p >= p_target and p_target not in checkpoints:
-            # Use exactly p_target determinants
             dets_p = p_dets[:p_target]
             idx_p = p_full_indices[:p_target]
+
+            # Re-diagonalize exact p_target × p_target submatrix
+            # to get correct E_bare for this P size (not from larger H_PP)
+            H_exact = H_PP[:p_target, :p_target]
+            E_exact, _ = eigh(H_exact)
+
             checkpoints[p_target] = {
                 'P': p_target,
                 'p_dets': [(int(a), int(b)) for a, b in dets_p],
                 'p_full_indices': [int(i) for i in idx_p],
-                'E_bare': [float(e) for e in E_bare],
-                'dE0_bare_mH': float(dE0_mH),
+                'E_bare': [float(e) for e in E_exact[:NROOTS]],
+                'dE0_bare_mH': float((E_exact[0] - e_dmrg[0]) * 1000),
                 'iter_num': iter_num,
             }
             fname = f"{OUTDIR}/step1_P{p_target:04d}.json"
-            # Also save the exact H_PP submatrix for verification
-            H_PP_exact = H_PP[:p_target, :p_target]
-            checkpoints[p_target]['H_PP_diag'] = [float(H_PP_exact[i,i])
-                                                   for i in range(p_target)]
             with open(fname, 'w') as f:
                 json.dump(checkpoints[p_target], f, indent=2)
-            print(f"    ✓ saved {fname}", flush=True)
+            print(f"    ✓ saved {fname} (E0_exact={E_exact[0]:.8f})", flush=True)
 
 wall_total = time.perf_counter() - wall_total
 
