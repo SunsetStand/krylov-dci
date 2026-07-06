@@ -39,47 +39,54 @@
 
 ---
 
-## Phase 18: State-Specific H^eff with Δ = 0
+## Phase 18: Two Variants of State-Specific H^eff
 
-**Goal**: Test whether state-specific effective Hamiltonians (different E₀^(k) and Δ^(k) for each root) improve multi-state accuracy compared to the original Stage C approach (single E₀, single basis for all roots).
+**Goal**: Test whether state-specific effective Hamiltonians improve multi-state accuracy.
 
 **System**: N₂/cc-pVDZ CAS(10,10), P = 400 HFPT2 determinants, DMRG-CI reference (nroots = 6).
 
-### Ground State Results
+### Phase 18b: Shared Krylov Basis + Per-State Diagonalization
 
-| Krylov Order m | New (state-specific E₀) | Old Stage C (shared E₀) |
-|:-:|--:|--:|
-| 0 | **+11.9 mH** | −0.7 mH |
-| 1 | −31.1 mH | +5.3 mH |
-| 2 | +12.9 mH | +3.5 mH |
-| 3 | +15.1 mH | +3.4 mH |
+Builds ONE Krylov basis at E₀^(0) (ground-state resolvent center), then diagonalizes per-state H^eff at each E₀^(k).
 
-P-only (bare H_PP) error: +88.3 mH (New) vs +5.0 mH (Stage C). The larger bare error is due to differences in HFPT2 determinant selection, not the method itself. Bloch correction at m=0 reduces this to +11.9 mH.
+| Root | m=0 (mH) | m=3 (mH) | Stage C m=0 (mH) |
+|------|----------|----------|-------------------|
+| S₀ | +11.9 | +15.1 | −0.7 |
+| S₁ | −516 | −3947 | +240 |
+| S₂ | +159 | −2634 | +311 |
+| S₃ | −70 | −2307 | +293 |
+| S₄ | +87 | −1844 | +284 |
+| S₅ | +107 | −1699 | +332 |
 
-### Excited State Results
+**Problem**: Krylov propagation (m > 0) with ground-state-centered basis makes excited states diverge catastrophically.
 
-| Root | m=0 (New) | m=3 (New) | Stage C m=0 |
-|------|----------|----------|-------------|
-| S₁ | −516 mH | −3947 mH | +240 mH |
-| S₂ | +159 mH | −2634 mH | +311 mH |
-| S₃ | −70 mH | −2307 mH | +293 mH |
-| S₄ | +87 mH | −1844 mH | +284 mH |
-| S₅ | +107 mH | −1699 mH | +332 mH |
+### Phase 18 Final: Per-State Krylov Bases ★
 
-### Critical Findings
+Builds 6 SEPARATE Krylov bases, one at each E₀^(k), then diagonalizes. **This is the key result.**
 
-1. **Ground state improves with per-state H^eff** (|+11.9| mH at m=0 vs Stage C's |−0.7| — similar magnitude, different P-space quality accounts for the gap).
+| Root | m=0 New (mH) | Stage C m=0 (mH) | Improvement |
+|------|-------------|-------------------|-------------|
+| S₀ | **+11.9** | −0.7 | — |
+| S₁ | **−75.6** | +240.5 | 3.2× |
+| S₂ | **−5.3** | +311.2 | 58× |
+| S₃ | **−36.8** | +293.2 | 8.0× |
+| S₄ | **+23.0** | +283.7 | 12× |
+| S₅ | **+53.4** | +332.1 | 6.2× |
 
-2. **Excited states degrade catastrophically with Krylov propagation (m > 0)**: m=3 gives -3947 mH for S₁, vs -516 mH at m=0. **Root cause**: the Krylov basis is built around E₀^(0) (ground-state resolvent center). The propagation operator A_q = (E₀^(0) − H_QQ[q])⁻¹ is centered on the ground state, making the basis increasingly blind to excited-state physics at higher m.
+**Max |dE| across excited states: 75.6 mH (New) vs 332.1 mH (Stage C) → 4.4× improvement!**
 
-3. **State-specific E₀ alone does not fix excited states**: Changing only the resolvent shift from E₀^(0) to E₀^(k) at the diagonalization stage does not compensate for building the Krylov basis at the wrong energy.
+### The Critical Distinction
 
-4. **P-projection is unnecessary and harmful**: The Phase 18b fix confirmed that explicitly removing P-space rows from H_QP (via `H_QP_t = H_QP.T @ basis`) is correct — P-components in the σ-vector are automatically handled by the Krylov subspace structure.
+| Variant | Krylov Basis | Diagonalization | Excited State Accuracy |
+|---------|-------------|----------------|----------------------|
+| Phase 18b | Shared (built at E₀^(0)) | Per-state (at E₀^(k)) | −516 mH (poor) |
+| **Phase 18 final** | **Per-state (built at E₀^(k))** | Per-state (at E₀^(k)) | **75.6 mH (good)** |
 
-### Lessons
+**Key insight**: The Krylov basis MUST be centered at the target state's energy. A ground-state-centered basis cannot represent excited-state resolvents, no matter how the diagonalization is shifted.
 
-- Per-state Krylov bases (building `build_basis(H_QP, E₀^(k))` for each root k) are required for excited states, not just per-state diagonalization.
-- The m=0 result (+11.9 mH ground state, excited states at hundreds of mH) establishes a baseline: the Bloch correction works, but excited-state accuracy requires state-specific Q-space treatment.
+### m > 0 Divergence
+
+All per-state Krylov bases collapse at m=1: S₁ goes from −76 mH (m=0) to −71,620 mH (m=1). The propagation operator amplifies near-degenerate Q modes regardless of the resolvent center. **m=0 is the practical sweet spot.**
 
 ---
 
@@ -133,19 +140,16 @@ Poor initial P → bad |Ψ_k⟩ → wrong σ_k → selects wrong determinants �
 
 The per-state P_k for root 4 has its 5th eigenvalue at −59.80 Ha, which is **0.69 Ha above root 5** (−60.49 Ha) — this "eigenstate" corresponds to no physical state at all. It exists purely as a truncation artifact.
 
-### Phase 19c: Iterative P + Krylov build_basis (In Progress — Job 15061)
+### Phase 19c: Iterative P + Per-State Krylov (In Progress — Job 15061)
 
-**Design**: Take the best of both worlds:
-1. **Iterative P selection** (validated: 0.33 mH ground state at P=2000 with m=0 resolvent)
-2. **build_basis + SVD compression** (validated: handles Q-space near-degeneracies, gave 240–332 mH excited states in Stage C with only P=400)
-3. **Per-state Bloch** (validated: +76 mH improvement over Stage C in Phase 18)
+**Design**: Phase 18 final's per-state Krylov approach (validated: 76 mH max error at P=400) + improved iterative P selection (validated: 0.33 mH ground state at P=2000). Same algorithm as `phase18_final.py`, using iterative P checkpoints instead of fixed P=400.
 
 Pipeline: For each P checkpoint and each root k:
 ```
 H_QP → build_basis(H_QP, E₀^(k)) → projected blocks (H_PQ_t, H_QQ_t) → build_effective_H(delta=0) → diagonalize → take k-th eigenvalue
 ```
 
-**Expected outcome**: Ground state ~0.3 mH (matching two-step), excited states 100–300 mH (matching or surpassing Stage C's 240–332 mH range).
+**Expected outcome**: Ground state < 1 mH, excited states approaching or surpassing Phase 18 final's 76 mH max error, especially at larger P (800–2000) where iterative selection adds more excited-state-relevant determinants than pure HFPT2.
 
 ---
 
@@ -153,27 +157,29 @@ H_QP → build_basis(H_QP, E₀^(k)) → projected blocks (H_PQ_t, H_QQ_t) → b
 
 ### What Works
 
-1. **Iterative P selection for ground state**: 0.33 mH Bloch error at P=2000 with m=0 resolvent. Converges systematically with P size. No DMRG or high-precision reference needed.
+1. **Per-state Krylov bases (Phase 18 final)**: Building separate Krylov bases at each E₀^(k) gives **75.6 mH max error** for excited states at P=400 — 4.4× better than Stage C (332 mH). This is the single most important validated result.
 
-2. **CAS scaling to 11.8M determinants**: Sub-linear time scaling (O(M¹·³)), 721 MB peak memory. Matrix-free sparse backend (Phase 16) is production-ready.
+2. **Iterative P selection for ground state**: 0.33 mH Bloch error at P=2000 with m=0 resolvent. Converges systematically with P size. No DMRG or high-precision reference needed.
 
-3. **State-specific H^eff for ground state**: Per-state Bloch with m=0 resolvent achieves chemical accuracy.
+3. **CAS scaling to 11.8M determinants**: Sub-linear time scaling (O(M¹·³)), 721 MB peak memory. Matrix-free sparse backend (Phase 16) is production-ready.
 
 ### What Does Not Work (and Why)
 
-1. **Raw m=0 diagonal resolvent for excited states**: Near-degenerate Q determinants cause resolvent divergence. Krylov basis compression (build_basis) is structurally required — NOT optional.
+1. **Shared Krylov basis for excited states**: A basis built at E₀^(0) cannot represent excited-state resolvents. Per-state Krylov bases are structurally required (Phase 18 final proved this).
 
-2. **Per-state P-space selection via iterative σ-vector scoring**: The k-th eigenstate of a truncated H_PP does not approximate the true k-th physical state. The selection is based on a phantom eigenstate, leading to determinant drift.
+2. **Raw m=0 diagonal resolvent for excited states**: Without Krylov basis compression, near-degenerate Q determinants cause resolvent divergence. build_basis is NOT optional.
 
-3. **Krylov propagation (m > 0) with ground-state-centered basis for excited states**: The Krylov basis built at E₀^(0) becomes increasingly irrelevant to excited-state resolvents at higher m.
+3. **Per-state P-space selection via iterative σ-vector scoring**: The k-th eigenstate of a truncated H_PP does not approximate the true k-th physical state. The selection is based on a phantom eigenstate, leading to determinant drift.
+
+4. **Krylov propagation (m > 0)**: Collapses at m=1 for ALL roots (ground and excited). The propagation operator amplifies near-degenerate Q modes. m=0 is the practical sweet spot.
 
 ### Next Steps
 
-- [ ] Complete Job 15061: iterative P + Krylov build_basis + per-state Bloch
-- [ ] If successful, integrate into production pipeline
-- [ ] State-specific Krylov bases: build separate bases at E₀^(k) for each root (requires Per-state `build_basis`)
-- [ ] Self-consistent delta iteration for each root (remove DMRG reference dependency in production)
+- [ ] **Immediate priority**: Complete Job 15061, verify iterative P + per-state Krylov surpasses Phase 18 final's 76 mH max
 - [ ] Merge `feat/two-step-pspace` into `main` after validation
+- [ ] Integrate `phase18_final.py` per-state Krylov logic as the production Bloch backend
+- [ ] Matrix-free Bloch backend (`bloch_mf.py`) for large systems
+- [ ] Self-consistent delta iteration (remove DMRG reference dependency)
 
 ---
 
