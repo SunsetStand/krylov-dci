@@ -25,7 +25,7 @@ from pyscf import gto, scf, ao2mo
 from pyscf.fci import cistring, direct_spin1
 
 N_CORE = 2; N_ACT = 10; NROOTS = 6
-DELTA = 0.0; M_MAX = 2
+DELTA = 0.0; M_MAX = 1
 P_TARGET = 1200
 
 INPDIR = '/data/home/wangcx/krylov-dci/checkpoints_pspace'
@@ -99,7 +99,7 @@ print("  Built in {:.1f}s".format(time.perf_counter() - t_qp), flush=True)
 # ═════════════════════════════════════════════════════════════
 results = {}
 
-for k in range(NROOTS):
+for k in range(1, NROOTS):  # skip root 0
     E0_k = E0_vals[k]
     v_k_bare = C_P[:, k]
     results[k] = []
@@ -160,7 +160,7 @@ print("  {:>3}  {:>9}  {:>9}  {:>9}  {:>9}  {:>9}  {:>9}".format(
 print("  " + "-" * 60)
 for m in range(M_MAX + 1):
     row = "  {:>3}".format(m)
-    for k in range(NROOTS):
+    for k in range(1, NROOTS):  # skip root 0
         row += "  {:>+8.1f}".format(results[k][m]['dE_mH'])
     print(row, flush=True)
 
@@ -169,7 +169,7 @@ print("  {:>3}  {:>9}  {:>9}  {:>9}  {:>9}  {:>9}  {:>9}".format(
     "m", "S0", "S1", "S2", "S3", "S4", "S5"))
 for m in range(M_MAX + 1):
     row = "  {:>3}".format(m)
-    for k in range(NROOTS):
+    for k in range(1, NROOTS):  # skip root 0
         row += "  {:>9}".format(results[k][m]['m_star'])
     print(row, flush=True)
 
