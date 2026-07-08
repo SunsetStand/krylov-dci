@@ -31,7 +31,7 @@ t1 = time.time()
 try:
     mc = mcscf.CASCI(mf, N_ACT, ne)
     mc.fcisolver = dmrgscf.DMRGCI(mf.mol, maxM=2000, tol=1e-6)
-    mc.fcisolver.block_extra_keyword = ["stack_mem 300000000"]
+    mc.fcisolver.memory = 16  # 16GB for M=2000 DMRG
     mc.fcisolver.nroots = NROOTS
     e_dmrg = mc.kernel()[0]
     dt = time.time()-t1
