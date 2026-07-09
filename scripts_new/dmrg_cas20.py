@@ -6,7 +6,7 @@ from pyscf.dmrgscf import DMRGCI
 
 N_CORE, N_ACT = 2, 20
 NROOTS, R = 6, 1.1
-MEM_MB = 64000  # Block2 memory in MB
+MEM_GB = 60  # Block2 memory in GB (PySCF passes as GB)
 
 print(f"=== DMRG Ref: N2/cc-pVDZ CAS({N_ACT},10) R={R} ===", flush=True)
 t0 = time.time()
@@ -20,12 +20,12 @@ na_o = list(range(N_CORE, N_CORE+N_ACT))
 ne = (mol.nelec[0]-N_CORE, mol.nelec[1]-N_CORE)
 from math import comb
 M = comb(N_ACT, ne[0]) * comb(N_ACT, ne[1])
-print(f"  M={M:,} ({M/1e6:.1f}M)  memory={MEM_MB}MB", flush=True)
+print(f"  M={M:,} ({M/1e6:.1f}M)  memory={MEM_GB}GB", flush=True)
 
-print(f"\n[1] DMRG-CI (M=2000, nroots={NROOTS}, mem={MEM_MB}MB)...", flush=True)
+print(f"\n[1] DMRG-CI (M=2000, nroots={NROOTS}, mem={MEM_GB}GB)...", flush=True)
 t1 = time.time()
 mc = mcscf.CASCI(mf, N_ACT, ne)
-mc.fcisolver = DMRGCI(mol, maxM=2000, tol=1e-6, memory=MEM_MB)
+mc.fcisolver = DMRGCI(mol, maxM=2000, tol=1e-6, memory=MEM_GB)
 mc.fcisolver.nroots = NROOTS
 try:
     e_dmrg = mc.kernel()[0]
