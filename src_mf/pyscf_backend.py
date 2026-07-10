@@ -383,7 +383,7 @@ class KDCIBackend:
     # Krylov propagation: B_{m+1} = MGS([B_m, compressed(AB_m)])
     # ═══════════════════════════════════════════════════════════════
 
-    def propagate_basis(self, basis: np.ndarray, E0_P: float,
+    def propagate_basis(self, basis: np.ndarray, E0_P: float, p_indices: np.ndarray = None,
                         lindep_threshold: float = 1e-10,
                         svd_threshold: float = 1e-3,
                         verbose: bool = True) -> Tuple[np.ndarray, int]:
@@ -418,6 +418,8 @@ class KDCIBackend:
             ).reshape(-1)
             # H_O' * b_k = H_QQ * b_k - D_QQ * b_k
             residual = sigma_k - self.q_idx.hdiag * b_k
+            if p_indices is not None:
+                residual[p_indices] = 0.0
             x_k = A_q * residual
             propagated.append(x_k)
 
@@ -455,7 +457,7 @@ class KDCIBackend:
 
         return basis_new, d_new
 
-    def build_krylov_layers(self, H_QP: np.ndarray, E0_P: float,
+    def build_krylov_layers(self, H_QP: np.ndarray, E0_P: float, p_indices: np.ndarray = None,
                             m_max: int = 0,
                             lindep_threshold: float = 1e-10,
                             svd_threshold: float = 1e-3,
@@ -482,7 +484,7 @@ class KDCIBackend:
 
         for m in range(1, m_max + 1):
             basis, d_m = self.propagate_basis(
-                basis, E0_P,
+                basis, E0_P, p_indices,
                 lindep_threshold=lindep_threshold,
                 svd_threshold=svd_threshold,
                 verbose=verbose)
