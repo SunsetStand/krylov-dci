@@ -157,7 +157,7 @@ class KDCIBackend:
 
         Layer 0 of the Krylov-dCI pipeline:
           1. L0 = A * H_QP,  A_q = 1/(E0_P - D_qq)
-          2. T = A * L0 = A^2 * H_QP
+          2. T = L0 = A * H_QP
           3. SVD(T), keep sigma > 1e-3 * sigma_max
           4. Return U (left singular vectors, orthonormal)
 
@@ -169,7 +169,7 @@ class KDCIBackend:
         denom = E0_P - self.q_idx.hdiag
         A_q = np.where(np.abs(denom) > 1e-10, 1.0 / denom, 0.0)
         L0 = H_QP * A_q[:, np.newaxis]
-        T = A_q[:, np.newaxis] * L0
+        T = L0  # no extra A-weighting
 
         if verbose:
             t0 = time.perf_counter()
@@ -314,7 +314,7 @@ class KDCIBackend:
         """Propagate Krylov basis: B_{m+1} = MGS([B_m, SVD(A*H_O'*B_m)]).
 
         1. X_k = A * H_O' * b_k = A * (H_QQ * b_k - D_QQ * b_k)
-        2. T = A * X  (re-weight for resolvent importance)
+        2. T = X  (no extra weighting)
         3. SVD(T), keep sigma > svd_threshold * sigma_max
         4. MGS(U_trunc) against existing basis
 
@@ -350,7 +350,7 @@ class KDCIBackend:
         prop_mat = np.column_stack(propagated)  # (M, r)
 
         # Step 2-3: T = A * X, SVD truncation
-        T = A_q[:, np.newaxis] * prop_mat
+        T = prop_mat  # no extra A-weighting
         U_svd, s, _ = np.linalg.svd(T, full_matrices=False)
         keep = s > svd_threshold * max(1.0, s[0])
         n_keep = int(np.sum(keep))
