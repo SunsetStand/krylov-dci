@@ -179,7 +179,7 @@ def build_basis_mf(p_dets, E_ref, tag=""):
     A_half = np.sqrt(np.abs(A_q))
 
     tmpdir = f'{PROJECT_ROOT}/tmp'; os.makedirs(tmpdir, exist_ok=True)
-    fpath = f'{tmpdir}/phaseA_ps1_L0_N{N}_{tag}.dat'
+    fpath = f'{tmpdir}/phaseA_ps1_L0_N{N}_{TAG}_{tag}_pid{os.getpid()}.dat'
     T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_all, N))
 
     p_idx_set = set()
@@ -228,7 +228,7 @@ def propagate_basis_mf(U_basis, A_q, p_idx_set, tag=""):
     if d_old == 0: return U_basis.copy(), d_old
 
     tmpdir = f'{PROJECT_ROOT}/tmp'; os.makedirs(tmpdir, exist_ok=True)
-    fpath = f'{tmpdir}/phaseA_ps1_prop_d{d_old}_{tag}.dat'
+    fpath = f'{tmpdir}/phaseA_ps1_prop_d{d_old}_{TAG}_{tag}_pid{os.getpid()}.dat'
     T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_dim, d_old))
 
     t0 = time.perf_counter()
