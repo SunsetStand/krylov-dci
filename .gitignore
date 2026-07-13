@@ -25,3 +25,7 @@ Thumbs.db
 *.npy
 *.h5
 *.chk
+
+# large runtime data
+scratch/
+tmp/
