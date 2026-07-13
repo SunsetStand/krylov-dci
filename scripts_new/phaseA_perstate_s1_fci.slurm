@@ -9,10 +9,12 @@
 #SBATCH -e /data/home/wangcx/krylov-dci/slurm_outputs/phaseA_ps_s1_fci.err
 
 cd /data/home/wangcx/krylov-dci
-source /data/home/wangcx/env/pyscf_env/bin/activate
+export PATH=/data/home/wangcx/LiYF4_Er3+/env/bin:$PATH
 export OMP_NUM_THREADS=32
+export MKL_NUM_THREADS=32
+export OPENBLAS_NUM_THREADS=32
 
-python scripts_new/phaseA_cas10_perstate_s1.py \
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/phaseA_cas10_perstate_s1.py \
     --P 400,600,800,1000,2000,4000 \
     --eref fci \
     --m-max 1 \
