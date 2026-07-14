@@ -20,7 +20,7 @@ PROJECT_ROOT = '/data/home/wangcx/krylov-dci'
 sys.path.insert(0, PROJECT_ROOT)
 
 from src_mf import QSpaceIndex, KDCIBackend, KDCISparse
-from src_mf.pspace_ops import embed_pspace_vec, build_pmask, score_and_select
+from src_mf.pspace_ops import embed_pspace_vec, build_pmask, score_and_select, build_hpp_sigma, extend_hpp_sigma
 from src_mf.sparse_vector import SparseQVector
 from src.effective_h import build_effective_H, diagonalize_effective_H
 from src.determinants import hf_determinant, bit_positions
@@ -145,22 +145,11 @@ n_doubles = len(init_dets) - 1 - n_singles
 print(f"  Seed P={len(init_dets)} (HF + {n_singles} singles + {n_doubles} HFPT2 doubles)\n")
 
 def build_hpp(dets):
-    n=len(dets);H=np.zeros((n,n))
-    for i in range(n):
-        for j in range(i,n):
-            v=ham.matrix_element(dets[i],dets[j]);H[i,j]=v;H[j,i]=v
-    return H
+    # C-level sigma build (src_mf.pspace_ops), replaces O(P^2) Python Slater-Condon
+    return build_hpp_sigma(dets, backend, aidx, bidx, na, nb)
 
 def extend_hpp(H_old, old_dets, new_dets):
-    No=len(old_dets);na=len(new_dets);Hn=np.zeros((No+na,No+na))
-    Hn[:No,:No]=H_old
-    for il,dn in enumerate(new_dets):
-        r=No+il
-        for j in range(No):
-            v=ham.matrix_element(dn,old_dets[j]);Hn[r,j]=v;Hn[j,r]=v
-        for jl in range(il+1):
-            c=No+jl;v=ham.matrix_element(dn,new_dets[jl]);Hn[r,c]=v;Hn[c,r]=v
-    return Hn
+    return extend_hpp_sigma(H_old, old_dets, new_dets, backend, aidx, bidx, na, nb)
 
 
 # ═══════════════════════════════════════════════════════════════

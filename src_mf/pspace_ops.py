@@ -57,3 +57,44 @@ def score_and_select(sigmas, hdiag, p_mask, batch,
     order = cand[np.argsort(-weights[cand], kind='stable')]
     sel = order[:batch].astype(np.int64)
     return sel, float(weights[order[0]]), weights
+
+
+def _flat_indices(dets, aidx, bidx, nb):
+    return np.array([aidx[int(a)] * nb + bidx[int(b)] for (a, b) in dets],
+                    dtype=np.int64)
+
+
+def build_hpp_sigma(dets, backend, aidx, bidx, na, nb):
+    """H_PP over `dets` via C-level sigma_full columns (OMP-parallel libfci),
+    replacing the O(P^2) pure-Python Slater-Condon `matrix_element` loop.
+
+    For each determinant d: sigma = H|d>  (one contract_2e), then the column
+    H[:, d] restricted to `dets` is sigma[flat_indices(dets)].
+    """
+    n = len(dets)
+    flat = _flat_indices(dets, aidx, bidx, nb)
+    H = np.zeros((n, n))
+    for j, (a, b) in enumerate(dets):
+        ci = np.zeros((na, nb)); ci[aidx[int(a)], bidx[int(b)]] = 1.0
+        sig = backend.sigma_full(ci).reshape(-1)
+        H[:, j] = sig[flat]
+    return 0.5 * (H + H.T)
+
+
+def extend_hpp_sigma(H_old, old_dets, new_dets, backend, aidx, bidx, na, nb):
+    """Grow H_PP by appending `new_dets` (rows+cols) via C-level sigma_full,
+    reusing the existing H_old block. Numerically matches extend via matrix_element.
+    """
+    No = len(old_dets); m = len(new_dets)
+    all_dets = list(old_dets) + list(new_dets)
+    flat_all = _flat_indices(all_dets, aidx, bidx, nb)
+    Hn = np.zeros((No + m, No + m))
+    Hn[:No, :No] = H_old
+    for jl, (a, b) in enumerate(new_dets):
+        ci = np.zeros((na, nb)); ci[aidx[int(a)], bidx[int(b)]] = 1.0
+        sig = backend.sigma_full(ci).reshape(-1)
+        col = sig[flat_all]
+        r = No + jl
+        Hn[:, r] = col
+        Hn[r, :] = col
+    return Hn
