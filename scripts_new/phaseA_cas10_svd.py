@@ -61,8 +61,19 @@ na_o = list(range(N_CORE, N_CORE+N_ACT))
 # (good internal check: localized FCI energies must match canonical to ~uHartree).
 C_act = mf.mo_coeff[:, na_o].copy()
 if LOCALIZE:
-    C_act = lo.PipekMezey(mol, C_act).kernel()
-    print("  [localize] Pipek-Mezey applied to active orbitals", flush=True)
+    # Localize occupied-active and virtual-active blocks SEPARATELY.
+    # Full-space localization mixes occ+virt -> destroys the HF single-det
+    # reference (E_HF wrong by ~Ha, Brillouin broken, seed meaningless).
+    # Separate occ/virt rotations keep the HF determinant invariant and keep
+    # the canonical Fock occ-virt block zero, so Brillouin's theorem (hence the
+    # forced-singles / HFPT2 seed logic) stays valid. This is also the standard
+    # local-correlation construction (LMP2/DLPNO).
+    n_occ = ne[0]  # active occupied spatial orbitals (RHF: = active alpha)
+    C_occ = lo.PipekMezey(mol, C_act[:, :n_occ]).kernel()
+    C_vir = lo.PipekMezey(mol, C_act[:, n_occ:]).kernel()
+    C_act = np.hstack([C_occ, C_vir])
+    print(f"  [localize] Pipek-Mezey applied SEPARATELY to occ({n_occ})/virt({N_ACT-n_occ}) "
+          f"active blocks (preserves HF reference & Brillouin)", flush=True)
 hcore = mf.get_hcore()
 h1a = C_act.T @ hcore @ C_act
 era = ao2mo.full(mol.intor('int2e'), C_act, compact=False).reshape(N_ACT, N_ACT, N_ACT, N_ACT)
