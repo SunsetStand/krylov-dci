@@ -310,11 +310,28 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
 # ═══════════════════════════════════════════════════════════════
 # Full Krylov pipeline (matrix-free): m=0..M_MAX
 # ═══════════════════════════════════════════════════════════════
-def krylov_mf_pipeline(H_PP, p_dets, E0, p_idx_set_mf, tag=""):
-    """build_basis_mf + propagate_basis_mf, H_eff at each m."""
-    results = []
+def perstate_eff_eigvals(H_PP, H_PK, H_KK, E_refs, nroots):
+    """(B) Per-state Bloch downfolding: build H_eff(E_k) centered at each state's
+    OWN H_PP eigenvalue E_k, and return the eigenvalue nearest E_k (the physically
+    meaningful root of the energy-dependent effective Hamiltonian)."""
+    ev_out = np.zeros(len(E_refs))
+    for k, Ek in enumerate(E_refs):
+        evk = np.asarray(diagonalize_effective_H(
+            build_effective_H(H_PP, H_PK, H_KK, float(Ek), delta=0.0),
+            n_states=nroots)[0])
+        ev_out[k] = evk[int(np.argmin(np.abs(evk - Ek)))]
+    return ev_out
 
-    # m=0: build_basis_mf
+
+def krylov_mf_pipeline(H_PP, p_dets, E_refs, p_idx_set_mf, tag=""):
+    """build_basis_mf + propagate_basis_mf; per-state H_eff at each m (option B).
+    Krylov basis is shared (built at ground-state E_refs[0]); the Bloch effective
+    Hamiltonian resolvent is centered per-state at E_refs[k]."""
+    results = []
+    E_refs = np.asarray(E_refs, dtype=float)
+    E0 = float(E_refs[0])
+
+    # m=0: build_basis_mf (shared basis, ground-state resolvent weighting)
     U_0, d_0, A_q = build_basis_mf(p_dets, E0, tag)
 
     def build_blocks(U_basis, p_dets):
@@ -338,9 +355,7 @@ def krylov_mf_pipeline(H_PP, p_dets, E0, p_idx_set_mf, tag=""):
 
     U_m = U_0; d_m = d_0
     H_KK, H_PK = build_blocks(U_m, p_dets)
-    ev = diagonalize_effective_H(
-        build_effective_H(H_PP, H_PK, H_KK, E0, delta=0.0),
-        n_states=NROOTS)[0]
+    ev = perstate_eff_eigvals(H_PP, H_PK, H_KK, E_refs[:NROOTS], NROOTS)
     dE = [(ev[k]-e_fci[k])*1000 for k in range(min(NROOTS, len(ev)))]
     results.append({'d': d_m, 'dE': dE, 'U': U_m})
     print(f"    m=0: d={d_m}, dE0={dE[0]:+.3f} mH", flush=True)
@@ -355,9 +370,7 @@ def krylov_mf_pipeline(H_PP, p_dets, E0, p_idx_set_mf, tag=""):
             break
 
         H_KK, H_PK = build_blocks(U_m, p_dets)
-        ev = diagonalize_effective_H(
-            build_effective_H(H_PP, H_PK, H_KK, E0, delta=0.0),
-            n_states=NROOTS)[0]
+        ev = perstate_eff_eigvals(H_PP, H_PK, H_KK, E_refs[:NROOTS], NROOTS)
         dE = [(ev[k]-e_fci[k])*1000 for k in range(min(NROOTS, len(ev)))]
         ddE = dE[0] - results[-1]['dE'][0]
         results.append({'d': d_m, 'dE': dE, 'U': U_m})
@@ -385,7 +398,7 @@ def eval_checkpoint(p_dets, p_full_idx, H_PP_sub, p_target, it_num):
         f"S{k}:dE={bares[k]:+.0f},<S2>={s2s[k]:.2f}" for k in range(nlab)), flush=True)
 
     tag = f"P{p_target}_i{it_num}"
-    kr_results, A_q = krylov_mf_pipeline(H_PP_sub, p_dets, E0, p_idx_set, tag)
+    kr_results, A_q = krylov_mf_pipeline(H_PP_sub, p_dets, E0_vals[:NROOTS], p_idx_set, tag)
 
     ex_de = [abs(kr_results[0]['dE'][k]) for k in range(1,min(NROOTS,len(kr_results[0]['dE'])))]
     m_last = min(M_MAX, len(kr_results)-1)
