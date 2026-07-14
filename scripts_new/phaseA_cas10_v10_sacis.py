@@ -483,7 +483,7 @@ for pt in P_CHECKPOINTS:
 # Save
 outdir = os.path.join(PROJECT_ROOT, 'checkpoints_phaseA')
 os.makedirs(outdir, exist_ok=True)
-with open(f'{outdir}/phaseA_v8_m{min(M_MAX,len(kr_results)-1)}_svd{SVD_THR}_{TAG}.json','w') as f:
+with open(f'{outdir}/phaseA_v8_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
     json.dump({
         'config': {'cas':N_ACT,'n_core':N_CORE,'P':P_CHECKPOINTS,
                    'm_max':M_MAX,'svd_threshold':SVD_THR,'M':M_all,
