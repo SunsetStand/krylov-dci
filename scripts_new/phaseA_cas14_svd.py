@@ -33,16 +33,17 @@ args.add_argument('--P', type=str, default='400,600,800,1000,2000,4000')
 args.add_argument('--m-max', type=int, default=3)
 args.add_argument('--svd-threshold', type=float, default=1e-3)
 args.add_argument('--batch', type=int, default=200)
-args.add_argument('--tag', type=str, default='v10sacis')
+args.add_argument('--tag', type=str, default='cas14svd')
 args = args.parse_args()
 
 P_CHECKPOINTS = sorted([int(x) for x in args.P.split(',')])
 M_MAX = args.m_max; SVD_THR = args.svd_threshold; BATCH = args.batch
 TAG = args.tag; P_MAX = max(P_CHECKPOINTS)
 
-N_ACT = 10; N_CORE = 2; NROOTS = 6; R = 1.1; ne = (5, 5)
+N_ACT = 14; N_CORE = 2; NROOTS = 6; R = 1.1; ne = (5, 5)  # CAS(14,10): 14 active orbitals, 10 active electrons
 print("=" * 70)
-print(f"Phase A v8 — CAS({N_ACT},{sum(ne)})  Matrix-Free Krylov m=0..{M_MAX}")
+print(f"Phase A CAS(14,10) SVD-truncation study  Matrix-Free Krylov m=0..{M_MAX}")
+print(f"  propagate order = MGS -> SVD (proposal 1.3); full singular-value spectra recorded")
 print(f"N2/cc-pVDZ R={R}  checkpoints={P_CHECKPOINTS}")
 print(f"SVD thr={SVD_THR}  m_max={M_MAX}  batch={BATCH}")
 print("=" * 70, flush=True)
@@ -64,6 +65,18 @@ bidx = {int(s): i for i, s in enumerate(bs_)}
 q_idx = QSpaceIndex(as_, bs_, N_ACT, ne, h1a, era)
 backend = KDCIBackend(q_idx); kdci_sparse = KDCISparse(q_idx)
 hdiag = q_idx.hdiag
+
+# ── Singular-value spectrum recording (SVD-truncation study) ──
+SPECTRA = []
+def record_spectrum(stage, sigma):
+    sig = np.asarray(sigma, dtype=float)
+    smax = float(sig[0]) if len(sig) else 0.0
+    SPECTRA.append({'stage': stage, 'n': int(len(sig)), 'smax': smax,
+                    'sigma': [float(s) for s in sig]})
+    if smax > 0:
+        ths = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+        kept = " ".join(f"{t:.0e}:{int(np.sum(sig >= t*smax))}" for t in ths)
+        print(f"    [spectrum {stage}] n={len(sig)}  kept@(thr*smax): {kept}", flush=True)
 
 print("  FCI reference...", flush=True)
 ef, _ = direct_spin1.FCI().kernel(h1a, era, N_ACT, ne, nroots=NROOTS, verbose=0)
@@ -207,6 +220,7 @@ def build_basis_mf(p_dets, E0, tag=""):
     t_svd = time.perf_counter()
     print(f"    SVD({M_all},{N})...", flush=True)
     U, sigma, Vt = svd(T, full_matrices=False)
+    record_spectrum(f"build_{tag}", sigma)
     smax = sigma[0] if len(sigma)>0 else 0
     mask = sigma >= SVD_THR * max(1.0, smax)
     d = int(np.sum(mask))
@@ -255,26 +269,42 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
             print(f"      col {k+1}/{d_old} ({time.perf_counter()-t0:.0f}s)", flush=True)
     T.flush()
 
-    # SVD
+    # ── MGS FIRST: project each column of T onto the orthogonal complement of
+    #    the EXISTING Krylov basis, so the subsequent SVD spectrum measures pure
+    #    incremental information (proposal §1.3: MGS → SVD). ──
+    t_mgs = time.perf_counter()
+    print(f"    [MGS->SVD] orthogonalizing {d_old} cols vs existing basis...", flush=True)
+    for k in range(d_old):
+        col = np.array(T[:, k])
+        col -= U_basis @ (U_basis.T @ col)   # remove already-captured directions
+        T[:, k] = col
+    T.flush()
+    print(f"    [MGS] done: {time.perf_counter()-t_mgs:.0f}s", flush=True)
+
+    # ── SVD of the orthogonalized increment ──
     t_svd = time.perf_counter()
-    print(f"    SVD({M_dim},{d_old})...", flush=True)
+    print(f"    SVD({M_dim},{d_old}) [post-MGS]...", flush=True)
     U_svd, sigma, Vt = svd(T, full_matrices=False)
+    record_spectrum(f"prop_{tag}", sigma)
     smax = sigma[0] if len(sigma)>0 else 0
     mask = sigma >= SVD_THR * max(1.0, smax)
     n_keep = int(np.sum(mask))
     U_trunc = U_svd[:, mask]
     e = time.perf_counter()-t_svd
-    print(f"    SVD done: {e:.0f}s, {d_old}→{n_keep} kept", flush=True)
+    print(f"    SVD done: {e:.0f}s, {d_old}->{n_keep} kept", flush=True)
 
     try: del T; gc.collect(); os.unlink(fpath)
     except: pass
 
-    # MGS against existing basis
+    # U_trunc columns are orthonormal and (by construction) ~orthogonal to the
+    # existing basis. Defensive re-orthogonalization against numerical leakage,
+    # then append. No full MGS needed since SVD already gave an orthonormal set.
     basis_list = [U_basis[:, j] for j in range(d_old)]
     new_count = 0
     for k in range(U_trunc.shape[1]):
         v = U_trunc[:, k].copy()
-        for b in basis_list:
+        v -= U_basis @ (U_basis.T @ v)                 # vs existing (should be ~0)
+        for b in basis_list[d_old:]:                    # vs newly appended
             v -= np.dot(b, v) * b
         nrm = np.linalg.norm(v)
         if nrm > 1e-10:
@@ -284,7 +314,7 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
 
     U_new = np.column_stack(basis_list)
     d_new = len(basis_list)
-    print(f"    MGS: d_old={d_old} + {new_count} new = {d_new}", flush=True)
+    print(f"    appended: d_old={d_old} + {new_count} new = {d_new}", flush=True)
     return U_new, d_new
 
 
@@ -470,12 +500,20 @@ for pt in P_CHECKPOINTS:
 # Save
 outdir = os.path.join(PROJECT_ROOT, 'checkpoints_phaseA')
 os.makedirs(outdir, exist_ok=True)
-with open(f'{outdir}/phaseA_v8_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
+with open(f'{outdir}/phaseA_cas14_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
     json.dump({
         'config': {'cas':N_ACT,'n_core':N_CORE,'P':P_CHECKPOINTS,
                    'm_max':M_MAX,'svd_threshold':SVD_THR,'M':M_all,
                    'e_fci':e_fci,'tag':TAG},
         'results': {str(k):v for k,v in all_results.items()},
     }, f, indent=2)
-print(f"\nSaved: {outdir}/phaseA_v8_m{M_MAX}_svd{SVD_THR}_{TAG}.json")
+print(f"\nSaved: {outdir}/phaseA_cas14_m{M_MAX}_svd{SVD_THR}_{TAG}.json")
+
+# ── Save full singular-value spectra for truncation analysis ──
+spec_path = f'{outdir}/spectra_cas14_m{M_MAX}_{TAG}.json'
+with open(spec_path, 'w') as f:
+    json.dump({'config': {'cas':N_ACT,'ne':list(ne),'M':M_all,
+                          'svd_threshold':SVD_THR,'P':P_CHECKPOINTS,'m_max':M_MAX},
+               'spectra': SPECTRA}, f)
+print(f"Saved spectra: {spec_path}  ({len(SPECTRA)} SVD calls)")
 print("Done.")
