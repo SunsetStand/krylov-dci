@@ -184,18 +184,21 @@ except Exception:
     pass
 
 # ═══════════════════════════════════════════════════════════════
-# NEW: dE evaluation stage
-# ═══════════════════════════════════════════════════════════════
 # 1) H_PP via C-level sigma (pspace_ops, 7/14 优化路径)
 print(f"\nBuilding H_PP ({TARGET_P}×{TARGET_P}) via build_hpp_sigma...", flush=True)
 t_h = time.perf_counter()
 H_PP = build_hpp_sigma(p_dets, backend, q_idx._alpha_idx, q_idx._beta_idx, na, nb)
 E0 = eigh(H_PP)[0][0]
-print(f"  lowest(H_PP) = {eigh(H_PP)[0][0]:.10f} (vs FCI[0]={E_FCI[0]:.10f})",flush=True)
+print(f"  lowest(H_PP) = {E0:.10f} (vs FCI[0]={E_FCI[0]:.10f})", flush=True)
 print(f"  H_PP: {time.perf_counter()-t_h:.0f}s", flush=True)
+
+# 2) Single sigma pass over r0 columns + on-the-fly H_QQ accumulation
+#    CAS10-svd uses full H_QQ diagonalization (build_effective_H / inv), not just diag.
+#    We compute the full d×d H_QQ via pair-wise dot products of sigma vectors.
 thr_min = min(THRESHOLDS)
 r0 = int(np.sum(sigma >= thr_min * smax))
-print(f"Sigma pass over r0={r0} kept columns (thr_min={thr_min:.0e})...", flush=True)
+print(f"Sigma pass over r0={r0} (thr_min={thr_min:.0e}), building full H_QQ...", flush=True)
+sigs = [None] * r0
 diag_qq = np.zeros(r0)
 HPQ = np.zeros((TARGET_P, r0))
 t_p = time.perf_counter()
@@ -204,15 +207,29 @@ for k in range(r0):
     sig = backend.sigma_full(u.reshape(na, nb)).reshape(-1)
     diag_qq[k] = float(np.dot(u, sig))
     HPQ[:, k] = sig[p_flat]
+    sigs[k] = sig
     if (k + 1) % max(1, r0 // 10) == 0:
         e = time.perf_counter() - t_p
         print(f"  col {k+1}/{r0} ({e:.0f}s, ETA {e/(k+1)*r0-e:.0f}s)", flush=True)
-print(f"  sigma pass: {time.perf_counter()-t_p:.0f}s", flush=True)
+t_sigma = time.perf_counter() - t_p
+print(f"  sigma pass: {t_sigma:.0f}s", flush=True)
 
-# 3) 每个阈值：切片 → H_eff → eigh → dE
+# Build full H_QQ (r0 × r0) and diagonalize once
+print(f"  building H_QQ ({r0}x{r0}) via dot products...", flush=True)
+H_QQ = np.zeros((r0, r0))
+for i in range(r0):
+    for j in range(i, r0):
+        v = np.dot(sigs[i], sigs[j])
+        H_QQ[i, j] = v; H_QQ[j, i] = v
+del sigs; gc.collect()
+H_QQ = 0.5 * (H_QQ + H_QQ.T)
+eigval_QQ, eigvec_QQ = eigh(H_QQ)
+print(f"  H_QQ built + diagonalized ({time.perf_counter()-t_p-t_sigma:.0f}s)", flush=True)
+
+# 3) Per-threshold: slice → full resolvent → H_eff → eigh → dE
 results = []
 print(f"\n{'='*60}")
-print(f"Testing {len(THRESHOLDS)} thresholds...")
+print(f"Testing {len(THRESHOLDS)} thresholds (full H_QQ resolvent)...")
 print(f"{'='*60}", flush=True)
 for thr in THRESHOLDS:
     r = int(np.sum(sigma >= thr * smax))
@@ -221,9 +238,13 @@ for thr in THRESHOLDS:
         print(f"  thr={thr:.0e}: r=0 (all truncated!)")
         continue
     t0_e = time.perf_counter()
-    dk = E0 - diag_qq[:r]
+    # Full resolvent in truncated Q-subspace: U_HQQ @ diag(1/(E0 - e)) @ U_HQQ^T
+    # Correction = HPQ[:,:r] @ resolvent @ HPQ[:,:r].T
+    #   = (HPQ[:,:r] @ U_QQ[:,:r]) @ diag(1/(E0 - eigval_QQ[:r])) @ (HPQ[:,:r] @ U_QQ[:,:r]).T
+    V = HPQ[:, :r] @ eigvec_QQ[:r, :r]
+    dk = E0 - eigval_QQ[:r]
     w = np.where(np.abs(dk) > 1e-10, 1.0 / dk, 0.0)
-    H_eff = H_PP + (HPQ[:, :r] * w) @ HPQ[:, :r].T
+    H_eff = H_PP + (V * w) @ V.T
     ev = eigh(H_eff)[0]
     t_e = time.perf_counter() - t0_e
 
