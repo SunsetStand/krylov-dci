@@ -516,7 +516,7 @@ if "LAST_U1_TRUNC" in dir() and LAST_U1_TRUNC is not None:
     p_valid = p_flat >= 0; p_f = p_flat[p_valid]
     
     THRESHOLDS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2e-1, 5e-1]
-    print(f"  {">8s":>8} {">5s":>5} {">8s":>8} {">9s":>9} {">9s":>9} {">9s":>9} {">9s":>9}  (mH)".format("thr","r","compr%","dE0","S1","S2","S3"), flush=True)
+    print("  {:>8} {:>5} {:>8} {:>9} {:>9} {:>9} {:>9}  (mH)".format("thr","r","compr%","dE0","S1","S2","S3"), flush=True)
     print("  " + "-" * 70, flush=True)
     
     for thr in THRESHOLDS:
