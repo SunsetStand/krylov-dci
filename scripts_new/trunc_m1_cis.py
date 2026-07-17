@@ -283,7 +283,7 @@ def perstate_eff_eigvals(Hpp, Hpk, Hkk, erefs, nroots):
     ev_list = []
     for k in range(min(nroots, len(erefs))):
         H_eff = build_effective_H(Hpp, Hpk, Hkk, erefs[k], delta=0.0)
-        ev = diagonalize_effective_H(H_eff, erefs[k])
+        ev, _ = diagonalize_effective_H(H_eff, erefs[k])
         ev_list.append(ev)
     return ev_list
 
