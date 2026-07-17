@@ -548,7 +548,7 @@ if LAST_U1 is not None:
         stage = sp.get("stage", "")
         sarr = np.asarray(sp["sigma"], dtype=float)
         if "build_" in stage:
-            sigma_build = sarr[:d0_build]
+            sigma_build = sarr  # full array from SPECTRA
         if "prop_" in stage and "m1" in stage and sigma_prop.size == 0:
             sigma_prop = sarr
     # Normalize each set independently by its own max
