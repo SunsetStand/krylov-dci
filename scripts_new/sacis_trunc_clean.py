@@ -142,6 +142,8 @@ del Tp;gc.collect();os.unlink(fpath_p)
 print(f"  m=1: d={d1}",flush=True)
 
 # Sort
+# Zero P-space rows in U1 for pure Q-space Krylov basis
+for q in p_idx_set: U1[q, :] = 0.0
 sort_idx=np.argsort(-sigma_comb[:d1])
 U1=U1[:,sort_idx];sigma_comb=sigma_comb[sort_idx];d1=U1.shape[1]
 
