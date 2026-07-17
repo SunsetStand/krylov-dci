@@ -426,7 +426,7 @@ def eval_checkpoint(p_dets, p_full_idx, H_PP_sub, p_target, it_num):
     kr_results, A_q = krylov_mf_pipeline(H_PP_sub, p_dets, E0_vals[:NROOTS], p_idx_set, tag)
 
     # ── store m=0 basis + its singular values for post-hoc truncation sweep ──
-    global LAST_U0, LAST_SIGMA
+    global LAST_U0, LAST_SIGMA, LAST_U1, d0_build
     LAST_U0 = kr_results[0]['U']
     if M_MAX >= 1 and len(kr_results) > 1:
             LAST_U1 = kr_results[1]["U"]
