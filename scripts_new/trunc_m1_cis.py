@@ -44,14 +44,17 @@ mc.fix_spin_(ss=0)
 mo_coeff = mc.sort_mo(cas_list, base=0)
 
 h1 = mo_coeff.T @ mf.get_hcore() @ mo_coeff; h1 = h1[ncore:ncore+ncas, ncore:ncore+ncas]
+as_ = cistring.gen_strings4orblist(range(N_ACT), ne[0])
+bs_ = cistring.gen_strings4orblist(range(N_ACT), ne[1])
+na, nb = len(as_), len(bs_); M_all = na * nb
 era = ao2mo.kernel(mol, mo_coeff[:, ncore:ncore+ncas], aosym='s4')
 h1a = h1.copy(); h1b = h1.copy()
 q_idx = QSpaceIndex(as_, bs_, N_ACT, ne, h1a, era); backend = KDCIBackend(q_idx)
+hdiag = q_idx.hdiag
 kdci_sparse = KDCISparse(q_idx)
-q_idx = kdci_sparse.q_idx
-na, nb = q_idx.na, q_idx.nb
-aidx = {int(a): i for i, a in enumerate(backend.as_)}; bidx = {int(b): i for i, b in enumerate(backend.bs_)}
-hdiag = q_idx.hdiag; M_all = len(as_) * len(bs_)
+
+
+aidx = {int(s): i for i, s in enumerate(as_)}; bidx = {int(s): i for i, s in enumerate(bs_)}
 
 print(f"  CAS({N_ACT},{ne_cas}): M={len(as_)*len(bs_):,}  ({time.perf_counter()-t0:.0f}s)", flush=True)
 
