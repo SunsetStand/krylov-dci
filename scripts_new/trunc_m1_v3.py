@@ -576,7 +576,8 @@ if LAST_U1 is not None and len(kr_results) > 1:
     p_valid_f = p_flat_f >= 0; p_f_f = p_flat_f[p_valid_f]
     Np_f = len(p_dets_f)
     THRESHOLDS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2e-1, 5e-1]
-    print(f"\n  {thr:>8} {r:>5} {compr%:>8} {dE0:>9} {S1:>9} {S2:>9}  (mH)")
+    print("\n  {:>8} {:>5} {:>8} {:>9} {:>9} {:>9}  (mH)".format("thr","r","compr%","dE0","S1","S2"))
+    print("  " + "-" * 56, flush=True)
     print("  " + "-" * 56, flush=True)
     for thr in THRESHOLDS:
         r = int(np.sum(sigma_combined[:d1] >= thr * smax))
