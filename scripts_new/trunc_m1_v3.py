@@ -557,6 +557,10 @@ if LAST_U1 is not None:
     if sigma_prop.size > 0 and np.max(np.abs(sigma_prop)) > 0:
         sigma_prop = sigma_prop / np.max(np.abs(sigma_prop))
     # Concatenate normalized spectra
+    print(f"    [DEBUG] build_sigma: len={len(sigma_build)}, range={sigma_build.min():.3f}-{sigma_build.max():.3f}", flush=True)
+    print(f"    [DEBUG] prop_sigma: len={len(sigma_prop)}, range={sigma_prop.min():.3f}-{sigma_prop.max():.3f}", flush=True)
+    print(f"    [DEBUG] combined: len={len(sigma_combined)}, range={sigma_combined.min():.3f}-{sigma_combined.max():.3f}", flush=True)
+    print(f"    [DEBUG] count>=0.5: {(sigma_combined >= 0.5).sum()}/{len(sigma_combined)}", flush=True)
     if sigma_prop.size > 0:
         sigma_combined = np.concatenate([sigma_build, sigma_prop[:d1 - len(sigma_build)]])
     else:
