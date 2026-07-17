@@ -415,7 +415,7 @@ while N_p < P_MAX:
     sigmas = []
     ns = min(len(SCORING_ROOTS), N_p)
     # Overlap tracking: assign current eigenvectors to reference states
-    global C_ref_track
+    
     if C_ref_track is None:
         C_ref_track = C_P[:, :ns].copy()
         tracked_roots = list(range(ns))
