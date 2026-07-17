@@ -90,6 +90,7 @@ hdiag = q_idx.hdiag
 # ── Singular-value spectrum recording (SVD-truncation study) ──
 SPECTRA = []
 LAST_U0 = None    # m=0 Krylov basis at the target checkpoint
+d0_build = 0
 LAST_U1 = None    # m=1 combined Krylov basis
 LAST_SIGMA = None # singular values of the retained m=0 basis columns
 def record_spectrum(stage, sigma):
@@ -428,7 +429,7 @@ def eval_checkpoint(p_dets, p_full_idx, H_PP_sub, p_target, it_num):
     global LAST_U0, LAST_SIGMA
     LAST_U0 = kr_results[0]['U']
     if M_MAX >= 1 and len(kr_results) > 1:
-        LAST_U1 = kr_results[1]['U']
+            LAST_U1 = kr_results[1]["U"]
     for sp in SPECTRA:
         if sp['stage'] == f"build_{tag}":
             LAST_SIGMA = np.asarray(sp['sigma'], dtype=float)[:LAST_U0.shape[1]]
@@ -537,9 +538,9 @@ print(f"\n{'='*70}")
 print(f"SVD truncation sweep (m=0 basis, P={TARGET_P})")
 print(f"{'='*70}", flush=True)
 trunc_results = []
-if LAST_U1 is not None and len(kr_results) > 1:
+if LAST_U1 is not None:
     U_1 = LAST_U1; d1 = U_1.shape[1]
-    d0_build = kr_results[0][d]
+    
     # Build combined sigma: sigma_0 (build) + sigma_1 (propagate increment)
     sigma_build = np.array([])
     sigma_prop  = np.array([])
@@ -547,7 +548,7 @@ if LAST_U1 is not None and len(kr_results) > 1:
         stage = sp.get("stage", "")
         sarr = np.asarray(sp["sigma"], dtype=float)
         if "build_" in stage:
-            sigma_build = sarr[:kr_results[0]["d"]]
+            sigma_build = sarr[:d0_build]
         if "prop_" in stage and sigma_prop.size == 0:
             sigma_prop = sarr
     if sigma_prop.size > 0:
