@@ -51,10 +51,9 @@ kdci_sparse = KDCISparse(q_idx)
 q_idx = kdci_sparse.q_idx
 na, nb = q_idx.na, q_idx.nb
 aidx = {int(a): i for i, a in enumerate(backend.as_)}; bidx = {int(b): i for i, b in enumerate(backend.bs_)}
-as_ = backend.as_; bs_ = backend.bs_
 hdiag = q_idx.hdiag; M_all = len(as_) * len(bs_)
 
-print(f"  CAS({N_ACT},{ne_cas}): M={M_all:,}  ({time.perf_counter()-t0:.0f}s)", flush=True)
+print(f"  CAS({N_ACT},{ne_cas}): M={len(as_)*len(bs_):,}  ({time.perf_counter()-t0:.0f}s)", flush=True)
 
 # FCI reference
 ef, _ = direct_spin1.FCI().kernel(h1a, era, N_ACT, ne, nroots=NROOTS, verbose=0)
