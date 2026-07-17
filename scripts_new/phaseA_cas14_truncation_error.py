@@ -134,7 +134,7 @@ for col in range(TARGET_P):
     ci_unit = np.zeros((na, nb)); ci_unit[ia, ib] = 1.0
     sigma_flat = backend.sigma_full(ci_unit).reshape(-1)
     for q in p_idx_set: sigma_flat[q] = 0.0
-    T[:, col] = A_half * sigma_flat
+    T[:, col] = A_q * sigma_flat  # T = A*H_QP (A1)
     if (col+1) % max(1, TARGET_P//10) == 0:
         e = time.perf_counter()-t_b
         print(f"  col {col+1}/{TARGET_P} ({e:.0f}s, ETA {e/(col+1)*TARGET_P-e:.0f}s)", flush=True)

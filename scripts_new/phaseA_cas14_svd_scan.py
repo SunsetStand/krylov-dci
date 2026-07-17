@@ -180,7 +180,7 @@ def record_svd_spectrum(p_dets, tag):
         sigma_flat = backend.sigma_full(ci_unit).reshape(-1)
         for q in p_idx_set:
             sigma_flat[q] = 0.0
-        T[:, col] = A_half * sigma_flat
+        T[:, col] = A_q * sigma_flat  # T = A*H_QP (A1)
 
         if (col + 1) % max(1, N // 10) == 0:
             elapsed = time.perf_counter() - t_build

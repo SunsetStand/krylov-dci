@@ -196,7 +196,7 @@ def build_basis_mf(p_dets, E_ref, tag=""):
         ci_unit = np.zeros((na, nb)); ci_unit[ia, ib] = 1.0
         sigma_flat = backend.sigma_full(ci_unit).reshape(-1)
         for q in p_idx_set: sigma_flat[q] = 0.0
-        T[:, p] = A_half * sigma_flat
+        T[:, p] = A_q * sigma_flat  # T = A*H_QP (A1, matches src_mf)
 
         if (p + 1) % max(1, N // 5) == 0:
             print(f"      col {p+1}/{N} ({time.perf_counter()-t0:.0f}s)", flush=True)
@@ -238,7 +238,7 @@ def propagate_basis_mf(U_basis, A_q, p_idx_set, tag=""):
         sigma_k = backend.sigma_full(b_k.reshape(na, nb)).reshape(-1)
         residual = sigma_k - hdiag * b_k
         for q in p_idx_set: residual[q] = 0.0
-        T[:, k] = A_half * residual
+        T[:, k] = A_q * residual  # T = A*residual (A1, matches src_mf)
 
         if (k + 1) % max(1, d_old // 5) == 0:
             print(f"      col {k+1}/{d_old} ({time.perf_counter()-t0:.0f}s)", flush=True)

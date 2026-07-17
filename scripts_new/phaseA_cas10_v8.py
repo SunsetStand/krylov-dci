@@ -2,11 +2,11 @@
 """
 Phase A v8 — Matrix-Free Krylov matching kdci_dense.py exactly
 
-Key: T = A²·X in BOTH build_basis and propagate_basis, SVD after each.
+Key: T = A1·X in BOTH build_basis and propagate_basis, SVD after each.
 
-build_basis:  V = A·H_QP (stream), T = A·V = A²·H_QP → SVD → U
+build_basis:  V = A·H_QP (stream), T = A·V = A1·H_QP → SVD → U
 propagate:    residual = H·b_k - D·b_k, X = A·residual,
-              T = A·X = A²·residual → SVD → MGS
+              T = A·X = A1·residual → SVD → MGS
 H_KK/H_PK:    from kdci_sparse (sparse projected blocks)
 
 Usage:
@@ -139,14 +139,14 @@ def extend_hpp(H_old, old_dets, new_dets):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Matrix-Free build_basis: T = A²·H_QP (matching kdci_dense.py)
+# Matrix-Free build_basis: T = A1·H_QP (A1 weight, matching src_mf)
 # ═══════════════════════════════════════════════════════════════
 def build_basis_mf(p_dets, E0, tag=""):
-    """T = A² · H_QP columns, stream to memmap, SVD → U.
+    """T = A1 · H_QP columns, stream to memmap, SVD → U.
 
     Exactly matches KDCIBackend.build_basis:
       L0 = H_QP * A_q (column-wise)
-      T  = A_q * L0 = A² * H_QP
+      T  = A_q * L0 = A1 * H_QP
       SVD(T) → U_trunc
     """
     N = len(p_dets)
@@ -162,7 +162,7 @@ def build_basis_mf(p_dets, E0, tag=""):
         if idx is not None and idx >= 0: p_idx_set.add(idx)
 
     t0 = time.perf_counter()
-    print(f"    [build_basis] T=A²·H_QP, N={N} cols → memmap...", flush=True)
+    print(f"    [build_basis] T=A1·H_QP, N={N} cols → memmap...", flush=True)
     for p in range(N):
         pa, pb = int(p_dets[p][0]), int(p_dets[p][1])
         ia = q_idx._alpha_idx.get(pa); ib = q_idx._beta_idx.get(pb)
@@ -172,8 +172,8 @@ def build_basis_mf(p_dets, E0, tag=""):
         for q in p_idx_set: sigma_flat[q] = 0.0
         # L0 = A * H_QP
         L0_p = A_q * sigma_flat
-        # T = A * L0 = A² * H_QP
-        T[:, p] = A_q * L0_p
+        # T = L0 = A * H_QP (A1 weight)
+        T[:, p] = L0_p  # T = A*H_QP (A1), L0_p already A-weighted
         if (p+1) % max(1, N//5) == 0:
             print(f"      col {p+1}/{N} ({time.perf_counter()-t0:.0f}s)", flush=True)
     T.flush()
@@ -199,12 +199,12 @@ def build_basis_mf(p_dets, E0, tag=""):
 # Matrix-Free propagate_basis: matching kdci_dense.propagate_basis
 # ═══════════════════════════════════════════════════════════════
 def propagate_basis_mf(U_basis, A_q, E0, tag=""):
-    """Propagate: X = A·H_O'·U, T = A·X = A²·H_O'·U → SVD → MGS.
+    """Propagate: X = A·H_O'·U, T = A·X = A1·H_O'·U → SVD → MGS.
 
     Exactly matches KDCIBackend.propagate_basis:
       residual = H·b_k - D·b_k  (H_O')
       x_k = A * residual
-      T = A * X = A² * H_O' * U
+      T = A * X = A1 * H_O' * U
       SVD(T), MGS against existing basis
     """
     M_dim, d_old = U_basis.shape
@@ -215,7 +215,7 @@ def propagate_basis_mf(U_basis, A_q, E0, tag=""):
     T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_dim, d_old))
 
     t0 = time.perf_counter()
-    print(f"    [propagate] d={d_old}, T=A²·H_O'·U → memmap...", flush=True)
+    print(f"    [propagate] d={d_old}, T=A1·H_O'·U → memmap...", flush=True)
     for k in range(d_old):
         b_k = U_basis[:, k]
         sigma_k = backend.sigma_full(b_k.reshape(na, nb)).reshape(-1)
@@ -223,8 +223,8 @@ def propagate_basis_mf(U_basis, A_q, E0, tag=""):
         residual = sigma_k - hdiag * b_k
         # X = A * residual
         x_k = A_q * residual
-        # T = A * X = A² * H_O' * b_k
-        T[:, k] = A_q * x_k
+        # T = X = A * residual (A1 weight) * H_O' * b_k
+        T[:, k] = x_k  # T = A*residual (A1), x_k already A-weighted
         if (k+1) % max(1, d_old//5) == 0:
             print(f"      col {k+1}/{d_old} ({time.perf_counter()-t0:.0f}s)", flush=True)
     T.flush()
