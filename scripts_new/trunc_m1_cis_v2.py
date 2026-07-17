@@ -25,24 +25,30 @@ from src_mf.sparse_vector import SparseQVector
 from src.effective_h import build_effective_H, diagonalize_effective_H
 from src.determinants import hf_determinant, bit_positions
 from src.hamiltonian import Hamiltonian
-from pyscf import gto, scf, ao2mo
+from pyscf import gto, scf, ao2mo, lo
 from pyscf.fci import cistring, direct_spin1, spin_op
 
 args = argparse.ArgumentParser()
-args.add_argument('--P', type=str, default='400,600,800,1000,2000,4000')
+args.add_argument('--target-p', type=int, default=800)
 args.add_argument('--m-max', type=int, default=3)
 args.add_argument('--svd-threshold', type=float, default=1e-3)
 args.add_argument('--batch', type=int, default=200)
-args.add_argument('--tag', type=str, default='v10sacis')
+args.add_argument('--tag', type=str, default='cas10svd')
+args.add_argument('--localize', action='store_true',
+                  help='Pipek-Mezey localize the active orbitals (proposal 2.2)')
 args = args.parse_args()
 
-P_CHECKPOINTS = sorted([int(x) for x in args.P.split(',')])
+TARGET_P = args.target_p
+P_CHECKPOINTS = [TARGET_P]
 M_MAX = args.m_max; SVD_THR = args.svd_threshold; BATCH = args.batch
-TAG = args.tag; P_MAX = max(P_CHECKPOINTS)
+TAG = args.tag; P_MAX = TARGET_P
 
-N_ACT = 10; N_CORE = 2; NROOTS = 6; R = 1.1; ne = (5, 5)
+N_ACT = 10; N_CORE = 2; NROOTS = 6; R = 1.1; ne = (5, 5)  # CAS(10,10): 10 active orbitals, 10 active electrons
+LOCALIZE = args.localize
 print("=" * 70)
-print(f"Phase A v8 — CAS({N_ACT},{sum(ne)})  Matrix-Free Krylov m=0..{M_MAX}")
+print(f"Phase A CAS(10,10) SVD-truncation study  Matrix-Free Krylov m=0..{M_MAX}")
+print(f"  orbitals = {'Pipek-Mezey LOCALIZED' if LOCALIZE else 'canonical MO'} (proposal 2.2)")
+print(f"  propagate order = MGS -> SVD (proposal 1.3); full singular-value spectra recorded")
 print(f"N2/cc-pVDZ R={R}  checkpoints={P_CHECKPOINTS}")
 print(f"SVD thr={SVD_THR}  m_max={M_MAX}  batch={BATCH}")
 print("=" * 70, flush=True)
@@ -51,11 +57,27 @@ t0 = time.perf_counter()
 mol = gto.M(atom=f'N 0 0 0; N 0 0 {R}', basis='cc-pVDZ', verbose=0)
 mf = scf.RHF(mol).run(verbose=0)
 na_o = list(range(N_CORE, N_CORE+N_ACT))
-norb = mf.mo_coeff.shape[1]
-h1_mo = mf.mo_coeff.T @ mf.get_hcore() @ mf.mo_coeff
-eri_4d = ao2mo.full(mol.intor('int2e'), mf.mo_coeff, compact=False)
-eri_4d = eri_4d.reshape(norb, norb, norb, norb)
-h1a = h1_mo[np.ix_(na_o, na_o)]; era = eri_4d[np.ix_(na_o, na_o, na_o, na_o)]
+# Active-space orbital coefficients (AO x N_ACT). Canonical == raw MO block;
+# localization is a unitary rotation WITHIN the active space so FCI is invariant
+# (good internal check: localized FCI energies must match canonical to ~uHartree).
+C_act = mf.mo_coeff[:, na_o].copy()
+if LOCALIZE:
+    # Localize occupied-active and virtual-active blocks SEPARATELY.
+    # Full-space localization mixes occ+virt -> destroys the HF single-det
+    # reference (E_HF wrong by ~Ha, Brillouin broken, seed meaningless).
+    # Separate occ/virt rotations keep the HF determinant invariant and keep
+    # the canonical Fock occ-virt block zero, so Brillouin's theorem (hence the
+    # forced-singles / HFPT2 seed logic) stays valid. This is also the standard
+    # local-correlation construction (LMP2/DLPNO).
+    n_occ = ne[0]  # active occupied spatial orbitals (RHF: = active alpha)
+    C_occ = lo.PipekMezey(mol, C_act[:, :n_occ]).kernel()
+    C_vir = lo.PipekMezey(mol, C_act[:, n_occ:]).kernel()
+    C_act = np.hstack([C_occ, C_vir])
+    print(f"  [localize] Pipek-Mezey applied SEPARATELY to occ({n_occ})/virt({N_ACT-n_occ}) "
+          f"active blocks (preserves HF reference & Brillouin)", flush=True)
+hcore = mf.get_hcore()
+h1a = C_act.T @ hcore @ C_act
+era = ao2mo.full(mol.intor('int2e'), C_act, compact=False).reshape(N_ACT, N_ACT, N_ACT, N_ACT)
 as_ = cistring.gen_strings4orblist(range(N_ACT), ne[0])
 bs_ = cistring.gen_strings4orblist(range(N_ACT), ne[1])
 na, nb = len(as_), len(bs_); M_all = na*nb
@@ -64,6 +86,21 @@ bidx = {int(s): i for i, s in enumerate(bs_)}
 q_idx = QSpaceIndex(as_, bs_, N_ACT, ne, h1a, era)
 backend = KDCIBackend(q_idx); kdci_sparse = KDCISparse(q_idx)
 hdiag = q_idx.hdiag
+
+# ── Singular-value spectrum recording (SVD-truncation study) ──
+SPECTRA = []
+LAST_U0 = None    # m=0 Krylov basis at the target checkpoint
+LAST_SIGMA = None # singular values of the retained m=0 basis columns
+LAST_U1 = None     # m=1 combined Krylov basis at the target checkpoint
+def record_spectrum(stage, sigma):
+    sig = np.asarray(sigma, dtype=float)
+    smax = float(sig[0]) if len(sig) else 0.0
+    SPECTRA.append({'stage': stage, 'n': int(len(sig)), 'smax': smax,
+                    'sigma': [float(s) for s in sig]})
+    if smax > 0:
+        ths = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+        kept = " ".join(f"{t:.0e}:{int(np.sum(sig >= t*smax))}" for t in ths)
+        print(f"    [spectrum {stage}] n={len(sig)}  kept@(thr*smax): {kept}", flush=True)
 
 print("  FCI reference...", flush=True)
 ef, _ = direct_spin1.FCI().kernel(h1a, era, N_ACT, ne, nroots=NROOTS, verbose=0)
@@ -169,7 +206,7 @@ def build_basis_mf(p_dets, E0, tag=""):
 
     tmpdir = f'{PROJECT_ROOT}/tmp'; os.makedirs(tmpdir, exist_ok=True)
     fpath = f'{tmpdir}/phaseA_v8_L0_N{N}_{tag}.dat'
-    T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_all, N))
+    T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_all, N), order='F')
 
     p_idx_set = set()
     for pa, pb in p_dets:
@@ -196,6 +233,7 @@ def build_basis_mf(p_dets, E0, tag=""):
     t_svd = time.perf_counter()
     print(f"    SVD({M_all},{N})...", flush=True)
     U, sigma, Vt = svd(T, full_matrices=False)
+    record_spectrum(f"build_{tag}", sigma)
     smax = sigma[0] if len(sigma)>0 else 0
     mask = sigma >= SVD_THR * max(1.0, smax)
     d = int(np.sum(mask))
@@ -227,7 +265,7 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
 
     tmpdir = f'{PROJECT_ROOT}/tmp'; os.makedirs(tmpdir, exist_ok=True)
     fpath = f'{tmpdir}/phaseA_v8_prop_d{d_old}_{tag}.dat'
-    T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_dim, d_old))
+    T = np.memmap(fpath, dtype='float64', mode='w+', shape=(M_dim, d_old), order='F')
 
     t0 = time.perf_counter()
     print(f"    [propagate] d={d_old}, T=A²·H_O'·U → memmap...", flush=True)
@@ -244,26 +282,42 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
             print(f"      col {k+1}/{d_old} ({time.perf_counter()-t0:.0f}s)", flush=True)
     T.flush()
 
-    # SVD
+    # ── MGS FIRST: project each column of T onto the orthogonal complement of
+    #    the EXISTING Krylov basis, so the subsequent SVD spectrum measures pure
+    #    incremental information (proposal §1.3: MGS → SVD). ──
+    t_mgs = time.perf_counter()
+    print(f"    [MGS->SVD] orthogonalizing {d_old} cols vs existing basis...", flush=True)
+    for k in range(d_old):
+        col = np.array(T[:, k])
+        col -= U_basis @ (U_basis.T @ col)   # remove already-captured directions
+        T[:, k] = col
+    T.flush()
+    print(f"    [MGS] done: {time.perf_counter()-t_mgs:.0f}s", flush=True)
+
+    # ── SVD of the orthogonalized increment ──
     t_svd = time.perf_counter()
-    print(f"    SVD({M_dim},{d_old})...", flush=True)
+    print(f"    SVD({M_dim},{d_old}) [post-MGS]...", flush=True)
     U_svd, sigma, Vt = svd(T, full_matrices=False)
+    record_spectrum(f"prop_{tag}", sigma)
     smax = sigma[0] if len(sigma)>0 else 0
     mask = sigma >= SVD_THR * max(1.0, smax)
     n_keep = int(np.sum(mask))
     U_trunc = U_svd[:, mask]
     e = time.perf_counter()-t_svd
-    print(f"    SVD done: {e:.0f}s, {d_old}→{n_keep} kept", flush=True)
+    print(f"    SVD done: {e:.0f}s, {d_old}->{n_keep} kept", flush=True)
 
     try: del T; gc.collect(); os.unlink(fpath)
     except: pass
 
-    # MGS against existing basis
+    # U_trunc columns are orthonormal and (by construction) ~orthogonal to the
+    # existing basis. Defensive re-orthogonalization against numerical leakage,
+    # then append. No full MGS needed since SVD already gave an orthonormal set.
     basis_list = [U_basis[:, j] for j in range(d_old)]
     new_count = 0
     for k in range(U_trunc.shape[1]):
         v = U_trunc[:, k].copy()
-        for b in basis_list:
+        v -= U_basis @ (U_basis.T @ v)                 # vs existing (should be ~0)
+        for b in basis_list[d_old:]:                    # vs newly appended
             v -= np.dot(b, v) * b
         nrm = np.linalg.norm(v)
         if nrm > 1e-10:
@@ -273,7 +327,7 @@ def propagate_basis_mf(U_basis, A_q, E0, p_idx_set, tag=""):
 
     U_new = np.column_stack(basis_list)
     d_new = len(basis_list)
-    print(f"    MGS: d_old={d_old} + {new_count} new = {d_new}", flush=True)
+    print(f"    appended: d_old={d_old} + {new_count} new = {d_new}", flush=True)
     return U_new, d_new
 
 
@@ -370,6 +424,16 @@ def eval_checkpoint(p_dets, p_full_idx, H_PP_sub, p_target, it_num):
     tag = f"P{p_target}_i{it_num}"
     kr_results, A_q = krylov_mf_pipeline(H_PP_sub, p_dets, E0_vals[:NROOTS], p_idx_set, tag)
 
+    # ── store m=0 basis + its singular values for post-hoc truncation sweep ──
+    global LAST_U0, LAST_SIGMA
+    global LAST_U1
+    if M_MAX >= 1 and len(kr_results) > 1:
+        LAST_U1 = kr_results[1][U]
+    LAST_U0 = kr_results[0]['U']
+    for sp in SPECTRA:
+        if sp['stage'] == f"build_{tag}":
+            LAST_SIGMA = np.asarray(sp['sigma'], dtype=float)[:LAST_U0.shape[1]]
+
     ex_de = [abs(kr_results[0]['dE'][k]) for k in range(1,min(NROOTS,len(kr_results[0]['dE'])))]
     m_last = min(M_MAX, len(kr_results)-1)
     print(f"  Summary P={p_target}: d(m=0)={kr_results[0]['d']} "
@@ -396,8 +460,6 @@ p_set = set(p_full_idx)
 H_PP = build_hpp(p_dets)
 N_p = len(p_dets)
 SCORING_ROOTS = list(range(min(NROOTS, 5)))
-# Overlap tracking: reference eigenvectors for consistent state assignment across iterations
-C_ref_track = None  # set after first H_PP diagonalization
 all_results = {}
 
 print(f"Iterative P: {N_p} → {P_MAX}")
@@ -414,29 +476,8 @@ while N_p < P_MAX:
 
     sigmas = []
     ns = min(len(SCORING_ROOTS), N_p)
-    # Overlap tracking: assign current eigenvectors to reference states
-    global C_ref_track
-    if C_ref_track is None:
-        C_ref_track = C_P[:, :ns].copy()
-        tracked_roots = list(range(ns))
-    else:
-        n_ref = min(C_ref_track.shape[1], ns)
-        overlap = np.abs(C_ref_track[:, :n_ref].T @ C_P[:, :ns])
-        assigned = set()
-        tracked_roots = []
-        for j in range(ns):
-            best_i, best_ov = -1, -1.0
-            for i in range(n_ref):
-                if i not in assigned and float(overlap[i, j]) > best_ov:
-                    best_ov = float(overlap[i, j]); best_i = i
-            if best_i >= 0:
-                assigned.add(best_i)
-                tracked_roots.append(best_i)
-            else:
-                tracked_roots.append(j)
-        C_ref_track = C_P[:, :ns].copy()
     for sk in range(ns):
-        k = tracked_roots[sk]
+        k = SCORING_ROOTS[sk]
         vec = embed_pspace_vec(C_P[:, k], p_full_idx, M_all)
         sigmas.append((E_P[k], backend.sigma(vec)))
 
@@ -492,15 +533,79 @@ for pt in P_CHECKPOINTS:
     s2 = r.get('s2', [])
     print("  <S2> " + " ".join(f"{(s2[k] if k<len(s2) else -1):>9.2f}" for k in range(NROOTS)))
 
+# ── SVD truncation sweep on the m=0 Krylov basis (cached sigma vectors) ──
+print(f"\n{'='*70}")
+print(f"SVD truncation sweep (m=0 basis, P={TARGET_P})")
+print(f"{'='*70}", flush=True)
+trunc_results = []
+if LAST_U0 is not None and LAST_SIGMA is not None and len(LAST_SIGMA) > 0:
+    U_0 = LAST_U0; d0 = U_0.shape[1]; smax = float(LAST_SIGMA[0])
+    p_dets_f = p_dets[:TARGET_P]
+    H_PP_f = H_PP[:TARGET_P, :TARGET_P]
+    E_vals_f, _ = eigh(H_PP_f)
+    E_refs_f = E_vals_f[:NROOTS]
+    # precompute sigma vectors of all d0 basis columns (reused across thresholds)
+    t_sig = time.perf_counter()
+    print(f"  precomputing {d0} sigma vectors...", flush=True)
+    SIG = np.zeros((M_all, d0))
+    for k in range(d0):
+        SIG[:, k] = backend.sigma_full(U_0[:, k].reshape(na, nb)).reshape(-1)
+        if (k+1) % max(1, d0//5) == 0:
+            print(f"    {k+1}/{d0} ({time.perf_counter()-t_sig:.0f}s)", flush=True)
+    p_flat_f = kdci_sparse.q_idx.p_indices(p_dets_f)
+    p_valid_f = p_flat_f >= 0; p_f_f = p_flat_f[p_valid_f]
+    Np_f = len(p_dets_f)
+    THRESHOLDS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2e-1, 5e-1]
+    print(f"\n  {'thr':>8} {'r':>5} {'compr%':>8} {'dE0':>9} {'S1':>9} {'S2':>9}  (mH)")
+    print("  " + "-" * 56, flush=True)
+    for thr in THRESHOLDS:
+        r = int(np.sum(LAST_SIGMA >= thr * smax))
+        if r == 0:
+            print(f"  {thr:>8.0e} {0:>5}  (skip: no columns kept)", flush=True)
+            continue
+        U_r = U_0[:, :r]; SIG_r = SIG[:, :r]
+        H_KK_r = U_r.T @ SIG_r
+        H_KK_r = 0.5 * (H_KK_r + H_KK_r.T)
+        H_PK_r = np.zeros((Np_f, r))
+        H_PK_r[p_valid_f, :] = SIG_r[p_f_f, :]
+        ev = perstate_eff_eigvals(H_PP_f, H_PK_r, H_KK_r, E_refs_f, NROOTS)
+        dE = [(ev[k] - e_fci[k]) * 1000 for k in range(min(NROOTS, len(ev)))]
+        compr = 100.0 * (1.0 - r / d0)
+        print(f"  {thr:>8.0e} {r:>5} {compr:>7.1f}% {dE[0]:>+9.3f} {dE[1]:>+9.3f} {dE[2]:>+9.3f}", flush=True)
+        trunc_results.append({'thr': float(thr), 'r': r, 'd0': int(d0),
+                              'compr_pct': float(compr),
+                              'dE_mH': [float(x) for x in dE]})
+    outdir_tr = os.path.join(PROJECT_ROOT, 'checkpoints_phaseA')
+    os.makedirs(outdir_tr, exist_ok=True)
+    trunc_path = f'{outdir_tr}/cas10_truncation_dE_P{TARGET_P}.json'
+    with open(trunc_path, 'w') as f:
+        json.dump({'config': {'target_p': TARGET_P, 'm_max': M_MAX,
+                              'svd_threshold': SVD_THR, 'd0': int(d0),
+                              'smax': smax, 'e_fci': e_fci, 'tag': TAG},
+                   'sigma': [float(s) for s in LAST_SIGMA],
+                   'results': trunc_results}, f, indent=2)
+    print(f"\nSaved truncation sweep: {trunc_path}", flush=True)
+else:
+    print("  [warn] LAST_U0/LAST_SIGMA not set; skipping truncation sweep", flush=True)
+
 # Save
 outdir = os.path.join(PROJECT_ROOT, 'checkpoints_phaseA')
 os.makedirs(outdir, exist_ok=True)
-with open(f'{outdir}/phaseA_v8_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
+with open(f'{outdir}/phaseA_cas10_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
     json.dump({
         'config': {'cas':N_ACT,'n_core':N_CORE,'P':P_CHECKPOINTS,
                    'm_max':M_MAX,'svd_threshold':SVD_THR,'M':M_all,
+                   'localize':LOCALIZE,
                    'e_fci':e_fci,'tag':TAG},
         'results': {str(k):v for k,v in all_results.items()},
     }, f, indent=2)
-print(f"\nSaved: {outdir}/phaseA_v8_m{M_MAX}_svd{SVD_THR}_{TAG}.json")
+print(f"\nSaved: {outdir}/phaseA_cas10_m{M_MAX}_svd{SVD_THR}_{TAG}.json")
+
+# ── Save full singular-value spectra for truncation analysis ──
+spec_path = f'{outdir}/spectra_cas10_m{M_MAX}_{TAG}.json'
+with open(spec_path, 'w') as f:
+    json.dump({'config': {'cas':N_ACT,'ne':list(ne),'M':M_all,'localize':LOCALIZE,
+                          'svd_threshold':SVD_THR,'P':P_CHECKPOINTS,'m_max':M_MAX},
+               'spectra': SPECTRA}, f)
+print(f"Saved spectra: {spec_path}  ({len(SPECTRA)} SVD calls)")
 print("Done.")

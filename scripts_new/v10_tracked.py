@@ -396,8 +396,6 @@ p_set = set(p_full_idx)
 H_PP = build_hpp(p_dets)
 N_p = len(p_dets)
 SCORING_ROOTS = list(range(min(NROOTS, 5)))
-# Overlap tracking: reference eigenvectors for consistent state assignment across iterations
-C_ref_track = None  # set after first H_PP diagonalization
 all_results = {}
 
 print(f"Iterative P: {N_p} → {P_MAX}")
@@ -414,29 +412,8 @@ while N_p < P_MAX:
 
     sigmas = []
     ns = min(len(SCORING_ROOTS), N_p)
-    # Overlap tracking: assign current eigenvectors to reference states
-    global C_ref_track
-    if C_ref_track is None:
-        C_ref_track = C_P[:, :ns].copy()
-        tracked_roots = list(range(ns))
-    else:
-        n_ref = min(C_ref_track.shape[1], ns)
-        overlap = np.abs(C_ref_track[:, :n_ref].T @ C_P[:, :ns])
-        assigned = set()
-        tracked_roots = []
-        for j in range(ns):
-            best_i, best_ov = -1, -1.0
-            for i in range(n_ref):
-                if i not in assigned and float(overlap[i, j]) > best_ov:
-                    best_ov = float(overlap[i, j]); best_i = i
-            if best_i >= 0:
-                assigned.add(best_i)
-                tracked_roots.append(best_i)
-            else:
-                tracked_roots.append(j)
-        C_ref_track = C_P[:, :ns].copy()
     for sk in range(ns):
-        k = tracked_roots[sk]
+        k = SCORING_ROOTS[sk]
         vec = embed_pspace_vec(C_P[:, k], p_full_idx, M_all)
         sigmas.append((E_P[k], backend.sigma(vec)))
 
