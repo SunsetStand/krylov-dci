@@ -120,7 +120,7 @@ def gen_hfpt2_scores():
                     d=(hf_a^(1<<i)|(1<<a),hf_b^(1<<j)|(1<<b))
                     hij=ham.matrix_element(d,(hf_a,hf_b));den=E_HF-ham.matrix_element(d,d)
                     if abs(den)>1e-12:sc.append((d,-hij*hij/den))
-    sc.sort(key=lambda x: x[1], reverse=True)
+    sc.sort(key=lambda x: (-x[1], x[0][0], x[0][1]))
     return sc
 
 P_INIT = 200
@@ -137,11 +137,18 @@ for i in bo:
     for a in bv: singles.append((hf_a, hf_b ^ (1 << i) | (1 << a)))
 for d in singles:
     if d not in init_dets: init_dets.append(d)
-n_singles = len(init_dets) - 1
-for d, _ in scores:  # fill remainder with top HFPT2 doubles
-    if len(init_dets) >= P_INIT: break
-    if d not in init_dets: init_dets.append(d)
-n_doubles = len(init_dets) - 1 - n_singles
+    n_singles = len(init_dets) - 1
+tied_score = None
+for d, sc in scores:  # fill remainder with top HFPT2 doubles
+    if len(init_dets) >= P_INIT:
+        if tied_score is not None and abs(sc - tied_score) > 1e-12:
+            break
+    if d not in init_dets:
+        init_dets.append(d)
+        if len(init_dets) == P_INIT:
+            n_doubles = len(init_dets) - 1 - n_singles
+            tied_score = sc  # include ALL determinants tied with the P_INIT-th
+
 print(f"  Seed P={len(init_dets)} (HF + {n_singles} singles + {n_doubles} HFPT2 doubles)\n")
 
 def build_hpp(dets):
