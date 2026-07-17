@@ -606,8 +606,8 @@ if LAST_U1 is not None and len(kr_results) > 1:
                   "sigma": [float(s) for s in sigma_combined[:d1]],
                    "results": trunc_results}, f, indent=2)
     print(f"\nSaved truncation sweep (m=1): {trunc_path}", flush=True)
-elif LAST_U0 is not None and LAST_SIGMA is not None and len(LAST_SIGMA) > 0:
-    # Fallback: original m=0 truncation sweep
+else:
+    print("  [warn] LAST_U1 not set; skipping truncation sweep", flush=True)
 outdir = os.path.join(PROJECT_ROOT, 'checkpoints_phaseA')
 os.makedirs(outdir, exist_ok=True)
 with open(f'{outdir}/phaseA_cas10_m{M_MAX}_svd{SVD_THR}_{TAG}.json','w') as f:
