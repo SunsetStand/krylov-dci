@@ -280,12 +280,13 @@ E_vals, _ = eigh(H_PP)
 E_refs = E_vals[:NROOTS]
 
 def perstate_eff_eigvals(Hpp, Hpk, Hkk, erefs, nroots):
-    ev_list = []
-    for k in range(min(nroots, len(erefs))):
-        H_eff = build_effective_H(Hpp, Hpk, Hkk, erefs[k], delta=0.0)
-        ev, _ = diagonalize_effective_H(H_eff, erefs[k])
-        ev_list.append(ev)
-    return ev_list
+    ev_out = np.zeros(len(erefs))
+    for k, Ek in enumerate(erefs[:nroots]):
+        evk = np.asarray(diagonalize_effective_H(
+            build_effective_H(Hpp, Hpk, Hkk, float(Ek), delta=0.0),
+            n_states=nroots)[0])
+        ev_out[k] = evk[int(np.argmin(np.abs(evk - Ek)))]
+    return ev_out
 
 # ── Truncation sweep ──
 THRESHOLDS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2e-1, 5e-1]
