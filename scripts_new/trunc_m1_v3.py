@@ -549,16 +549,28 @@ if LAST_U1 is not None:
         sarr = np.asarray(sp["sigma"], dtype=float)
         if "build_" in stage:
             sigma_build = sarr[:d0_build]
-        if "prop_" in stage and sigma_prop.size == 0:
+        if "prop_" in stage and "m1" in stage and sigma_prop.size == 0:
             sigma_prop = sarr
+    # Normalize each set independently by its own max
+    if sigma_build.size > 0 and np.max(np.abs(sigma_build)) > 0:
+        sigma_build = sigma_build / np.max(np.abs(sigma_build))
+    if sigma_prop.size > 0 and np.max(np.abs(sigma_prop)) > 0:
+        sigma_prop = sigma_prop / np.max(np.abs(sigma_prop))
+    # Concatenate normalized spectra
     if sigma_prop.size > 0:
         sigma_combined = np.concatenate([sigma_build, sigma_prop[:d1 - len(sigma_build)]])
     else:
         sigma_combined = sigma_build if sigma_build.size > 0 else np.ones(d1)
     if len(sigma_combined) < d1:
         sigma_combined = np.ones(d1)
-    smax = float(np.max(np.abs(sigma_combined)))
+    smax = 1.0  # already normalized
     
+    # Sort basis columns by descending sigma for truncation ordering
+    sort_idx = np.argsort(-sigma_combined[:d1])
+    U_1 = U_1[:, sort_idx]
+    sigma_combined = sigma_combined[sort_idx]
+    # Reconstruct d1 after sorting (same value)
+    d1 = U_1.shape[1]
     p_dets_f = p_dets[:TARGET_P]
     H_PP_f = H_PP[:TARGET_P, :TARGET_P]
     E_vals_f, _ = eigh(H_PP_f)
