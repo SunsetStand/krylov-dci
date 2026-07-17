@@ -500,7 +500,8 @@ if "LAST_U1_TRUNC" in dir() and LAST_U1_TRUNC is not None:
     print(f"  Sigma done: {time.perf_counter()-t_sig:.0f}s", flush=True)
     
     # Column norms as sigma proxy
-    d0 = kr_results[0]["d"]
+    # d0 from the checkpoint result
+    d0 = list(all_results.values())[-1]["krylov"][0]["d"]
     sigma_build = np.linalg.norm(U_1[:, :d0], axis=0)
     sigma_prop  = np.linalg.norm(U_1[:, d0:d_full], axis=0)
     sigma_build = sigma_build / sigma_build.max()
