@@ -46,13 +46,13 @@ mo_coeff = mc.sort_mo(cas_list, base=0)
 h1 = mo_coeff.T @ mf.get_hcore() @ mo_coeff; h1 = h1[ncore:ncore+ncas, ncore:ncore+ncas]
 era = ao2mo.kernel(mol, mo_coeff[:, ncore:ncore+ncas], aosym='s4')
 h1a = h1.copy(); h1b = h1.copy()
-backend = KDCIBackend(h1a, h1b, era, N_ACT, ne, verbose=0)
-kdci_sparse = KDCISparse(h1a, h1b, era, N_ACT, ne)
+q_idx = QSpaceIndex(as_, bs_, N_ACT, ne, h1a, era); backend = KDCIBackend(q_idx)
+kdci_sparse = KDCISparse(q_idx)
 q_idx = kdci_sparse.q_idx
-na, nb = backend.na, backend.nb
+na, nb = q_idx.na, q_idx.nb
 aidx = {int(a): i for i, a in enumerate(backend.as_)}; bidx = {int(b): i for i, b in enumerate(backend.bs_)}
 as_ = backend.as_; bs_ = backend.bs_
-hdiag = kdci_sparse.hdiag; M_all = len(as_) * len(bs_)
+hdiag = q_idx.hdiag; M_all = len(as_) * len(bs_)
 
 print(f"  CAS({N_ACT},{ne_cas}): M={M_all:,}  ({time.perf_counter()-t0:.0f}s)", flush=True)
 
