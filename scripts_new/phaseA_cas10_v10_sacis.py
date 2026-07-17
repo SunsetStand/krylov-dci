@@ -421,7 +421,7 @@ while N_p < P_MAX:
         tracked_roots = list(range(ns))
     else:
         n_ref = min(C_ref_track.shape[1], ns)
-        overlap = np.abs(C_ref_track[:, :n_ref].T @ C_P[:, :ns])
+        overlap = np.abs(C_ref_track[:, :n_ref].T @ C_P[:Np_old, :ns])
         assigned = set()
         tracked_roots = []
         for j in range(ns):
