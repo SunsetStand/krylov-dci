@@ -408,6 +408,7 @@ total_t0 = time.perf_counter()
 it = 0
 
 while N_p < P_MAX:
+    Np_old = N_p
     t_it = time.perf_counter()
     E_P, C_P = eigh(H_PP)
     E0_cur = E_P[0]
