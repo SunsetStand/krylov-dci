@@ -417,12 +417,20 @@ while N_p < P_MAX:
     t_it = time.perf_counter()
     E_P, C_P = eigh(H_PP)
     E0_cur = E_P[0]
-
+    # S2-labeled eigenvectors for consistent state identity across iterations
+    n_lab = min(NROOTS, N_p)
+    s2_vals = [float(s2_of_pvec(C_P[:, k], p_dets)) for k in range(n_lab)]
+    singlet_idx = [i for i in range(n_lab) if s2_vals[i] < 0.5]
+    triplet_idx = [i for i in range(n_lab) if s2_vals[i] > 1.5]
+    singlet_idx.sort(key=lambda i: E_P[i])
+    triplet_idx.sort(key=lambda i: E_P[i])
+    state_roots = singlet_idx[:3] + triplet_idx[:3]
     sigmas = []
-    ns = min(len(SCORING_ROOTS), N_p)
+    ns = min(len(SCORING_ROOTS), len(state_roots))
     for sk in range(ns):
-        k = SCORING_ROOTS[sk]
+        k = state_roots[sk]
         vec = embed_pspace_vec(C_P[:, k], p_full_idx, M_all)
+        sigmas.append((E_P[k], backend.sigma(vec)))
         sigmas.append((E_P[k], backend.sigma(vec)))
     p_mask = build_pmask(p_set, M_all)
     sel, max_w, weights = score_and_select(sigmas, hdiag, p_mask, BATCH)
