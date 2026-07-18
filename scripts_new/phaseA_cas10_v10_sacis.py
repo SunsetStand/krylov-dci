@@ -376,7 +376,10 @@ def eval_checkpoint(p_dets, p_full_idx, H_PP_sub, p_target, it_num):
 
     tag = f"P{p_target}_i{it_num}"
     kr_results, A_q = krylov_mf_pipeline(H_PP_sub, p_dets, E0_vals[:NROOTS], p_idx_set, tag)
-    if p_target == 2000 and len(kr_results) > 1: global LAST_U1_P2K, LAST_PDETS, LAST_HPP; LAST_U1_P2K = kr_results[1]["U"]; LAST_PDETS = list(p_dets); LAST_HPP = H_PP_sub.copy(); global LAST_E0V; LAST_E0V = E0_vals[:NROOTS].copy()
+    if p_target == 2000 and len(kr_results) > 1:
+        np.savez_compressed(f"{PROJECT_ROOT}/checkpoints_phaseA/U1_P2000_m1.npz", U=kr_results[1]["U"], p_alpha=np.array([d[0] for d in p_dets], dtype=np.int64), p_beta=np.array([d[1] for d in p_dets], dtype=np.int64))
+        np.savez_compressed(f"{PROJECT_ROOT}/checkpoints_phaseA/HPP_P2000.npz", H_PP=H_PP_sub)
+        print(f"    Saved U1.npz + HPP.npz for P=2000", flush=True)
 
     ex_de = [abs(kr_results[0]['dE'][k]) for k in range(1,min(NROOTS,len(kr_results[0]['dE'])))]
     m_last = min(M_MAX, len(kr_results)-1)
@@ -417,20 +420,12 @@ while N_p < P_MAX:
     t_it = time.perf_counter()
     E_P, C_P = eigh(H_PP)
     E0_cur = E_P[0]
-    # S2-labeled eigenvectors for consistent state identity across iterations
-    n_lab = min(NROOTS, N_p)
-    s2_vals = [float(s2_of_pvec(C_P[:, k], p_dets)) for k in range(n_lab)]
-    singlet_idx = [i for i in range(n_lab) if s2_vals[i] < 0.5]
-    triplet_idx = [i for i in range(n_lab) if s2_vals[i] > 1.5]
-    singlet_idx.sort(key=lambda i: E_P[i])
-    triplet_idx.sort(key=lambda i: E_P[i])
-    state_roots = singlet_idx[:3] + triplet_idx[:3]
+
     sigmas = []
-    ns = min(len(SCORING_ROOTS), len(state_roots))
+    ns = min(len(SCORING_ROOTS), N_p)
     for sk in range(ns):
-        k = state_roots[sk]
+        k = SCORING_ROOTS[sk]
         vec = embed_pspace_vec(C_P[:, k], p_full_idx, M_all)
-        sigmas.append((E_P[k], backend.sigma(vec)))
         sigmas.append((E_P[k], backend.sigma(vec)))
     p_mask = build_pmask(p_set, M_all)
     sel, max_w, weights = score_and_select(sigmas, hdiag, p_mask, BATCH)
@@ -471,40 +466,6 @@ for pt in P_CHECKPOINTS:
     print(f"{r['krylov'][0]['d']:>7}")
 
 # ── Per-root (state-average) summary at final m, with <S^2> labels ──
-# Post-hoc P=2000 m=1 SVD truncation sweep
-global LAST_U1_P2K, LAST_PDETS, LAST_HPP, LAST_E0V
-if "LAST_U1_P2K" in dir() and LAST_U1_P2K is not None:
-    print("\\nTruncation sweep at P=2000 m=1...", flush=True)
-    U1 = LAST_U1_P2K; d_full = U1.shape[1]
-    d0 = kr_results[0]["d"] if "kr_results" in dir() and kr_results else 2000
-    pd_sw = LAST_PDETS; Hpp_sw = LAST_HPP; Er_sw = LAST_E0V
-
-    SIG = np.zeros((M_all, d_full))
-    for k in range(d_full):
-        SIG[:, k] = backend.sigma_full(U1[:, k].reshape(na, nb)).reshape(-1)
-
-    p_flat_s = kdci_sparse.q_idx.p_indices(pd_sw)
-    p_valid_s = p_flat_s >= 0; p_f_s = p_flat_s[p_valid_s]
-    Np_s = len(pd_sw)
-
-    THR = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2e-1, 5e-1]
-    # Use column norms as sigma proxy
-    sigma_cols = np.linalg.norm(U1, axis=0)
-    sigma_cols = sigma_cols / sigma_cols.max()
-    si = np.argsort(-sigma_cols)
-    U1 = U1[:, si]; SIG = SIG[:, si]; sigma_cols = sigma_cols[si]
-    d_full = U1.shape[1]
-
-    for thr in THR:
-        r = int(np.sum(sigma_cols >= thr))
-        if r == 0: continue
-        Ur = U1[:, :r]; SIGr = SIG[:, :r]
-        Hkk = Ur.T @ SIGr; Hkk = 0.5*(Hkk + Hkk.T)
-        Hpk = np.zeros((Np_s, r)); Hpk[p_valid_s, :] = SIGr[p_f_s, :]
-        ev = perstate_eff_eigvals(Hpp_sw, Hpk, Hkk, Er_sw, NROOTS)
-        dE = [(ev[k] - e_fci[k]) * 1000 for k in range(min(NROOTS, len(ev)))]
-        cp = 100*(1-r/d_full)
-        print(f"  {thr:.0e} {r:>5} {cp:>6.1f}% {dE[0]:>+9.1f} {dE[1]:>+9.1f} {dE[2]:>+9.1f} {dE[3]:>+9.1f}", flush=True)
 print(f"\nPer-root dE (mH) at m={M_MAX}  [FCI: " +
       " ".join(f"S{k}={e_fci[k]:.4f}" for k in range(NROOTS)) + "]")
 print(f"{'P':>6} " + " ".join(f"{'S'+str(k):>9}" for k in range(NROOTS)))
