@@ -13,4 +13,4 @@ export MKL_NUM_THREADS=12
 export OPENBLAS_NUM_THREADS=12
 
 cd /data/home/wangcx/krylov-dci
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/phaseA_cas10_v10_sacis.py --P 800 --m-max 1 --tag verify
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/phaseA_cas10_v10_sacis.py --P 800 --m-max 1 --tag tracked
