@@ -1,0 +1,173 @@
+# Krylov-dCI Project Rules for Cline
+
+## Git Workflow (MANDATORY)
+
+### Before Any Code Change
+1. `git status` — must be clean
+2. Create a feature branch: `git checkout -b feat/<description>`
+3. Write code → test → `git add` + `git commit` + `git push`
+4. Only then submit SLURM jobs
+
+### Branch Conventions
+- Feature/refactor: `feat/<description>`
+- Phase work: `phase/<N>-<description>`
+- Commit messages in English, descriptive
+- No force push to master
+- Delete branch after merge
+
+### Code Modification Protocol
+- **Never modify code directly on remote via sed/heredoc** — write locally, scp, then run
+- **Always commit before sbatch** — no exceptions
+- Keep remote `git status` clean at all times
+
+---
+
+## Code Architecture
+
+### Core Library: `src_mf/`
+- `pyscf_backend.py` — KDCIBackend: PySCF integration (integral transforms, FCI solver, sigma vectors)
+- `kdci_dense.py` — Dense Krylov-dCI: H_QP, build_basis, propagate_basis, effective Hamiltonian
+- `kdci_sparse.py` — Sparse Krylov-dCI variant
+- `bloch_mf.py` — Bloch resolvent construction
+- `pspace_ops.py` — P-space selection (iterative scoring, CIS seeds, state tracking)
+- `qspace.py` — Q-space operations
+- `sparse_ops.py`, `sparse_vector.py` — Sparse matrix/vector utilities
+
+### Golden Rule
+**NEVER reimplement `src_mf/` functions in scripts.** Import and use them. Scripts copy-pasting creates version drift. All new algorithms go into `src_mf/` first, then scripts call them.
+
+### Two Copies Warning
+`pyscf_backend.py` and `kdci_dense.py` each have a `KDCIBackend` class. This is tech debt. When modifying backend logic, update BOTH or (better) refactor to a single source.
+
+---
+
+## SLURM Job Submission
+
+### Template
+```bash
+#!/bin/bash
+#SBATCH -J <jobname>
+#SBATCH -p amd
+#SBATCH -n <N>           # max 32 (single node)
+#SBATCH -t 24:00:00       # default 24h, don't set too tight
+#SBATCH -o /data/home/wangcx/krylov-dci/logs/%j.out
+#SBATCH -e /data/home/wangcx/krylov-dci/logs/%j.err
+```
+
+### Core Count
+- Smoke tests: 1-2 cores
+- CAS(10,10): 4-8 cores
+- CAS(14,10)+: 16-32 cores
+- **amd partition has only 1 node (32 cores)** — jobs run sequentially!
+
+### Python stdout
+- Scripts must use `flush=True` on all print statements, or set `PYTHONUNBUFFERED=1`
+- Python stdout is fully buffered (8KB) when redirected — no output until buffer fills
+
+---
+
+## Mathematical Formulation
+
+See `docs/formalisms.md` for the authoritative equations.
+
+### Key Notation
+- **A** = (E₀I − D_QQ)⁻¹ — diagonal resolvent
+- **B** = H_O' − ΔI — off-diagonal coupling (Δ = 0 for m=0)
+- **K_m** — Krylov subspace of order m
+- **A¹ weight** for layer 0 (NOT A²): K₀ = SVD(A·H_QP)
+
+---
+
+## Testing
+
+### Quick Smoke Test
+```bash
+python tests/smoke_sacis.py    # P=400, ~2min, validates full pipeline
+```
+
+### Regression Tests
+```bash
+python tests/test_regression.py  # 7 tests, covers core functionality
+```
+
+### Test Before Commit
+- Minimum: pass `smoke_sacis.py`
+- For backend changes: pass `test_regression.py`
+- For new features: add a test in `tests/`
+
+### Critical: Small-system tests don't prove correctness
+H₂/STO-3G (2 orbitals) symmetry hides many bugs. Always test on H₂O/STO-3G (7 orbitals) or larger before trusting results.
+
+---
+
+## Paths
+
+### Remote (PKU Lab Server)
+```
+Host:      10.129.77.222:2933
+User:      wangcx
+Auth:      SSH key (~/.ssh/id_ed25519)
+Project:   /data/home/wangcx/krylov-dci/
+Python:    /data/home/wangcx/LiYF4_Er3+/env/bin/python
+```
+
+### Do NOT Confuse Servers
+- **PKU** (10.129.77.222:2933): This project. SLURM, amd partition.
+- **HKU** (10.64.81.53): HKU summer research only. No SLURM.
+
+---
+
+## Reports & Documentation
+
+### Phase Reports
+- Location: `hku_report/`
+- Language: English
+- Include negative results and failures — they're as important as successes
+- Follow format: Objective → Method → Results → Lessons → Next Steps
+
+### Weekly Summaries
+- Location: `reports/`
+- English
+
+---
+
+## Problem Diagnosis Protocol
+
+When results don't match expectations:
+
+1. **Describe the situation objectively** — What ran? What parameters? What result?
+2. **Compare with reference** — What changed from the last working version?
+3. **List POSSIBLE causes** (rank by likelihood, don't assert definitively)
+4. **Check the code first, theorize second** — most "method failures" were actually code bugs
+
+### Past False Diagnoses (Warning Signs)
+- Blaming method/math when the problem is implementation-level
+- "SVD doesn't work for this system" → actual: memmap C-order bug
+- "Krylov m>1 is useless" → actual: P-space contamination in propagation
+- "Excited states fundamentally broken" → actual: HFPT2 seeds miss singles (Brillouin)
+
+---
+
+## Known Pitfalls
+
+1. **Integrals must be in the same basis** — FCI solver needs h1e and h2e both in MO basis
+2. **Chemist vs physicist notation** — `(ij|kl)` ≠ `⟨ik|jl⟩`, transpose: `h2e_phys = h2e_chem.transpose(0,2,1,3)`
+3. **AO→MO transform**: `ao2mo.kernel()` + `ao2mo.restore('s1', ...)` for 4D
+4. **CAS(n,m) = CAS(orbitals, electrons)** — CAS(10,10) = 10 orbitals, 10 electrons
+5. **memmap order='F'** for column-wise access, order='C' for row-wise
+6. **Level shift must be 0** for m=0 — non-zero distorts the resolvent
+7. **Localization: occ and virt blocks separately** — mixing them destroys HF reference
+8. **m=1 is the sweet spot** for Krylov layers — m≥2 often non-monotonic
+9. **Excited states need CIS-seeded P-space + ⟨S²⟩ tracking** — blind index-based root selection fails for triplet states
+10. **CAS(14,10) = 4M determinants** → use matrix-free streaming, not dense storage
+
+---
+
+## References
+
+- Li & Yang, *JPCL* 2022, 13, 10042 (dCI method)
+- Krylov, A.N. *Izvestiya AN SSSR* 1931, No. 4, 491-539
+- Sun et al., *WIREs Comput. Mol. Sci.* 2018, 8, e1340 (PySCF)
+- `docs/formalisms.md` — authoritative mathematical formulation
+- `docs/lessons_learned.md` — detailed lessons from the project
+- `SKILL.md` — full project conventions (authoritative)
