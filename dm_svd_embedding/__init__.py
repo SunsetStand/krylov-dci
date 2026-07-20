@@ -11,4 +11,14 @@ from .occ_virt_partition import (
     partition_determinants,
     build_block_matrices,
     generate_subspace_determinants,
+    setup_partition,
+)
+from .density_matrix import (
+    svd_truncate_block,
+    compute_schmidt_decomposition,
+    compute_compression_metrics,
+    reconstruct_ci_vector,
+)
+from .embedded_hamiltonian import (
+    build_h_emb,
 )
