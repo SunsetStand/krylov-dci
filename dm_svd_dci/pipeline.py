@@ -5,7 +5,7 @@ Main pipeline: dmSVD + Krylov-dCI combined method.
 Steps:
   1. PySCF molecule setup + CASCI reference
   2. dmSVD: occ-virt determinant partition → density matrix SVD → Schmidt basis
-  3. Build H^emb in Schmidt product basis (sigma-vector projection, parallel)
+  3. Build H^emb = H_A + H_B + H_AB in Schmidt product basis (Path C + parallel sigma)
   4. Partition Schmidt basis: P = {n ∈ p_blocks}, Q = all other n
   5. Extract H_PP, H_PQ, H_QQ from full H^emb (方案 A)
   6. Krylov-dCI: m=0 MGS → m=1 MGS (NO SVD)
@@ -26,9 +26,9 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 # Step 1: System setup
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 
 def setup_system(
     atom: str = 'N 0 0 0; N 0 0 1.098',
@@ -60,7 +60,7 @@ def setup_system(
     cas.kernel()
     fcivec = cas.ci
     ci_flat = fcivec.reshape(-1)
-    E_fci = cas.e_tot
+    E_fci = cas.e_tot  # total energy including core
 
     na, nb = n_active_elec
     alpha_strs = cistring.gen_strings4orblist(range(n_act), na)
@@ -74,10 +74,12 @@ def setup_system(
     ham = Hamiltonian(h1=h1eff, h2=h2_4d, E_nuc=ecore, E_HF=0.0)
 
     if verbose:
-        print(f"  System: {atom.strip()}, {basis}")
-        print(f"  CAS({n_act},{n_elec_total}): M={M_all:,} dets, n_core={n_core}")
-        print(f"  CASCI energy: {E_fci:.12f} Ha")
-        print(f"  Setup done: {time.perf_counter() - t0:.0f}s", flush=True)
+        print(f"  System:          {atom.strip()}, {basis}")
+        print(f"  CAS({n_act},{n_elec_total}):      M={M_all:,} dets, n_core={n_core}")
+        print(f"  CASCI total E:   {E_fci:.12f} Ha")
+        print(f"  E_core (frozen): {ecore:.12f} Ha")
+        print(f"  Active E:        {E_fci - ecore:.12f} Ha")
+        print(f"  Setup done:      {time.perf_counter() - t0:.0f}s", flush=True)
 
     return {
         'mol': mol, 'mf': mf,
@@ -90,22 +92,35 @@ def setup_system(
     }
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Step 2-3: Build H^emb in Schmidt product basis (parallel sigma-vectors)
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+# Step 3: Build H^emb = H_A + H_B + H_AB  (Path C + parallel sigma)
+# ═══════════════════════════════════════════════════════════════
 
 def build_hemb_parallel(
     schmidt_data: Dict[int, Dict],
     partition: Dict[int, Dict],
     q_idx,
     backend,
+    h1_full: np.ndarray,
+    h2_full: np.ndarray,
     n_occ: int,
     n_act: int,
     n_workers: int = 1,
     verbose: bool = True,
-) -> Tuple[np.ndarray, List[Dict]]:
-    """Build H^emb in Schmidt product basis with parallel sigma-vectors."""
-    from dm_svd_embedding.embedded_hamiltonian import _expand_schmidt_product_to_ci_matrix
+) -> Tuple[np.ndarray, List[Dict], Dict]:
+    """Build H^emb = H_A + H_B + H_AB in Schmidt product basis.
+
+    H_AB: sigma-vector projection (parallel ThreadPoolExecutor)
+    H_A:  Path C — build H_A^det, project via U^† H_A^det U
+    H_B:  Path C — build H_B^det, project via V^† H_B^det V
+
+    Returns (H_emb, basis_info, norms_dict).
+    """
+    from dm_svd_embedding.embedded_hamiltonian import (
+        _expand_schmidt_product_to_ci_matrix,
+        _build_subspace_hamiltonian,
+        _extract_subspace_integrals,
+    )
     from dm_svd_dci.parallel_ops import compute_sigma_vectors_parallel
 
     # ── Build basis index map ──
@@ -116,7 +131,7 @@ def build_hemb_parallel(
     for n_A in sorted(schmidt_data.keys()):
         sd = schmidt_data[n_A]
         r = sd['r']
-        block_offsets[n_A] = offset
+        block_offsets[n_A] = (offset, r)
         for alpha in range(r):
             for beta in range(r):
                 basis_info.append({
@@ -127,14 +142,17 @@ def build_hemb_parallel(
 
     D = offset
     if D == 0:
-        return np.zeros((0, 0)), []
+        return np.zeros((0, 0)), [], {}
 
     if verbose:
-        print(f"  Schmidt product basis dimension: D = {D}")
+        print(f"  Schmidt product basis dimension: D = Σ_n r_n² = {D}")
+        print(f"  {'n':>4} {'r_n':>5} {'r_n²':>7}")
+        print(f"  {'-'*18}")
         for n_A in sorted(schmidt_data.keys()):
             r = schmidt_data[n_A]['r']
-            print(f"    n={n_A}: r={r}, r²={r*r}")
+            print(f"  {n_A:>4} {r:>5} {r*r:>7}")
 
+    # ── Full CAS string info ──
     alpha_strs = q_idx.alpha_strs
     beta_strs = q_idx.beta_strs
     n_alpha_strs = len(alpha_strs)
@@ -142,18 +160,28 @@ def build_hemb_parallel(
     alpha_to_idx = {int(s): i for i, s in enumerate(alpha_strs)}
     beta_to_idx = {int(s): i for i, s in enumerate(beta_strs)}
 
-    # ── Pre-compute CI matrices for all D basis states ──
+    # ── Orbital indices for A and B spaces ──
+    A_orb_indices = np.arange(n_occ, dtype=int)
+    B_orb_indices = np.arange(n_occ, n_act, dtype=int)
+    n_virt = n_act - n_occ
+
     if verbose:
-        t0 = time.perf_counter()
-        print(f"  Expanding {D} Schmidt basis states to full CAS CI matrices...", flush=True)
+        print(f"  Orbitals: A = [0..{n_occ-1}], B = [{n_occ}..{n_act-1}] ({n_virt} virt)")
+
+    # ═══════════════════════════════════════════════════════
+    # Part 1: H_AB via sigma-vector projection (parallel)
+    # ═══════════════════════════════════════════════════════
+    if verbose:
+        t_expand = time.perf_counter()
+        print(f"  [H_AB] Expanding {D} Schmidt states to CAS CI matrices...", flush=True)
 
     ci_mats = []
     for info in basis_info:
-        n_A = info['n']
+        n_A_val = info['n']
         alpha = info['alpha']
         beta = info['beta']
-        blk_schmidt = schmidt_data[n_A]
-        blk_partition = partition[n_A]
+        blk_schmidt = schmidt_data[n_A_val]
+        blk_partition = partition[n_A_val]
         ci_mat = _expand_schmidt_product_to_ci_matrix(
             alpha, beta, blk_schmidt, blk_partition,
             n_alpha_strs, n_beta_strs, n_occ,
@@ -161,47 +189,142 @@ def build_hemb_parallel(
         ci_mats.append(ci_mat)
 
     if verbose:
-        print(f"    Expansion done: {time.perf_counter() - t0:.0f}s", flush=True)
+        print(f"    Expansion done: {time.perf_counter() - t_expand:.0f}s", flush=True)
 
-    # ── Compute sigma vectors in parallel ──
+    # Parallel sigma-vector computation
     if verbose:
         t1 = time.perf_counter()
-        print(f"  Computing sigma-vectors for {D} basis states ({n_workers} workers)...", flush=True)
+        print(f"  [H_AB] Computing {D} sigma-vectors ({n_workers} workers)...", flush=True)
 
     sigmas = compute_sigma_vectors_parallel(
         backend.sigma_full, ci_mats, n_workers=n_workers, verbose=verbose)
 
     if verbose:
         elapsed = time.perf_counter() - t1
-        print(f"    Sigma-vectors done: {elapsed:.0f}s ({elapsed/max(D,1):.2f}s/vector)", flush=True)
+        print(f"    Sigma done: {elapsed:.0f}s ({elapsed/max(D,1):.2f}s/vector)", flush=True)
 
-    # ── Project: H_emb[k,l] = v_l · sigma_k ──
+    # Project: H_emb_AB[k,l] = v_l · sigma_k
     if verbose:
-        t2 = time.perf_counter()
-        print(f"  Projecting {D}×{D} matrix elements...", flush=True)
+        t_proj = time.perf_counter()
+        print(f"  [H_AB] Projecting {D}×{D} matrix elements...", flush=True)
 
     ci_flat_mats = [cm.reshape(-1) for cm in ci_mats]
     sigma_flat = [sm.reshape(-1) for sm in sigmas]
-
     H_emb = np.zeros((D, D))
+
     for k in range(D):
         sk = sigma_flat[k]
         for l in range(D):
             H_emb[l, k] = np.dot(ci_flat_mats[l], sk)
 
-    H_emb = 0.5 * (H_emb + H_emb.T)
+    if verbose:
+        elapsed = time.perf_counter() - t_proj
+        print(f"    Projection done: {elapsed:.0f}s", flush=True)
+
+    # Release memory for CI mats
+    del ci_mats, sigmas, ci_flat_mats, sigma_flat
+
+    # ═══════════════════════════════════════════════════════
+    # Part 2: H_A + H_B via Path C
+    # ═══════════════════════════════════════════════════════
+    if verbose:
+        t_pathc = time.perf_counter()
+        print(f"  [Path C] Computing H_A and H_B in Schmidt basis...", flush=True)
+
+    h1_A, h2_A = _extract_subspace_integrals(h1_full, h2_full, A_orb_indices)
+    h1_B, h2_B = _extract_subspace_integrals(h1_full, h2_full, B_orb_indices)
+
+    H_emb_HA = np.zeros((D, D))
+    H_emb_HB = np.zeros((D, D))
+
+    for n_A_val in sorted(schmidt_data.keys()):
+        sd = schmidt_data[n_A_val]
+        blk = partition[n_A_val]
+        r = sd['r']
+        if r == 0:
+            continue
+
+        a_dets = blk['a_dets']
+        if len(a_dets) == 0:
+            continue
+
+        aA0, bA0 = a_dets[0]
+        nA_alpha = aA0.bit_count()
+        nA_beta = bA0.bit_count()
+
+        # Build H_A^det in A-subspace determinant basis
+        if n_occ > 0:
+            HA_det = _build_subspace_hamiltonian(
+                a_dets, h1_A, h2_A, n_occ, nA_alpha, nA_beta)
+            HA_schmidt = sd['U'].T @ HA_det @ sd['U']
+        else:
+            HA_schmidt = np.zeros((r, r))
+
+        # Build H_B^det in B-subspace determinant basis
+        b_dets = blk['b_dets']
+        if len(b_dets) > 0 and n_virt > 0:
+            bB0, bB0b = b_dets[0]
+            nB_alpha = bB0.bit_count()
+            nB_beta = bB0b.bit_count()
+            HB_det = _build_subspace_hamiltonian(
+                b_dets, h1_B, h2_B, n_virt, nB_alpha, nB_beta)
+            HB_schmidt = sd['V'].T @ HB_det @ sd['V']
+        else:
+            HB_schmidt = np.zeros((r, r))
+
+        # Map to H_emb blocks: H_A = U^† H_A^det U ⊗ I_B
+        #                        H_B = I_A ⊗ V^† H_B^det V
+        offset_n, _ = block_offsets[n_A_val]
+        for alpha in range(r):
+            for beta in range(r):
+                k_idx = offset_n + alpha * r + beta
+                # H_A: δ_{βδ} HA_schmidt[α,γ]
+                for gamma in range(r):
+                    l_idx = offset_n + gamma * r + beta
+                    H_emb_HA[l_idx, k_idx] = HA_schmidt[gamma, alpha]
+                # H_B: δ_{αγ} HB_schmidt[β,δ]
+                for delta in range(r):
+                    l_idx = offset_n + alpha * r + delta
+                    H_emb_HB[l_idx, k_idx] = HB_schmidt[delta, beta]
 
     if verbose:
-        elapsed = time.perf_counter() - t2
-        asym = np.abs(H_emb - H_emb.T).max()
-        print(f"    Projection done: {elapsed:.0f}s, max|H-H^T| = {asym:.2e}", flush=True)
+        elapsed = time.perf_counter() - t_pathc
+        print(f"    Path C done: {elapsed:.0f}s", flush=True)
 
-    return H_emb, basis_info
+    # ═══════════════════════════════════════════════════════
+    # Combine: H_emb = H_AB + H_A + H_B
+    # ═══════════════════════════════════════════════════════
+    H_emb += H_emb_HA
+    H_emb += H_emb_HB
+    H_emb = 0.5 * (H_emb + H_emb.T)
+
+    # Diagnostic norms
+    ha_norm = np.linalg.norm(H_emb_HA)
+    hb_norm = np.linalg.norm(H_emb_HB)
+    hab_norm = np.linalg.norm(H_emb - H_emb_HA - H_emb_HB)
+    total_norm = np.linalg.norm(H_emb)
+    asym = np.abs(H_emb - H_emb.T).max()
+
+    norms = {
+        'norm_HA': float(ha_norm), 'norm_HB': float(hb_norm),
+        'norm_HAB': float(hab_norm), 'norm_total': float(total_norm),
+        'asymmetry': float(asym),
+    }
+
+    if verbose:
+        print(f"  H^emb decomposition:")
+        print(f"    ||H_A||  = {ha_norm:.2f}")
+        print(f"    ||H_B||  = {hb_norm:.2f}")
+        print(f"    ||H_AB|| = {hab_norm:.2f}")
+        print(f"    ||H||    = {total_norm:.2f}")
+        print(f"    max|H - H^T| = {asym:.2e}", flush=True)
+
+    return H_emb, basis_info, norms
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 # Main pipeline entry point
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 
 def run_dm_svd_dci(
     atom: str = 'N 0 0 0; N 0 0 1.098',
@@ -225,26 +348,26 @@ def run_dm_svd_dci(
     t_total = time.perf_counter()
     timing = {}
 
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     # Step 1: System setup
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     if verbose:
         print("=" * 70)
-        print("Step 1: System Setup")
+        print("STEP 1: System Setup")
         print("=" * 70)
 
     sys_data = setup_system(
         atom=atom, basis=basis,
         n_active=n_active, n_active_elec=n_active_elec, n_core=n_core,
         nroots=sa_states, verbose=verbose)
-    timing['setup'] = time.perf_counter() - t_total
+    timing['1_setup'] = time.perf_counter() - t_total
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Step 2: dmSVD — occ-virt partition + density matrix SVD
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
+    # Step 2: dmSVD
+    # ═══════════════════════════════════════════════════════
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"Step 2: dmSVD (occ-virt partition + Schmidt decomposition)")
+        print(f"STEP 2: dmSVD (occ-virt partition + Schmidt decomposition)")
         print(f"{'=' * 70}")
 
     t_step2 = time.perf_counter()
@@ -256,7 +379,6 @@ def run_dm_svd_dci(
     partition, full_dets = setup_partition(n_active, sum(n_active_elec), n_occ, ms=ms)
     C_blocks = build_block_matrices(partition, sys_data['ci_flat'])
 
-    # State-averaging
     state_average = None
     if sa_states > 1:
         if verbose:
@@ -268,44 +390,55 @@ def run_dm_svd_dci(
         cas2.kernel()
         state_average = []
         for k in range(sa_states):
-            ci_k = cas2.ci[k]
-            Ck_blocks = build_block_matrices(partition, ci_k.reshape(-1))
+            Ck_blocks = build_block_matrices(partition, cas2.ci[k].reshape(-1))
             state_average.append(Ck_blocks)
 
     schmidt = compute_schmidt_decomposition(
         C_blocks, eps=svd_eps, state_average=state_average)
     metrics = compute_compression_metrics(schmidt, C_blocks, sys_data['ci_flat'])
 
-    timing['dm_svd'] = time.perf_counter() - t_step2
+    timing['2_dm_svd'] = time.perf_counter() - t_step2
 
     if verbose:
-        print(f"  r_total = {metrics['r_total']}, "
-              f"compression ratio = {metrics['compression_ratio']:.4f}")
-        print(f"  dmSVD done: {timing['dm_svd']:.0f}s", flush=True)
+        print(f"  Schmidt decomposition results:")
+        print(f"    r_total = {metrics['r_total']}/{metrics['dim_fci']} "
+              f"(compression {metrics['compression_ratio']:.4%})")
+        print(f"    discarded weight = {metrics['discarded_weight']:.2e}")
+        print(f"    Per-block singular values (σ₁):")
+        for n_A in sorted(schmidt.keys()):
+            sd = schmidt[n_A]
+            if sd['r'] > 0:
+                sig_str = ", ".join(f"{s:.2e}" for s in sd['sigma'][:5])
+                print(f"      n={n_A}: r={sd['r']}/{sd['dim_A']}×{sd['dim_B']}, "
+                      f"σ₁={sd['sigma'][0]:.2e} [{sig_str}...]")
+            else:
+                print(f"      n={n_A}: r=0 (fully truncated)")
+        print(f"  dmSVD done: {timing['2_dm_svd']:.0f}s", flush=True)
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Step 3: Build H^emb in Schmidt product basis
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
+    # Step 3: Build H^emb
+    # ═══════════════════════════════════════════════════════
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"Step 3: Build H^emb (HA+HB+HAB, parallel sigma-vectors)")
+        print(f"STEP 3: Build H^emb = H_A + H_B + H_AB")
         print(f"{'=' * 70}")
 
     t_step3 = time.perf_counter()
-    H_emb, basis_info = build_hemb_parallel(
+    H_emb, basis_info, hemb_norms = build_hemb_parallel(
         schmidt, partition,
         sys_data['q_idx'], sys_data['backend'],
+        h1_full=sys_data['h1eff'], h2_full=sys_data['h2_4d'],
         n_occ=n_occ, n_act=n_active,
         n_workers=n_workers, verbose=verbose)
-    timing['build_hemb'] = time.perf_counter() - t_step3
+    timing['3_build_hemb'] = time.perf_counter() - t_step3
     D = H_emb.shape[0]
 
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     # Step 4: Partition P/Q
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"Step 4: Partition Schmidt Basis → P / Q")
+        print(f"STEP 4: Partition Schmidt Basis → P / Q")
         print(f"{'=' * 70}")
 
     from dm_svd_dci.schmidt_partition import partition_schmidt_basis, extract_subblocks
@@ -315,15 +448,18 @@ def run_dm_svd_dci(
 
     if verbose:
         print(f"  Total Schmidt dim: D = {part['total_dim']}")
-        print(f"  P-space: |P| = {part['p_dim']} (n ∈ {p_blocks})")
-        print(f"  Q-space: |Q| = {part['q_dim']} (n ∉ {p_blocks})")
-        print(f"  H_PP: {H_PP.shape}, H_PQ: {H_PQ.shape}, H_QQ: {H_QQ.shape}", flush=True)
+        print(f"  P-space (n ∈ {p_blocks}): |P| = {part['p_dim']}")
+        print(f"  Q-space (n ∉ {p_blocks}): |Q| = {part['q_dim']}")
+        print(f"  H_PP: {H_PP.shape}, H_PQ: {H_PQ.shape}, H_QQ: {H_QQ.shape}")
+        print(f"  H_PP sparsity: {np.count_nonzero(H_PP)/(H_PP.shape[0]*H_PP.shape[1]):.2%}")
+        print(f"  H_QQ sparsity: {np.count_nonzero(H_QQ)/(H_QQ.shape[0]*H_QQ.shape[1]):.2%}",
+              flush=True)
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Step 5: Bare P-space diagonalization
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
+    # Step 5: Bare H_PP diagonalization
+    # ═══════════════════════════════════════════════════════
     if part['p_dim'] == 0:
-        print("  WARNING: P-space is empty! Check p_blocks setting.")
+        print("  ERROR: P-space is empty! Check p_blocks setting.")
         return {'error': 'Empty P-space'}
 
     E_P, C_P = eigh(H_PP)
@@ -331,14 +467,22 @@ def run_dm_svd_dci(
 
     if verbose:
         dE_bare = (E0 - sys_data['E_fci']) * 1000
-        print(f"\n  Bare H_PP: E0 = {E0:.12f} Ha, ΔE = {dE_bare:+.3f} mH vs CASCI", flush=True)
+        print(f"\n  Bare H_PP diagonalization:")
+        print(f"    E0 (lowest)    = {E0:.12f} Ha")
+        print(f"    ΔE vs FCI      = {dE_bare:+.3f} mH")
+        if len(E_P) >= 5:
+            print(f"    First 5 eigenvalues:")
+            for k in range(min(5, len(E_P))):
+                exc = (E_P[k] - E_P[0]) * 1000 if k > 0 else 0.0
+                print(f"      S{k}: {E_P[k]:.12f} Ha  ({exc:+.1f} mH exc)")
+        print(f"    ||H_PP||       = {np.linalg.norm(H_PP):.2f}", flush=True)
 
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     # Step 6: Krylov-dCI (MGS only, NO SVD)
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"Step 6: Krylov-dCI (MGS only, no SVD)")
+        print(f"STEP 6: Krylov-dCI (MGS only, no SVD)")
         print(f"{'=' * 70}")
 
     from dm_svd_dci.krylov_propagator import build_krylov_full
@@ -350,12 +494,12 @@ def run_dm_svd_dci(
 
     # ── m=0 ──
     if verbose:
-        print(f"\n  --- m=0 ---")
+        print(f"\n  --- m=0: Initial Krylov basis (A · H_QP → MGS) ---")
 
     B0, layers0, A_q = build_krylov_full(
         H_PQ, H_QQ, H_QQ_diag, E0, m_max=0,
         lindep_threshold=lindep_threshold, verbose=verbose)
-    r0 = layers0[0]  # extract int from list
+    r0 = layers0[0]
 
     res_m0 = run_effective_ham_at_m(
         H_PP, H_PQ, H_QQ, E0, B0,
@@ -370,12 +514,13 @@ def run_dm_svd_dci(
     res['r0'] = r0
 
     if verbose:
-        print(f"  m=0 result: E = {E_eff_m0:.12f} Ha, ΔE = {dE_m0_mH:+.3f} mH, r₀ = {r0}", flush=True)
+        print(f"\n  m=0 SUMMARY: E = {E_eff_m0:.12f} Ha, "
+              f"ΔE = {dE_m0_mH:+.3f} mH, r₀ = {r0}", flush=True)
 
-    # ── m=1 (if requested) ──
+    # ── m=1 ──
     if m_max >= 1 and r0 > 0:
         if verbose:
-            print(f"\n  --- m=1 ---")
+            print(f"\n  --- m=1: Propagation (MGS only) ---")
 
         B1, layer_sizes, _ = build_krylov_full(
             H_PQ, H_QQ, H_QQ_diag, E0, m_max=1,
@@ -396,34 +541,43 @@ def run_dm_svd_dci(
         res['layer_sizes'] = layer_sizes
 
         if verbose:
-            print(f"  m=1 result: E = {E_eff_m1:.12f} Ha, ΔE = {dE_m1_mH:+.3f} mH, r₁ = {r1} (layers: {layer_sizes})", flush=True)
+            print(f"\n  m=1 SUMMARY: E = {E_eff_m1:.12f} Ha, "
+                  f"ΔE = {dE_m1_mH:+.3f} mH, r₁ = {r1} "
+                  f"(layers: {layer_sizes})", flush=True)
 
-    timing['krylov'] = time.perf_counter() - t_krylov
+    timing['6_krylov'] = time.perf_counter() - t_krylov
 
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     # Summary
-    # ═══════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════
     timing['total'] = time.perf_counter() - t_total
 
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"Summary")
+        print(f"FINAL SUMMARY")
         print(f"{'=' * 70}")
-        print(f"  CASCI:     {sys_data['E_fci']:.12f} Ha")
-        print(f"  Bare H_PP: {E0:.12f} Ha  (ΔE = {(E0 - sys_data['E_fci'])*1000:+.3f} mH)")
-        print(f"  m=0:       {E_eff_m0:.12f} Ha  (ΔE = {dE_m0_mH:+.3f} mH)")
+        print(f"  E(FCI)      = {sys_data['E_fci']:.12f} Ha")
+        print(f"  E(bare H_PP) = {E0:.12f} Ha  "
+              f"(ΔE = {(E0 - sys_data['E_fci'])*1000:+.3f} mH)")
+        print(f"  E(m=0)       = {E_eff_m0:.12f} Ha  "
+              f"(ΔE = {dE_m0_mH:+.3f} mH)")
         if 'E_eff_m1' in res:
-            print(f"  m=1:       {res['E_eff_m1']:.12f} Ha  (ΔE = {res['dE_m1_mH']:+.3f} mH)")
-        print(f"  Schmidt dim: D = {D}, |P| = {part['p_dim']}, |Q| = {part['q_dim']}")
-        kdim = f"r₀ = {r0}"
-        if 'r1' in res:
-            kdim += f", r₁ = {res['r1']}"
-        print(f"  Krylov: {kdim}")
-        print(f"\n  Timing:")
+            print(f"  E(m=1)       = {res['E_eff_m1']:.12f} Ha  "
+                  f"(ΔE = {res['dE_m1_mH']:+.3f} mH)")
+        print(f"  Schmidt: r_total={metrics['r_total']}, D={D}, "
+              f"|P|={part['p_dim']}, |Q|={part['q_dim']}")
+        print(f"  H^emb norms: HA={hemb_norms['norm_HA']:.1f}, "
+              f"HB={hemb_norms['norm_HB']:.1f}, "
+              f"HAB={hemb_norms['norm_HAB']:.1f}")
+        print(f"  Krylov: r₀={r0}" +
+              (f", r₁={res.get('r1', 'N/A')}" if m_max >= 1 else ""))
+        print(f"\n  Wall time breakdown:")
         for step, t in timing.items():
-            print(f"    {step}: {t:.0f}s")
+            pct = t / timing['total'] * 100
+            print(f"    {step:20s} {t:8.1f}s  ({pct:5.1f}%)")
+        print(f"    {'total':20s} {timing['total']:8.1f}s  (100.0%)", flush=True)
 
-    # ── Build return dict ──
+    # ── Build output dict ──
     output = {
         'E_fci': sys_data['E_fci'],
         'E_bare_P': E0,
@@ -436,23 +590,22 @@ def run_dm_svd_dci(
             'compression_ratio': metrics['compression_ratio'],
             'discarded_weight': metrics['discarded_weight'],
         },
+        'hemb_norms': hemb_norms,
         'partition_info': {
             'D_total': part['total_dim'],
-            'P_dim': part['p_dim'],
-            'Q_dim': part['q_dim'],
-            'p_blocks': p_blocks,
-            'n_blocks': part['n_blocks'],
+            'P_dim': part['p_dim'], 'Q_dim': part['q_dim'],
+            'p_blocks': p_blocks, 'n_blocks': part['n_blocks'],
         },
         'krylov_dims': {'r0': r0},
-        'timing': timing,
+        'timing': {k: float(v) for k, v in timing.items()},
     }
     if 'E_eff_m1' in res:
         output['E_eff_m1'] = res['E_eff_m1']
         output['dE_m1_mH'] = res['dE_m1_mH']
         output['krylov_dims']['r1'] = res['r1']
-        output['krylov_dims']['layer_sizes'] = res['layer_sizes']
+        output['krylov_dims']['layer_sizes'] = [int(x) for x in res['layer_sizes']]
 
-    # ── Save ──
+    # ── Save JSON ──
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)
         fname = os.path.join(output_dir, 'dm_svd_dci_results.json')
@@ -477,23 +630,3 @@ def _make_serializable(obj):
     elif isinstance(obj, (np.floating,)):
         return float(obj)
     return obj
-
-
-def test_pipeline_small():
-    """Run pipeline on N₂ CAS(6,6)/STO-3G (fast smoke test)."""
-    print("=" * 70)
-    print("Test: dmSVD + Krylov-dCI on N₂ CAS(6,6)/STO-3G")
-    print("=" * 70)
-    results = run_dm_svd_dci(
-        atom='N 0 0 0; N 0 0 1.098', basis='sto-3g',
-        n_active=6, n_active_elec=(3, 3), n_core=0, n_occ=3,
-        svd_eps=1e-3, sa_states=1, p_blocks=[4, 5, 6],
-        m_max=1, n_workers=1, verbose=True)
-    assert 'E_fci' in results
-    assert 'E_eff_m0' in results
-    assert abs(results['E_eff_m0'] - results['E_fci']) < 1.0
-    print("\n  ✓ Pipeline test passed")
-
-
-if __name__ == "__main__":
-    test_pipeline_small()
