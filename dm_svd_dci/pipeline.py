@@ -292,10 +292,9 @@ def build_hemb_parallel(
         print(f"    Path C done: {elapsed:.0f}s", flush=True)
 
     # ═══════════════════════════════════════════════════════
-    # Combine: H_emb = H_AB + H_A + H_B
+    # H_emb already contains H_A + H_B + H_AB from sigma-vector projection.
+    # H_emb_HA and H_emb_HB are for diagnostic use only (NOT added back).
     # ═══════════════════════════════════════════════════════
-    H_emb += H_emb_HA
-    H_emb += H_emb_HB
     H_emb = 0.5 * (H_emb + H_emb.T)
 
     # Diagnostic norms
@@ -432,6 +431,14 @@ def run_dm_svd_dci(
         n_workers=n_workers, verbose=verbose)
     timing['3_build_hemb'] = time.perf_counter() - t_step3
     D = H_emb.shape[0]
+
+    # H_emb is built in active space only (ecore = 0).
+    # Add frozen core + nuclear repulsion energy to get total energies.
+    if D > 0:
+        H_emb += sys_data['ecore'] * np.eye(D)
+        if verbose:
+            print(f"  Added ecore = {sys_data['ecore']:.12f} Ha to H^emb "
+                  f"(total energy reference)", flush=True)
 
     # ═══════════════════════════════════════════════════════
     # Step 4: Partition P/Q

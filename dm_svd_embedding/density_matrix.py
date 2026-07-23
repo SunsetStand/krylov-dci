@@ -144,17 +144,40 @@ def compute_schmidt_decomposition(
             r = int(np.sum(keep))
             U_trunc = U_SA[:, keep]
 
-            # For each state, project C into this common basis to get V-equivalents
-            # C = U Σ V^† ⇒ V = C^† U Σ^{-1}
-            # In the truncated basis: Ṽ = C^† U_trunc
-            # But for the shared basis we store U_trunc as the A-basis;
-            # V for each state is computed later in embedded_hamiltonian.
+            # Also diagonalize ρ_B^SA to get common V basis (symmetric to ρ_A^SA)
+            rho_B_SA = np.zeros((C.shape[1], C.shape[1]))
+            for C_k in state_average:
+                Ck = C_k.get(n_A)
+                if Ck is not None and Ck.shape == C.shape:
+                    rho_B_SA += Ck.T @ Ck
+            rho_B_SA /= len(state_average)
+
+            eigvals_B, V_SA = np.linalg.eigh(rho_B_SA)
+            idx_B = np.argsort(-eigvals_B)
+            eigvals_B = eigvals_B[idx_B]
+            V_SA = V_SA[:, idx_B]
+
+            sigma_sq_B = np.maximum(eigvals_B, 0.0)
+            sigma_est_B = np.sqrt(sigma_sq_B)
+            keep_B = singular_value_threshold(sigma_est_B, eps)
+            r_B = int(np.sum(keep_B))
+            V_trunc_B = V_SA[:, keep_B]
+
+            # Use common rank r_common = min(r_A, r_B) for paired Schmidt product basis
+            r_common = min(r, r_B)
+            U_common = U_trunc[:, :r_common]
+            V_common = V_trunc_B[:, :r_common]
+            sigma_common = sigma_est[keep][:r_common]
+
             result[n_A] = {
-                'U': U_trunc,
-                'sigma': sigma_est[keep],
-                'V': None,  # per-state V will be computed later
-                'r': r,
-                'sigma_full': sigma_est,
+                'U': U_common,
+                'sigma': sigma_common,
+                'V': V_common,
+                'r': r_common,
+                'sigma_full': sigma_est,       # ρ_A eigenvalues for diagnostics
+                'sigma_full_B': sigma_est_B,   # ρ_B eigenvalues for diagnostics
+                'r_A': r,
+                'r_B': r_B,
                 'dim_A': C.shape[0],
                 'dim_B': C.shape[1],
             }
