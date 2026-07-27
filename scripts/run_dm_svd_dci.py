@@ -91,9 +91,15 @@ Examples:
     p.add_argument('--lindep-threshold', type=float, default=1e-10,
                    help='Linear dependence threshold for MGS')
 
+    # ── Scheme ──
+    p.add_argument('--scheme', type=str, default='A', choices=['A', 'B', 'B_streaming'],
+                    help='Scheme: A=full H^emb (default), B/B_streaming=direct P/Q blocks')
+    p.add_argument('--batch-size', type=int, default=32,
+                    help='Batch size for B_streaming mode (default 32)')
+
     # ── Parallel ──
     p.add_argument('--n-workers', type=int, default=1,
-                   help='Number of parallel threads for sigma-vector computation')
+                    help='Number of parallel threads for sigma-vector computation')
 
     # ── Output ──
     p.add_argument('--output-dir', type=str, default=None,
@@ -130,6 +136,7 @@ def main():
     print(f"  SVD eps:   {args.svd_eps}")
     print(f"  P blocks:  {p_blocks}")
     print(f"  m_max:     {args.m_max}")
+    print(f"  Scheme:    {args.scheme} (batch_size={args.batch_size})")
     print(f"  Workers:   {args.n_workers}")
     print(f"  Output:    {args.output_dir or '(none)'}")
     print()
@@ -149,6 +156,8 @@ def main():
         delta=args.delta,
         lindep_threshold=args.lindep_threshold,
         n_workers=args.n_workers,
+        scheme=args.scheme,
+        batch_size=args.batch_size,
         output_dir=args.output_dir,
         verbose=verbose,
     )
