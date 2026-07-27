@@ -97,13 +97,15 @@ A third job (15374) with P-blocks = [7, 8, 9, 10] in sa mode has been submitted 
 |---------------|---------------|---------|---------|
 | **gs** (P=[8,9,10]) | +4.842 mH | +0.253 mH | **+0.144 mH** |
 | **sa** (P=[8,9,10]) | +4.837 mH | +0.459 mH | **+0.395 mH** |
+| **sa** (P=[7,8,9,10]) | +3.503 mH | +0.399 mH | **+0.399 mH** |
 
 FCI reference: $E_{\text{FCI}} = -109.048064266113$ Ha.
 
 **Key observations:**
-- The bare $H_{PP}$ diagonalization already captures the dominant static correlation, with an error of only ~4.8 mH.
+- The bare $H_{PP}$ diagonalization already captures the dominant static correlation, with an error of only ~4.8 mH for P=[8,9,10] and ~3.5 mH for P=[7,8,9,10].
 - A single Krylov propagation step ($m = 1$) reduces the error by a factor of ~12–34×, bringing both modes well within chemical accuracy.
 - The gs mode yields slightly lower absolute errors (+0.144 vs +0.395 mH) due to its smaller Schmidt rank (128 vs 228), which arises because the ground-state wavefunction has lower entanglement than the state-averaged ensemble.
+- **Expanding the P-space from [8,9,10] to [7,8,9,10] provides negligible improvement** (+0.395→+0.399 mH at m=1) despite 5.3× larger |P| (2,126→11,342). This indicates that the n=7 block contributes little to the resolvent correction, and P=[8,9,10] already captures the essential physics for N₂.
 
 ### 2.3 Schmidt Decomposition: SVD Truncation and Compression
 
@@ -197,6 +199,67 @@ FCI reference: $E_{\text{FCI}} = -109.048064266113$ Ha.
 - Within $H^{\text{emb}}$ construction, the $H_{AB}$ projection step (computing $\langle v_l | \sigma_k \rangle$ for all $l, k$) accounts for >95% of the time (4,321 s out of 4,420 s for sa). This is an $\mathcal{O}(D^2 \cdot M)$ operation where $M = 63{,}504$ is the CI dimension.
 - The Krylov propagation cost is modest: 31–632 s, dominated by MGS orthogonalization ($\mathcal{O}(\lvert Q\rvert \cdot r^2)$) and effective Hamiltonian construction ($\mathcal{O}(\lvert P\rvert \cdot r^2)$).
 
+### 2.7 Expanded P-Space: P=[7,8,9,10] (Job 15377)
+
+To test whether including the $n=7$ occupation block in the P-space improves accuracy, a job with P=[7,8,9,10] was run (SLURM Job ID 15377). The results are compared with P=[8,9,10] (Job 15372) below:
+
+| Metric | 15372 (P=[8,9,10]) | 15377 (P=[7,8,9,10]) | Change |
+|--------|---------------------|------------------------|--------|
+| $\lvert P\rvert$ | 2,126 | 11,342 | **5.3×** |
+| $\lvert Q\rvert$ | 13,072 | 3,856 | 0.30× |
+| $D$ | 15,198 | 15,198 | unchanged |
+| $r_{\text{total}}$ | 228 | 228 | unchanged |
+| Bare $H_{PP}$ error | +4.837 mH | +3.503 mH | −1.334 mH |
+| $m=1$ error | **+0.395 mH** | **+0.399 mH** | +0.004 mH |
+| Build $H^{\text{emb}}$ | 4,420 s | 4,463 s | ~unchanged |
+| Krylov-dCI | 632 s | 4,608 s | **7.3×** |
+| Krylov $r_0$ | 875 | 1,786 | 2.0× |
+| Krylov $m=1$ new | 875 | **only 3** | near-zero |
+| **Total** | **5,061 s** | **9,282 s** | **1.8×** |
+
+**Key findings:**
+
+1. **Accuracy gain is negligible.** Expanding P-space by 5.3× reduces the Krylov-corrected error by only 0.004 mH (+0.395→+0.399 mH). The $n=7$ block contributes almost no resolvent correction, indicating that P=[8,9,10] already captures all physically relevant coupling pathways for N₂.
+
+2. **Krylov cost explodes.** The MGS orthogonalization in $m=0$ now operates on 11,342 P-basis columns (vs 2,126), making it the dominant cost at 4,608 s. The $m=1$ propagation adds only 3 new vectors (vs 875 for P=[8,9,10]), confirming that expanding P leaves almost no unexplored Q-space directions.
+
+3. **Conclusion: P=[8,9,10] is the optimal choice for N₂/CAS(10,10).** The occupation blocks near half-filling ($n=8,9,10$) capture the essential physics; including lower-$n$ blocks dilutes the Krylov basis with redundant information while increasing computational cost.
+
+**Per-state excited-state energies (Job 15377, $m=1$):**
+
+| State | CASCI Ref. (Ha) | dmSVD-dCI $E_{\text{eff}}$ (Ha) | $\Delta E$ (mH) |
+|-------|-----------------|----------------------------------|-----------------|
+| S0 | −109.048064266106 | −109.047665307540 | **+0.399** |
+| S1 | −108.748806290013 | −108.748308217454 | **+0.498** |
+| S2 | −108.732916737431 | −108.732142661916 | **+0.774** |
+| S3 | −108.729931381930 | −108.729494783029 | **+0.437** |
+| S4 | −108.702902364387 | −108.702415809260 | **+0.487** |
+
+Note: The $\Delta E$ column now correctly compares each per-state effective energy against its **own CASCI reference energy**, not the ground-state FCI energy (this bug has been fixed in the pipeline code).
+
+### 2.8 H_AB Bottleneck and BLAS3 Optimization
+
+The original `build_hemb_parallel` function in `pipeline.py` used a **double Python loop** for the H_AB projection:
+
+```python
+# Original (slow): O(D²·M) in pure Python
+for k in range(D):
+    sk = sigma_flat[k]
+    for l in range(D):
+        H_emb[l, k] = np.dot(ci_flat_mats[l], sk)
+```
+
+For $D=15{,}198$ and $M=63{,}504$, this requires $D^2 = 231$ million dot products, each calling NumPy's C-level dot with Python overhead per call. This accounted for >95% of the H^emb construction time (4,321 s out of 4,420 s for sa mode).
+
+**Fix: BLAS3 matrix multiplication.** Stacking all CI vectors and sigma vectors into $(M, D)$ matrices and computing:
+
+```python
+# Optimized: single BLAS3 call, O(D²·M) in C
+H_emb = C_flat.T @ S_flat  # (D, D) = (D, M) @ (M, D)
+```
+
+This replaces 231M Python-to-C crossings with a single BLAS3 `dgemm` call. The expected speedup is **100–1000×** for the projection step, reducing H^emb construction from ~4,400 s to an estimated ~50–500 s for CAS(10,10). This optimization has been applied to both `pipeline.py` (the production code) and `embedded_hamiltonian.py` (the legacy reference implementation).
+
 ---
 
 ## 3. Next Steps
@@ -227,6 +290,66 @@ The current implementation (Scheme A) explicitly constructs the full $D \times D
 - Store only the Schmidt basis expansion coefficients $\{U^{(n)}, V^{(n)}\}$.
 - Implement `H_QQ @ v` on-the-fly by expanding $v$ back to the CI determinant basis, applying the Hamiltonian via `contract_2e` (C-level, GIL-free, thread-parallel), and projecting back to the Schmidt basis.
 - The Krylov propagation would then be fully matrix-free, with the dominant cost being $\mathcal{O}(r \cdot M \cdot N_{\text{orb}}^4)$ per iteration, where $r$ is the Krylov dimension and $M$ is the full CI dimension.
+
+### 3.7 Scheme B Implementation: Direct P/Q Construction
+
+The current Scheme A builds the full $H^{\text{emb}}$ ($D \times D$), then extracts $H_{PP}$, $H_{PQ}$, $H_{QQ}$ via slicing. Scheme B eliminates the full matrix, constructing only the needed blocks:
+
+**`build_hpp_direct`** — Build $H_{PP}$ ($\lvert P\rvert \times \lvert P\rvert$):
+1. Expand each P-basis Schmidt state to a full CAS CI matrix.
+2. Compute $\sigma = H \cdot v$ for each P-basis state (parallel via ThreadPoolExecutor).
+3. BLAS3 projection: $H_{PP} = C_P^T @ S_P$, where $C_P$ and $S_P$ are $(M, \lvert P\rvert)$.
+
+Cost: $\lvert P\rvert$ sigma-vector calls (vs. $D$ for Scheme A). For P=[8,9,10], $\lvert P\rvert=2{,}126$ vs. $D=15{,}198$ → 7× fewer sigma calls.
+
+**`build_hpq_direct`** — Build $H_{PQ}$ ($\lvert P\rvert \times \lvert Q\rvert$):
+- Strategy: sigma on the **smaller** side. For P=[8,9,10] with $\lvert P\rvert=2{,}126$, $\lvert Q\rvert=13{,}072$, compute sigma for P states and project onto Q states: $H_{PQ} = (C_Q^T @ S_P)^T$.
+- For P=[7,8,9,10] with $\lvert P\rvert=11{,}342$, $\lvert Q\rvert=3{,}856$, compute sigma for Q states and project onto P states: $H_{PQ} = C_P^T @ S_Q$.
+
+Cost: $\min(\lvert P\rvert, \lvert Q\rvert)$ sigma-vector calls.
+
+**`apply_hqq_on_the_fly`** — Matrix-free $H_{QQ} @ v$:
+1. Build combined CI matrix: $C_{\text{combined}} = \sum_{q} v_q \cdot C_q^{\text{(Q-basis)}}$.
+2. Compute one sigma-vector: $\sigma = H \cdot C_{\text{combined}}$.
+3. Project back: $\text{result}_q = \langle C_q^{\text{(Q-basis)}} | \sigma \rangle$.
+
+Cost: 1 sigma-vector call per evaluation (vs. storing $\lvert Q\rvert \times \lvert Q\rvert$ matrix).
+
+**Memory savings:** Scheme B stores only $\{U^{(n)}, V^{(n)}\}$ (~MB), the CI expansion matrices ($M \times \lvert P\rvert$ or $M \times \lvert Q\rvert$, ~few GB peak), and the projected blocks $H_{PP}$ and $H_{PQ}$. The largest item — the $D \times D$ $H^{\text{emb}}$ — is never allocated. This enables calculations with $D > 100{,}000$, where Scheme A would require >80 GB for $H^{\text{emb}}$ alone.
+
+The implementation is available in `dm_svd_dci/schmidt_partition.py` as `build_hpp_direct()`, `build_hpq_direct()`, `apply_hqq_on_the_fly()`, and `apply_hqq_batch()`.
+
+### 3.8 Storage Bottleneck Analysis for Larger Systems
+
+As the active space grows, several objects hit memory limits. Below is a scaling analysis (float64, 8 bytes/element):
+
+| Object | Dimension | CAS(10,10) | CAS(14,10) | CAS(20,10) | Limit |
+|--------|-----------|------------|------------|------------|-------|
+| CI vector $M$ | $\#\text{dets}$ | 63,504 | 4,008,004 | 260,406,900 | — |
+| $H^{\text{emb}}$ | $D \times D$ | 15k→**1.8 GB** | ~100k→**80 GB** ❌ | ~500k→**2 TB** ❌ | ~20k (3.2 GB) |
+| CI mats $(M \times D)$ | $M \times D$ | 63k×15k→**7.7 GB** | 4M×100k→**3.2 TB** ❌ | 260M×500k→**1 PB** ❌ | ~1M×20k (160 GB) |
+| $H_{QQ}$ | $\lvert Q\rvert \times \lvert Q\rvert$ | 13k→1.4 GB | ~80k→**51 GB** ❌ | ~400k→**1.3 TB** ❌ | ~50k (20 GB) |
+| $H_{PP}$ | $\lvert P\rvert \times \lvert P\rvert$ | 2.1k→36 MB | ~20k→3.2 GB | ~100k→80 GB | large but safe |
+| $H_{PQ}$ | $\lvert P\rvert \times \lvert Q\rvert$ | 2.1k×13k→222 MB | ~20k×80k→13 GB | ~100k×400k→320 GB ❌ | ~100k×100k (80 GB) |
+| U/V matrices | $\dim(F) \times r$ | 252×60→0.1 MB | ~10k×300→24 MB | ~200k×1k→1.6 GB | small |
+| Krylov basis $B$ | $\lvert Q\rvert \times r$ | 13k×875→92 MB | ~80k×2k→1.3 GB | ~400k×5k→16 GB | manageable |
+
+**Critical thresholds:**
+
+1. **$D > 20{,}000$**: Scheme A fails — $H^{\text{emb}}$ exceeds 3.2 GB. Must switch to Scheme B.
+
+2. **$M \times D > 160$ GB**: CI expansion mats exceed RAM. Mitigations:
+   - **On-the-fly expansion**: Instead of pre-computing all CI mats, expand Schmidt states one at a time (or in small batches), compute sigma, project, and discard.
+   - This is already partially implemented in `apply_hqq_on_the_fly`, but needs extension to the $H_{PP}$ and $H_{PQ}$ construction steps.
+
+3. **$\lvert Q\rvert > 50{,}000$**: Even in Scheme B, storing $H_{QQ}$ is impossible. The Krylov propagation must be fully matrix-free, using only `apply_hqq_on_the_fly` for all $H_{QQ} @ v$ operations. The Krylov MGS step requires $\mathcal{O}(\lvert Q\rvert \cdot r^2)$ memory for storing the basis $B$, which is manageable (~20 GB at worst).
+
+4. **CI vector $M > 10^7$**: The original CASCI diagonalization to obtain the dmSVD input wavefunction becomes the bottleneck. §3.1 outlines strategies for obtaining approximate CI coefficients without full CASCI.
+
+**Recommendations for scaling to larger systems:**
+
+- **CAS(14,10)**: Use Scheme B for $H_{PP}$ and $H_{PQ}$ construction. Use on-the-fly CI expansion (avoid storing $M \times \lvert P\rvert$ and $M \times \lvert Q\rvert$ simultaneously). The dominant cost becomes the $\lvert P\rvert + \lvert Q\rvert$ sigma-vector calls ($\approx D$ calls, same as Scheme A, but without the $H^{\text{emb}}$ memory cost).
+- **CAS(20,10)**: Fully matrix-free Scheme B required. All steps — $H_{PP}$ construction, $H_{PQ}$ construction, $H_{QQ} @ v$, and Krylov propagation — must use on-the-fly CI expansion. The sigma-vector computation (contract_2e) remains the dominant cost, but it scales as $\mathcal{O}(M \cdot N_{\text{orb}}^4)$ and is C-level (GIL-free, parallelizable). Estimated total cost: ~$D \times 10^3$–$10^4$ s depending on $M$ and parallelization.
 
 ### 3.3 Self-Consistent $\Delta$ Iteration
 

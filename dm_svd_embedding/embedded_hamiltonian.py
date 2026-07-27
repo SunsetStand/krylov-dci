@@ -285,16 +285,18 @@ def build_h_emb(
         print(f"    Sigma-vectors done in {elapsed:.0f}s "
               f"({elapsed / max(D, 1):.2f}s/vector)")
 
-    # ── Project: H_emb[k,l] = v_l^T · sigma_k ──
+    # ── Project: H_emb[l,k] = v_l · sigma_k → H_emb = C^T @ S (BLAS3) ──
     if verbose:
         t1 = time.perf_counter()
-        print(f"  Projecting {D}×{D} matrix elements...")
+        print(f"  Projecting {D}×{D} matrix elements via BLAS3...")
 
+    M_flat = ci_mats[0].size
+    C_flat = np.empty((M_flat, D))
+    S_flat = np.empty((M_flat, D))
     for k in range(D):
-        sigma_flat = sigmas[k].reshape(-1)
-        for l in range(D):
-            v_l = ci_mats[l].reshape(-1)
-            H_emb[l, k] = np.dot(v_l, sigma_flat)
+        C_flat[:, k] = ci_mats[k].reshape(-1)
+        S_flat[:, k] = sigmas[k].reshape(-1)
+    H_emb = C_flat.T @ S_flat  # (D, D) = (D, M) @ (M, D)
 
     if verbose:
         elapsed = time.perf_counter() - t1

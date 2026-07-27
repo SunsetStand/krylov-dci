@@ -203,26 +203,26 @@ def build_hemb_parallel(
         elapsed = time.perf_counter() - t1
         print(f"    Sigma done: {elapsed:.0f}s ({elapsed/max(D,1):.2f}s/vector)", flush=True)
 
-    # Project: H_emb_AB[k,l] = v_l · sigma_k
+    # Project: H_emb[l,k] = v_l · sigma_k → H_emb = C^T @ S (BLAS3)
     if verbose:
         t_proj = time.perf_counter()
-        print(f"  [H_AB] Projecting {D}×{D} matrix elements...", flush=True)
+        print(f"  [H_AB] Projecting {D}×{D} matrix elements via BLAS3...", flush=True)
 
-    ci_flat_mats = [cm.reshape(-1) for cm in ci_mats]
-    sigma_flat = [sm.reshape(-1) for sm in sigmas]
-    H_emb = np.zeros((D, D))
-
+    # Stack CI vectors and sigma vectors as (M, D) matrices
+    M_flat = ci_mats[0].size
+    C_flat = np.empty((M_flat, D))
+    S_flat = np.empty((M_flat, D))
     for k in range(D):
-        sk = sigma_flat[k]
-        for l in range(D):
-            H_emb[l, k] = np.dot(ci_flat_mats[l], sk)
+        C_flat[:, k] = ci_mats[k].reshape(-1)
+        S_flat[:, k] = sigmas[k].reshape(-1)
+    H_emb = C_flat.T @ S_flat  # (D, D) = (D, M) @ (M, D)
 
     if verbose:
         elapsed = time.perf_counter() - t_proj
         print(f"    Projection done: {elapsed:.0f}s", flush=True)
 
     # Release memory for CI mats
-    del ci_mats, sigmas, ci_flat_mats, sigma_flat
+    del ci_mats, sigmas, C_flat, S_flat
 
     # ═══════════════════════════════════════════════════════
     # Part 2: H_A + H_B via Path C
@@ -379,6 +379,7 @@ def run_dm_svd_dci(
     C_blocks = build_block_matrices(partition, sys_data['ci_flat'])
 
     state_average = None
+    E_casci_list = None
     if sa_states > 1:
         if verbose:
             print(f"  State-averaged mode: {sa_states} states")
@@ -387,6 +388,9 @@ def run_dm_svd_dci(
         cas2.frozen = n_core
         cas2.fcisolver.nroots = sa_states
         cas2.kernel()
+        # Capture multi-root CASCI reference energies
+        if hasattr(cas2, 'e_tot'):
+            E_casci_list = np.atleast_1d(np.asarray(cas2.e_tot)).flatten()
         state_average = []
         for k in range(sa_states):
             Ck_blocks = build_block_matrices(partition, cas2.ci[k].reshape(-1))
@@ -601,12 +605,13 @@ def run_dm_svd_dci(
               (f", r₁={res.get('r1', 'N/A')}" if m_max >= 1 else ""))
         if 'E_eff_per_state' in res and sa_states > 1:
             print(f"\n  Excited states (per-state E₀):")
-            print(f"  {'State':>5} {'E_per_state':>16} {'ΔE vs FCI':>12}")
-            print(f"  {'-'*41}")
+            print(f"  {'State':>5} {'E_per_state':>16} {'ΔE vs CASCI':>14}")
+            print(f"  {'-'*43}")
             for k in range(min(sa_states, len(res['E_eff_per_state']))):
                 E_ps = res['E_eff_per_state'][k]
-                dE = (E_ps - sys_data['E_fci']) * 1000
-                print(f"  {'S'+str(k):>5} {E_ps:>16.12f} {dE:>+11.3f} mH", flush=True)
+                E_ref_k = E_casci_list[k] if E_casci_list is not None and k < len(E_casci_list) else sys_data['E_fci']
+                dE = (E_ps - E_ref_k) * 1000
+                print(f"  {'S'+str(k):>5} {E_ps:>16.12f} {dE:>+13.3f} mH", flush=True)
         print(f"\n  Wall time breakdown:")
         for step, t in timing.items():
             pct = t / timing['total'] * 100
