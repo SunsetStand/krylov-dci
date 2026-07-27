@@ -19,7 +19,7 @@ Algorithm (m=1):
 
 import numpy as np
 from numpy.linalg import norm
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Callable
 import time
 
 
@@ -292,6 +292,143 @@ def build_krylov_full(
         r_before = r_current
         B_current, r_current = propagate_krylov_mgs(
             B_current, H_QQ, H_QQ_diag, A_q,
+            lindep_threshold, verbose)
+        r_incr = r_current - r_before
+        layer_sizes.append(r_incr)
+
+        if r_current == r_before:
+            if verbose:
+                print(f"  m={m}: no new directions, stopping propagation")
+            break
+
+    return B_current, layer_sizes, A_q
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Matrix-free Krylov propagation (for Scheme B streaming)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def propagate_krylov_mgs_matvec(
+    B_current: np.ndarray,
+    H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
+    H_QQ_diag: np.ndarray,
+    A_q: np.ndarray,
+    lindep_threshold: float = 1e-10,
+    verbose: bool = True,
+) -> Tuple[np.ndarray, int]:
+    """Propagate Krylov basis using matrix-free H_QQ via matvec callback.
+
+    Same as propagate_krylov_mgs, but instead of passing a dense H_QQ matrix,
+    accepts a callable H_QQ_matvec(v) → H_QQ @ v.
+
+    Args:
+        B_current:        (|Q|, r_current) current orthonormal Krylov basis.
+        H_QQ_matvec:      Callable: (|Q|,) → (|Q|,) computing H_QQ @ v.
+        H_QQ_diag:        (|Q|,) diagonal of H_QQ.
+        A_q:              (|Q|,) diagonal resolvent from build_krylov_basis_mgs.
+        lindep_threshold: Linear dependence threshold.
+        verbose:          Print progress.
+
+    Returns:
+        (B_new, r_new):
+          B_new: (|Q|, r_new) extended orthonormal basis.
+          r_new: Total number of vectors after propagation.
+    """
+    q_dim = B_current.shape[0]
+    r_current = B_current.shape[1]
+
+    if r_current == 0 or q_dim == 0:
+        return B_current.copy(), r_current
+
+    if verbose:
+        t0 = time.perf_counter()
+        print(f"  [m=1] Propagating {r_current} basis vectors (matvec)...", flush=True)
+
+    # ── Step 1: residual = H_QQ @ B - diag(H_QQ) * B ──
+    # Use matvec for each column
+    HQQ_B = np.empty((q_dim, r_current))
+    for j in range(r_current):
+        HQQ_B[:, j] = H_QQ_matvec(B_current[:, j])
+
+    residual = HQQ_B - H_QQ_diag[:, np.newaxis] * B_current
+
+    # ── Step 2: X = A · residual ──
+    X = residual * A_q[:, np.newaxis]  # (|Q|, r_current)
+
+    if verbose:
+        print(f"    Residuals computed ({time.perf_counter() - t0:.0f}s)", flush=True)
+        t1 = time.perf_counter()
+
+    # ── Step 3: MGS against existing basis + new directions ──
+    B_incr, retained = modified_gram_schmidt(
+        X, existing_basis=B_current, lindep_threshold=lindep_threshold,
+        verbose=verbose)
+
+    r_incr = B_incr.shape[1]
+
+    if r_incr > 0:
+        B_new = np.hstack([B_current, B_incr])
+    else:
+        B_new = B_current.copy()
+
+    r_new = B_new.shape[1]
+
+    if verbose:
+        elapsed = time.perf_counter() - t1
+        print(f"  [m=1] Done: r_new = {r_new} (+{r_incr} new, "
+              f"{r_current + r_incr - r_new} lost to lindep) "
+              f"({elapsed:.0f}s MGS)", flush=True)
+
+    return B_new, r_new
+
+
+def build_krylov_full_matvec(
+    H_PQ: np.ndarray,
+    H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
+    H_QQ_diag: np.ndarray,
+    E0: float,
+    m_max: int = 1,
+    lindep_threshold: float = 1e-10,
+    verbose: bool = True,
+) -> Tuple[np.ndarray, List[int], np.ndarray]:
+    """Build full Krylov basis up to m=m_max using matrix-free H_QQ.
+
+    Same as build_krylov_full, but accepts H_QQ_matvec callable instead
+    of dense H_QQ matrix. Suitable for Scheme B streaming mode.
+
+    Args:
+        H_PQ:        (|P|, |Q|) P–Q coupling.
+        H_QQ_matvec: Callable (|Q|,) → (|Q|,) for H_QQ @ v.
+        H_QQ_diag:   (|Q|,) diagonal of H_QQ.
+        E0:          Reference energy (from H_PP).
+        m_max:       Max Krylov order (0 or 1 typical).
+        lindep_threshold: Linear dependence threshold.
+        verbose:     Print progress.
+
+    Returns:
+        (B_final, layer_sizes, A_q):
+          B_final:     (|Q|, r_total) orthonormal basis.
+          layer_sizes: [r₀, r₁_incr, ...] retained per layer.
+          A_q:         (|Q|,) diagonal resolvent.
+    """
+    # m=0: same as original (uses only H_PQ and H_QQ_diag, no H_QQ matrix)
+    B0, r0, A_q = build_krylov_basis_mgs(
+        H_PQ, H_QQ_diag, E0, lindep_threshold, verbose)
+    layer_sizes = [r0]
+
+    B_current = B0
+    r_current = r0
+
+    # m ≥ 1: use matvec version
+    for m in range(1, m_max + 1):
+        if r_current == 0:
+            if verbose:
+                print(f"  m={m}: no basis vectors, stopping")
+            break
+
+        r_before = r_current
+        B_current, r_current = propagate_krylov_mgs_matvec(
+            B_current, H_QQ_matvec, H_QQ_diag, A_q,
             lindep_threshold, verbose)
         r_incr = r_current - r_before
         layer_sizes.append(r_incr)

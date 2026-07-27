@@ -2,8 +2,8 @@
 
 > **Complete Summary Report**
 >
-> **Author:** Chengxin Wang
-> **Date:** July 24, 2026
+> **Author:** Chenxi Wang
+> **Date:** July 27, 2026
 > **System:** N₂ / cc-pVDZ, CAS(10,10)
 > **Code:** `krylov-dci/dm_svd_dci/` + `dm_svd_embedding/`
 

@@ -340,10 +340,17 @@ def run_dm_svd_dci(
     delta: float = 0.0,
     lindep_threshold: float = 1e-10,
     n_workers: int = 1,
+    scheme: str = 'A',
+    batch_size: int = 32,
     output_dir: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict:
-    """Run the complete dmSVD + Krylov-dCI pipeline."""
+    """Run the complete dmSVD + Krylov-dCI pipeline.
+    
+    Args:
+        scheme: 'A' = full H^emb (default), 'B'/'B_streaming' = direct P/Q blocks
+        batch_size: Batch size for 'B_streaming' mode (default 32).
+    """
     t_total = time.perf_counter()
     timing = {}
 
