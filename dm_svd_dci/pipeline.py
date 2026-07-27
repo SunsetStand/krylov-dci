@@ -426,52 +426,66 @@ def run_dm_svd_dci(
         print(f"  dmSVD done: {timing['2_dm_svd']:.0f}s", flush=True)
 
     # ═══════════════════════════════════════════════════════
-    # Step 3: Build H^emb
+    # Step 3+4: Build H^emb / H_PP / H_PQ (scheme-dependent)
     # ═══════════════════════════════════════════════════════
-    if verbose:
-        print(f"\n{'=' * 70}")
-        print(f"STEP 3: Build H^emb = H_A + H_B + H_AB")
-        print(f"{'=' * 70}")
-
-    t_step3 = time.perf_counter()
-    H_emb, basis_info, hemb_norms = build_hemb_parallel(
-        schmidt, partition,
-        sys_data['q_idx'], sys_data['backend'],
-        h1_full=sys_data['h1eff'], h2_full=sys_data['h2_4d'],
-        n_occ=n_occ, n_act=n_active,
-        n_workers=n_workers, verbose=verbose)
-    timing['3_build_hemb'] = time.perf_counter() - t_step3
-    D = H_emb.shape[0]
-
-    # H_emb is built in active space only (ecore = 0).
-    # Add frozen core + nuclear repulsion energy to get total energies.
-    if D > 0:
-        H_emb += sys_data['ecore'] * np.eye(D)
-        if verbose:
-            print(f"  Added ecore = {sys_data['ecore']:.12f} Ha to H^emb "
-                  f"(total energy reference)", flush=True)
-
-    # ═══════════════════════════════════════════════════════
-    # Step 4: Partition P/Q
-    # ═══════════════════════════════════════════════════════
-    if verbose:
-        print(f"\n{'=' * 70}")
-        print(f"STEP 4: Partition Schmidt Basis → P / Q")
-        print(f"{'=' * 70}")
-
     from dm_svd_dci.schmidt_partition import partition_schmidt_basis, extract_subblocks
 
     part = partition_schmidt_basis(schmidt, p_blocks=p_blocks)
-    H_PP, H_PQ, H_QQ = extract_subblocks(H_emb, part)
+    D = part['total_dim']
 
     if verbose:
-        print(f"  Total Schmidt dim: D = {part['total_dim']}")
+        print(f"\n{'=' * 70}")
+        print(f"STEP 3+4: Build Hamiltonian Blocks  (scheme={scheme})")
+        print(f"{'=' * 70}")
+        print(f"  Total Schmidt dim: D = {D}")
         print(f"  P-space (n ∈ {p_blocks}): |P| = {part['p_dim']}")
         print(f"  Q-space (n ∉ {p_blocks}): |Q| = {part['q_dim']}")
-        print(f"  H_PP: {H_PP.shape}, H_PQ: {H_PQ.shape}, H_QQ: {H_QQ.shape}")
-        print(f"  H_PP sparsity: {np.count_nonzero(H_PP)/(H_PP.shape[0]*H_PP.shape[1]):.2%}")
-        print(f"  H_QQ sparsity: {np.count_nonzero(H_QQ)/(H_QQ.shape[0]*H_QQ.shape[1]):.2%}",
-              flush=True)
+
+    t_step3 = time.perf_counter()
+    hemb_norms = {}
+    H_QQ_matvec = None
+
+    if scheme == 'A':
+        H_emb, basis_info, hemb_norms = build_hemb_parallel(
+            schmidt, partition,
+            sys_data['q_idx'], sys_data['backend'],
+            h1_full=sys_data['h1eff'], h2_full=sys_data['h2_4d'],
+            n_occ=n_occ, n_act=n_active,
+            n_workers=n_workers, verbose=verbose)
+        if D > 0:
+            H_emb += sys_data['ecore'] * np.eye(D)
+        H_PP, H_PQ, H_QQ = extract_subblocks(H_emb, part)
+
+    elif scheme in ('B', 'B_streaming'):
+        from dm_svd_dci.streaming_ops import StreamBuilder
+        builder = StreamBuilder(
+            schmidt, partition, part,
+            sys_data['backend'],
+            n_occ, n_active,
+            batch_size=batch_size,
+            n_workers=n_workers,
+            verbose=verbose,
+        )
+        blocks = builder.build_all(prewarm_q=False)
+        H_PP = blocks['H_PP'] + sys_data['ecore'] * np.eye(part['p_dim'])
+        H_PQ = blocks['H_PQ']
+        H_QQ_diag_stream = blocks['H_QQ_diag'] + sys_data['ecore']
+        # Store the builder for later Krylov matvec use
+        H_QQ_matvec = blocks['H_QQ_matvec']
+        H_QQ = None  # No dense H_QQ available in streaming mode
+
+    else:
+        raise ValueError(f"Unknown scheme: {scheme}")
+
+    timing['3_build_hemb'] = time.perf_counter() - t_step3
+
+    if verbose:
+        if H_QQ is not None:
+            print(f"  H_PP: {H_PP.shape}, H_PQ: {H_PQ.shape}, H_QQ: {H_QQ.shape}")
+            print(f"  H_PP sparsity: {np.count_nonzero(H_PP)/(H_PP.shape[0]*H_PP.shape[1]):.2%}")
+        else:
+            print(f"  H_PP: {H_PP.shape}, H_PQ: {H_PQ.shape}, H_QQ: matrix-free")
+        print(flush=True)
 
     # ═══════════════════════════════════════════════════════
     # Step 5: Bare H_PP diagonalization
@@ -503,26 +517,45 @@ def run_dm_svd_dci(
         print(f"STEP 6: Krylov-dCI (MGS only, no SVD)")
         print(f"{'=' * 70}")
 
-    from dm_svd_dci.krylov_propagator import build_krylov_full
-    from dm_svd_dci.effective_ham import run_effective_ham_at_m, run_effective_ham_per_state
+    use_matvec = (H_QQ_matvec is not None)
+    if use_matvec:
+        from dm_svd_dci.krylov_propagator import build_krylov_full_matvec as _bld_krylov
+        from dm_svd_dci.effective_ham import run_effective_ham_at_m_matvec as _run_eff
+        from dm_svd_dci.effective_ham import run_effective_ham_per_state_matvec as _run_per_state
+        H_QQ_diag = H_QQ_diag_stream  # from streaming builder
+    else:
+        from dm_svd_dci.krylov_propagator import build_krylov_full as _bld_krylov
+        from dm_svd_dci.effective_ham import run_effective_ham_at_m as _run_eff
+        from dm_svd_dci.effective_ham import run_effective_ham_per_state as _run_per_state
+        H_QQ_diag = np.diag(H_QQ)
 
     res = {}
     t_krylov = time.perf_counter()
-    H_QQ_diag = np.diag(H_QQ)
 
     # ── m=0 ──
     if verbose:
         print(f"\n  --- m=0: Initial Krylov basis (A · H_QP → MGS) ---")
 
-    B0, layers0, A_q = build_krylov_full(
-        H_PQ, H_QQ, H_QQ_diag, E0, m_max=0,
-        lindep_threshold=lindep_threshold, verbose=verbose)
+    if use_matvec:
+        B0, layers0, A_q = _bld_krylov(
+            H_PQ, H_QQ_matvec, H_QQ_diag, E0, m_max=0,
+            lindep_threshold=lindep_threshold, verbose=verbose)
+    else:
+        B0, layers0, A_q = _bld_krylov(
+            H_PQ, H_QQ, H_QQ_diag, E0, m_max=0,
+            lindep_threshold=lindep_threshold, verbose=verbose)
     r0 = layers0[0]
 
-    res_m0 = run_effective_ham_at_m(
-        H_PP, H_PQ, H_QQ, E0, B0,
-        delta=delta, n_states=min(sa_states, len(E_P)),
-        C_ref=C_P, verbose=verbose)
+    if use_matvec:
+        res_m0 = _run_eff(
+            H_PP, H_PQ, H_QQ_matvec, E0, B0,
+            delta=delta, n_states=min(sa_states, len(E_P)),
+            C_ref=C_P, verbose=verbose)
+    else:
+        res_m0 = _run_eff(
+            H_PP, H_PQ, H_QQ, E0, B0,
+            delta=delta, n_states=min(sa_states, len(E_P)),
+            C_ref=C_P, verbose=verbose)
 
     E_eff_m0 = res_m0['E_eff'][0]
     dE_m0_mH = (E_eff_m0 - sys_data['E_fci']) * 1000
@@ -540,14 +573,25 @@ def run_dm_svd_dci(
         if verbose:
             print(f"\n  --- m=1: Propagation (MGS only) ---")
 
-        B1, layer_sizes, _ = build_krylov_full(
-            H_PQ, H_QQ, H_QQ_diag, E0, m_max=1,
-            lindep_threshold=lindep_threshold, verbose=verbose)
+        if use_matvec:
+            B1, layer_sizes, _ = _bld_krylov(
+                H_PQ, H_QQ_matvec, H_QQ_diag, E0, m_max=1,
+                lindep_threshold=lindep_threshold, verbose=verbose)
+        else:
+            B1, layer_sizes, _ = _bld_krylov(
+                H_PQ, H_QQ, H_QQ_diag, E0, m_max=1,
+                lindep_threshold=lindep_threshold, verbose=verbose)
 
-        res_m1 = run_effective_ham_at_m(
-            H_PP, H_PQ, H_QQ, E0, B1,
-            delta=delta, n_states=min(sa_states, len(E_P)),
-            C_ref=C_P, verbose=verbose)
+        if use_matvec:
+            res_m1 = _run_eff(
+                H_PP, H_PQ, H_QQ_matvec, E0, B1,
+                delta=delta, n_states=min(sa_states, len(E_P)),
+                C_ref=C_P, verbose=verbose)
+        else:
+            res_m1 = _run_eff(
+                H_PP, H_PQ, H_QQ, E0, B1,
+                delta=delta, n_states=min(sa_states, len(E_P)),
+                C_ref=C_P, verbose=verbose)
 
         E_eff_m1 = res_m1['E_eff'][0]
         dE_m1_mH = (E_eff_m1 - sys_data['E_fci']) * 1000
@@ -563,23 +607,22 @@ def run_dm_svd_dci(
                   f"ΔE = {dE_m1_mH:+.3f} mH, r₁ = {r1} "
                   f"(layers: {layer_sizes})", flush=True)
 
-    # ── Per-state E₀: each excited state uses its own H_PP eigenvalue ──
+    # ── Per-state E₀ ──
     if sa_states > 1:
-        # Use the largest Krylov basis available (m=1 if computed, else m=0)
         B_per = B1 if m_max >= 1 and r0 > 0 else B0
-
         if verbose:
             print(f"\n  --- Per-state E₀ (excited-state Löwdin refinement) ---")
-
-        E0_list = E_P[:sa_states]  # H_PP eigenvalues for each state
-        res_per_state = run_effective_ham_per_state(
-            H_PP, H_PQ, H_QQ, B_per,
-            E0_list=E0_list,
-            delta=delta,
-            n_states=sa_states,
-            C_ref=C_P,
-            verbose=verbose,
-        )
+        E0_list = E_P[:sa_states]
+        if use_matvec:
+            res_per_state = _run_per_state(
+                H_PP, H_PQ, H_QQ_matvec, B_per,
+                E0_list=E0_list, delta=delta,
+                n_states=sa_states, C_ref=C_P, verbose=verbose)
+        else:
+            res_per_state = _run_per_state(
+                H_PP, H_PQ, H_QQ, B_per,
+                E0_list=E0_list, delta=delta,
+                n_states=sa_states, C_ref=C_P, verbose=verbose)
         res['E_eff_per_state'] = res_per_state['E_eff_per_state'].tolist()
         res['overlaps_per_state'] = res_per_state['overlaps'].tolist()
         res['E0_per_state'] = [float(e) for e in E0_list]

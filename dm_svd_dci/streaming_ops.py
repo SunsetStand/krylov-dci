@@ -268,8 +268,8 @@ class StreamBuilder:
         self.q_dim = part_info['q_dim']
 
         # CAS string info
-        self.alpha_strs = backend.qspace_index.alpha_strs
-        self.beta_strs = backend.qspace_index.beta_strs
+        self.alpha_strs = backend.q_idx.alpha_strs
+        self.beta_strs = backend.q_idx.beta_strs
         self.n_alpha_strs = len(self.alpha_strs)
         self.n_beta_strs = len(self.beta_strs)
         self.M = self.n_alpha_strs * self.n_beta_strs
@@ -285,7 +285,7 @@ class StreamBuilder:
         self._q_ci_flat_cache: Dict[int, np.ndarray] = {}
 
         if verbose:
-            print(f"  [StreamBuilder] CAS({n_act},{sum(backend.qspace_index.nelec)}), "
+            print(f"  [StreamBuilder] CAS({n_act},{sum(backend.q_idx.nelec)}), "
                   f"M={self.M:,}, |P|={self.p_dim}, |Q|={self.q_dim}")
             print(f"    batch_size={batch_size}, n_workers={n_workers}, "
                   f"precompute={'on' if self.precomputed else 'off'}")

@@ -23,7 +23,7 @@ full H^emb (via extract_subblocks in schmidt_partition.py).
 
 import numpy as np
 from numpy.linalg import eigh, inv
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Callable
 import time
 
 
@@ -356,6 +356,128 @@ def run_effective_ham_per_state(
         evals_k, evecs_k = eigh(H_eff_k)
 
         # Track root k: find H_eff eigenvector with max overlap on C_ref[:, k]
+        ref_vec = C_ref[:, k]
+        ovlp = np.abs(evecs_k.T @ ref_vec)
+        m_star = np.argmax(ovlp)
+        E_per_state[k] = evals_k[m_star]
+        overlaps[k] = ovlp[m_star]
+
+        if verbose:
+            exc = (E_per_state[k] - E_per_state[0]) * 1000 if k > 0 else 0
+            exc_str = f"  ({exc:+.1f} mH)" if k > 0 else ""
+            print(f"    S{k}: E₀={E0_list[k]:.8f} → E_eff={E_per_state[k]:.12f} Ha"
+                  f"{exc_str} (overlap={overlaps[k]:.6f})")
+
+    return {
+        'E_eff_per_state': E_per_state,
+        'overlaps': overlaps,
+        'E0_list': E0_list,
+        'r': r,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Matvec-aware versions for Scheme B streaming (no dense H_QQ)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def build_projected_hqq_matvec(
+    H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
+    B: np.ndarray,
+) -> np.ndarray:
+    """Compute H_Q̃Q̃ = B^T @ H_QQ @ B using matrix-free matvec."""
+    if B.shape[1] == 0:
+        return np.zeros((0, 0))
+    r = B.shape[1]
+    HQ_B = np.empty((B.shape[0], r))
+    for j in range(r):
+        HQ_B[:, j] = H_QQ_matvec(B[:, j])
+    H_KK = B.T @ HQ_B
+    return 0.5 * (H_KK + H_KK.T)
+
+
+def run_effective_ham_at_m_matvec(
+    H_PP: np.ndarray,
+    H_PQ: np.ndarray,
+    H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
+    E0: float,
+    B: np.ndarray,
+    delta: float = 0.0,
+    n_states: int = 1,
+    C_ref: Optional[np.ndarray] = None,
+    verbose: bool = True,
+) -> Dict:
+    """Same as run_effective_ham_at_m but with H_QQ_matvec instead of dense H_QQ."""
+    r = B.shape[1]
+    if r == 0:
+        H_eff = 0.5 * (H_PP + H_PP.T)
+    else:
+        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B)
+        H_PK = build_projected_hpq(H_PQ, B)
+        E = E0 + delta
+        resolvent = inv(E * np.eye(r) - H_KK)
+        correction = H_PK @ resolvent @ H_PK.T
+        H_eff = H_PP + correction
+        H_eff = 0.5 * (H_eff + H_eff.T)
+
+    if C_ref is None:
+        _, C_ref = eigh(H_PP)
+    E_matched, E_vecs_matched, overlaps = track_roots(H_eff, C_ref, n_states=n_states)
+
+    if verbose:
+        print(f"  Effective eigenvalues (matvec):")
+        for k in range(min(n_states, len(E_matched))):
+            exc = (E_matched[k] - E_matched[0]) * 1000 if k > 0 else 0
+            exc_str = f"  ({exc:+.1f} mH)" if k > 0 else ""
+            print(f"    S{k}: {E_matched[k]:.12f} Ha{exc_str} "
+                  f"(overlap={overlaps[k]:.6f})")
+    return {
+        'H_eff': H_eff, 'E_eff': E_matched, 'E_vecs': E_vecs_matched,
+        'overlaps': overlaps, 'E0': E0, 'r': r,
+    }
+
+
+def run_effective_ham_per_state_matvec(
+    H_PP: np.ndarray,
+    H_PQ: np.ndarray,
+    H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
+    B: np.ndarray,
+    E0_list: np.ndarray,
+    delta: float = 0.0,
+    n_states: int = 1,
+    C_ref: Optional[np.ndarray] = None,
+    verbose: bool = True,
+) -> Dict:
+    """Same as run_effective_ham_per_state but with H_QQ_matvec."""
+    if C_ref is None:
+        _, C_ref = eigh(H_PP)
+    N = H_PP.shape[0]
+    r = B.shape[1]
+    n_track = min(n_states, len(E0_list))
+
+    if r > 0:
+        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B)
+        H_PK = build_projected_hpq(H_PQ, B)
+    else:
+        H_KK = np.zeros((0, 0))
+        H_PK = np.zeros((N, 0))
+
+    E_per_state = np.zeros(n_track)
+    overlaps = np.zeros(n_track)
+
+    if verbose:
+        print(f"  Per-state E₀ effective H (matvec, r_Q̃={r}):")
+
+    for k in range(n_track):
+        Ek = E0_list[k] + delta
+        if r > 0:
+            resolvent = inv(Ek * np.eye(r) - H_KK)
+            correction = H_PK @ resolvent @ H_PK.T
+            H_eff_k = H_PP + correction
+            H_eff_k = 0.5 * (H_eff_k + H_eff_k.T)
+        else:
+            H_eff_k = 0.5 * (H_PP + H_PP.T)
+
+        evals_k, evecs_k = eigh(H_eff_k)
         ref_vec = C_ref[:, k]
         ovlp = np.abs(evecs_k.T @ ref_vec)
         m_star = np.argmax(ovlp)
