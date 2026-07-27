@@ -493,7 +493,7 @@ def run_dm_svd_dci(
         print(f"{'=' * 70}")
 
     from dm_svd_dci.krylov_propagator import build_krylov_full
-    from dm_svd_dci.effective_ham import run_effective_ham_at_m
+    from dm_svd_dci.effective_ham import run_effective_ham_at_m, run_effective_ham_per_state
 
     res = {}
     t_krylov = time.perf_counter()
@@ -552,6 +552,27 @@ def run_dm_svd_dci(
                   f"ΔE = {dE_m1_mH:+.3f} mH, r₁ = {r1} "
                   f"(layers: {layer_sizes})", flush=True)
 
+    # ── Per-state E₀: each excited state uses its own H_PP eigenvalue ──
+    if sa_states > 1:
+        # Use the largest Krylov basis available (m=1 if computed, else m=0)
+        B_per = B1 if m_max >= 1 and r0 > 0 else B0
+
+        if verbose:
+            print(f"\n  --- Per-state E₀ (excited-state Löwdin refinement) ---")
+
+        E0_list = E_P[:sa_states]  # H_PP eigenvalues for each state
+        res_per_state = run_effective_ham_per_state(
+            H_PP, H_PQ, H_QQ, B_per,
+            E0_list=E0_list,
+            delta=delta,
+            n_states=sa_states,
+            C_ref=C_P,
+            verbose=verbose,
+        )
+        res['E_eff_per_state'] = res_per_state['E_eff_per_state'].tolist()
+        res['overlaps_per_state'] = res_per_state['overlaps'].tolist()
+        res['E0_per_state'] = [float(e) for e in E0_list]
+
     timing['6_krylov'] = time.perf_counter() - t_krylov
 
     # ═══════════════════════════════════════════════════════
@@ -578,6 +599,14 @@ def run_dm_svd_dci(
               f"HAB={hemb_norms['norm_HAB']:.1f}")
         print(f"  Krylov: r₀={r0}" +
               (f", r₁={res.get('r1', 'N/A')}" if m_max >= 1 else ""))
+        if 'E_eff_per_state' in res and sa_states > 1:
+            print(f"\n  Excited states (per-state E₀):")
+            print(f"  {'State':>5} {'E_per_state':>16} {'ΔE vs FCI':>12}")
+            print(f"  {'-'*41}")
+            for k in range(min(sa_states, len(res['E_eff_per_state']))):
+                E_ps = res['E_eff_per_state'][k]
+                dE = (E_ps - sys_data['E_fci']) * 1000
+                print(f"  {'S'+str(k):>5} {E_ps:>16.12f} {dE:>+11.3f} mH", flush=True)
         print(f"\n  Wall time breakdown:")
         for step, t in timing.items():
             pct = t / timing['total'] * 100
@@ -611,6 +640,12 @@ def run_dm_svd_dci(
         output['dE_m1_mH'] = res['dE_m1_mH']
         output['krylov_dims']['r1'] = res['r1']
         output['krylov_dims']['layer_sizes'] = [int(x) for x in res['layer_sizes']]
+
+    # Per-state E₀ results (excited states)
+    if 'E_eff_per_state' in res:
+        output['E_eff_per_state'] = res['E_eff_per_state']
+        output['overlaps_per_state'] = res['overlaps_per_state']
+        output['E0_per_state'] = res['E0_per_state']
 
     # ── Save JSON ──
     if output_dir is not None:

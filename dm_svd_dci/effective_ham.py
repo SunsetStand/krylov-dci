@@ -281,6 +281,102 @@ def run_effective_ham_at_m(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Per-state E0: each root uses its own H_PP eigenvalue as reference
+# ═══════════════════════════════════════════════════════════════════════════
+
+def run_effective_ham_per_state(
+    H_PP: np.ndarray,
+    H_PQ: np.ndarray,
+    H_QQ: np.ndarray,
+    B: np.ndarray,
+    E0_list: np.ndarray,
+    delta: float = 0.0,
+    n_states: int = 1,
+    C_ref: Optional[np.ndarray] = None,
+    verbose: bool = True,
+) -> Dict:
+    """Build and diagonalize H^eff for each root using its own E0.
+
+    For each root k, constructs:
+        H^eff(E0_k) = H_PP + H_PQ̃ · ((E0_k+Δ)I - H_Q̃Q̃)^(−1) · H_PQ̃^T
+
+    using E0_list[k] as the reference energy. Then diagonalizes and tracks
+    roots via max overlap with C_ref (H_PP eigenvectors).
+
+    Args:
+        H_PP, H_PQ, H_QQ: Hamiltonian blocks (same as run_effective_ham_at_m).
+        B:        (|Q|, r) Krylov-compressed orthonormal basis.
+        E0_list:  (n_states,) reference energies for each root.
+                  Typically E_P[k] from diagonalizing H_PP.
+        delta:    Energy shift Δ.
+        n_states: Number of states to track.
+        C_ref:    Reference eigenvectors for overlap tracking.
+                  If None, uses H_PP eigenvectors.
+        verbose:  Print diagnostics.
+
+    Returns:
+        dict with:
+          'E_eff_per_state': (n_states,) per-state effective eigenvalues.
+          'overlaps':        (n_states,) max |overlap| for each tracked root.
+          'E0_list':         (n_states,) reference energies used.
+          'r':               Krylov basis dimension.
+    """
+    if C_ref is None:
+        _, C_ref = eigh(H_PP)
+
+    N = H_PP.shape[0]
+    r = B.shape[1]
+    n_track = min(n_states, len(E0_list))
+
+    # Pre-build projected blocks (independent of E0)
+    if r > 0:
+        H_KK = build_projected_hqq(H_QQ, B)    # (r, r)
+        H_PK = build_projected_hpq(H_PQ, B)    # (N, r)
+    else:
+        H_KK = np.zeros((0, 0))
+        H_PK = np.zeros((N, 0))
+
+    E_per_state = np.zeros(n_track)
+    overlaps = np.zeros(n_track)
+
+    if verbose:
+        print(f"  Per-state E₀ effective H (r_Q̃={r}):")
+
+    for k in range(n_track):
+        Ek = E0_list[k] + delta
+
+        if r > 0:
+            resolvent = inv(Ek * np.eye(r) - H_KK)
+            correction = H_PK @ resolvent @ H_PK.T
+            H_eff_k = H_PP + correction
+            H_eff_k = 0.5 * (H_eff_k + H_eff_k.T)
+        else:
+            H_eff_k = 0.5 * (H_PP + H_PP.T)
+
+        evals_k, evecs_k = eigh(H_eff_k)
+
+        # Track root k: find H_eff eigenvector with max overlap on C_ref[:, k]
+        ref_vec = C_ref[:, k]
+        ovlp = np.abs(evecs_k.T @ ref_vec)
+        m_star = np.argmax(ovlp)
+        E_per_state[k] = evals_k[m_star]
+        overlaps[k] = ovlp[m_star]
+
+        if verbose:
+            exc = (E_per_state[k] - E_per_state[0]) * 1000 if k > 0 else 0
+            exc_str = f"  ({exc:+.1f} mH)" if k > 0 else ""
+            print(f"    S{k}: E₀={E0_list[k]:.8f} → E_eff={E_per_state[k]:.12f} Ha"
+                  f"{exc_str} (overlap={overlaps[k]:.6f})")
+
+    return {
+        'E_eff_per_state': E_per_state,
+        'overlaps': overlaps,
+        'E0_list': E0_list,
+        'r': r,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Tests
 # ═══════════════════════════════════════════════════════════════════════════
 

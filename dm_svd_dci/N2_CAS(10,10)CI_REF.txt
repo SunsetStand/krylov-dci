@@ -1,0 +1,6 @@
+CASCI(10,10) 5-state reference (total energies):
+  S0: -109.048064266106 Ha  (+0.0 mH exc)
+  S1: -108.748806290013 Ha  (+299.3 mH exc)
+  S2: -108.732916737431 Ha  (+315.1 mH exc)
+  S3: -108.729931381930 Ha  (+318.1 mH exc)
+  S4: -108.702902364387 Ha  (+345.2 mH exc)
