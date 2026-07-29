@@ -10,6 +10,12 @@ Memory peak = O(batch_size × M) instead of O(|P| × M) or O(D × M).
 For CAS(14,10) with M=4,008,004 and batch_size=32:
   Peak memory = 2 × 32 × 4M × 8 bytes ≈ 2 GB  (vs 192 GB for full expansion)
 
+H_QQ @ v matrix-free matvec is implemented via Q-index batching:
+  - Batch over Q-indices (size q_batch_size), expand CI mats once per batch
+  - Compute sigma-vectors for the batch in parallel
+  - Project onto ALL Krylov vectors simultaneously via BLAS3
+  - CI expansions: O(Q) instead of O(r·Q) in naive per-Krylov-column loop
+
 Usage:
     from dm_svd_dci.streaming_ops import StreamBuilder
 
@@ -19,7 +25,7 @@ Usage:
     H_PQ = builder.build_hpq()
     # For Krylov propagation:
     H_QQ_v = builder.apply_hqq(v)        # single vector
-    H_QQ_B = builder.apply_hqq_batch(B)  # batch of vectors
+    H_QQ_B = builder.apply_hqq_batch(B)  # batch of vectors (optimized)
 """
 
 import sys, os, time
@@ -219,7 +225,10 @@ class StreamBuilder:
     """Streaming (memory-efficient) builder for H_PP, H_PQ, and H_QQ@v.
 
     Attributes:
-        batch_size: Max number of CI matrices to keep in memory simultaneously.
+        batch_size: Max number of CI matrices to keep in memory simultaneously
+                    (for H_PP / H_PQ construction).
+        q_batch_size: Batch size for Q-index batching in H_QQ @ v matvec.
+                      Defaults to batch_size.
         n_workers: Thread-parallel workers for sigma-vector computation.
         precomputed: Optional precomputed index tables for fast expansion.
     """
@@ -235,6 +244,7 @@ class StreamBuilder:
         batch_size: int = 32,
         n_workers: int = 1,
         use_precompute: bool = True,
+        q_batch_size: Optional[int] = None,
         verbose: bool = True,
     ):
         """Initialize StreamBuilder.
@@ -249,6 +259,8 @@ class StreamBuilder:
             batch_size: Batch size for memory control (default 32).
             n_workers: Number of parallel threads for sigma computation.
             use_precompute: Whether to precompute expansion index tables.
+            q_batch_size: Batch size for Q-index batching in H_QQ@v.
+                          Defaults to batch_size if None.
             verbose: Print progress.
         """
         self.schmidt_data = schmidt_data
@@ -258,6 +270,7 @@ class StreamBuilder:
         self.n_occ = n_occ
         self.n_act = n_act
         self.batch_size = batch_size
+        self.q_batch_size = q_batch_size if q_batch_size is not None else batch_size
         self.n_workers = n_workers
         self.verbose = verbose
 
@@ -281,17 +294,18 @@ class StreamBuilder:
         if use_precompute:
             self._build_precomputed()
 
-        # Lazy cache for Q-basis CI flat vectors (for H_QQ@v)
+        # Lazy cache for Q-basis CI flat vectors (for H_QQ@v fast path)
         self._q_ci_flat_cache: Dict[int, np.ndarray] = {}
 
         if verbose:
             print(f"  [StreamBuilder] CAS({n_act},{sum(backend.q_idx.nelec)}), "
                   f"M={self.M:,}, |P|={self.p_dim}, |Q|={self.q_dim}")
-            print(f"    batch_size={batch_size}, n_workers={n_workers}, "
+            print(f"    batch_size={batch_size}, q_batch_size={self.q_batch_size}, "
+                  f"n_workers={n_workers}, "
                   f"precompute={'on' if self.precomputed else 'off'}")
             ci_mb = self.n_alpha_strs * self.n_beta_strs * 8 / (1024 * 1024)
             print(f"    CI matrix size: {ci_mb:.1f} MB, "
-                  f"peak mem: ~{2 * batch_size * ci_mb:.0f} MB")
+                  f"peak mem: ~{2 * max(batch_size, self.q_batch_size) * ci_mb:.0f} MB")
 
     def _build_precomputed(self):
         """Precompute index tables for all occupation blocks."""
@@ -593,7 +607,7 @@ class StreamBuilder:
         return H_PQ
 
     # ═══════════════════════════════════════════════════════════
-    # H_QQ @ v: matrix-free matvec (with optional Q-cache)
+    # H_QQ @ v: matrix-free matvec with Q-index batching
     # ═══════════════════════════════════════════════════════════
 
     def _get_q_ci_flat(self, q_idx_flat: int) -> np.ndarray:
@@ -628,70 +642,26 @@ class StreamBuilder:
     def apply_hqq(self, v: np.ndarray) -> np.ndarray:
         """Compute H_QQ @ v on-the-fly (matrix-free).
 
-        Steps:
-          1. Build combined CI matrix: C = Σ_q v[q] · CI_mat_q
-          2. Compute sigma = H · C
-          3. Project back: result[q] = ⟨CI_mat_q | sigma⟩
-
-        If Q-cache is warmed, steps 1 and 3 use cached CI flat vectors.
-        Otherwise, each Q-state is expanded on-the-fly (slower but lower memory).
-
-        Args:
-            v: (|Q|,) vector in Q-space.
-
-        Returns:
-            result: (|Q|,) = H_QQ @ v
+        Delegates to apply_hqq_batch for efficiency (Q-index batching).
         """
-        q_dim = self.q_dim
-        if q_dim == 0:
-            return np.zeros(0)
-
-        use_cache = len(self._q_ci_flat_cache) > 0
-
-        if use_cache:
-            # Fast path: cached CI flat vectors
-            # Step 1: linear combination
-            ci_combined_flat = np.zeros(self.M)
-            for q_idx in range(q_dim):
-                v_val = v[q_idx]
-                if abs(v_val) < 1e-14:
-                    continue
-                ci_combined_flat += v_val * self._get_q_ci_flat(q_idx)
-
-            # Step 2: sigma
-            sigma_mat = self.backend.sigma_full(
-                ci_combined_flat.reshape(self.n_alpha_strs, self.n_beta_strs))
-            sigma_flat = sigma_mat.reshape(-1)
-
-            # Step 3: projection
-            result = np.zeros(q_dim)
-            for q_idx in range(q_dim):
-                result[q_idx] = np.dot(self._get_q_ci_flat(q_idx), sigma_flat)
-        else:
-            # Slow path: on-the-fly expansion (no Q cache)
-            ci_combined = np.zeros((self.n_alpha_strs, self.n_beta_strs))
-            for q_idx in range(q_dim):
-                v_val = v[q_idx]
-                if abs(v_val) < 1e-14:
-                    continue
-                ci_q = self.expand_one(self.q_basis[q_idx])
-                ci_combined += v_val * ci_q
-
-            sigma_mat = self.backend.sigma_full(ci_combined)
-            sigma_flat = sigma_mat.reshape(-1)
-
-            result = np.zeros(q_dim)
-            for q_idx in range(q_dim):
-                ci_q = self.expand_one(self.q_basis[q_idx])
-                result[q_idx] = np.dot(ci_q.reshape(-1), sigma_flat)
-
-        return result
+        return self.apply_hqq_batch(v.reshape(-1, 1)).reshape(-1)
 
     def apply_hqq_batch(self, B: np.ndarray) -> np.ndarray:
-        """Compute H_QQ @ B for a batch of vectors (columns of B).
+        """Compute H_QQ @ B using Q-index batching with parallel sigma.
+
+        Key idea: batch over Q-indices instead of Krylov vectors.
+        For each Q-batch (size q_batch_size), expand all Q states once,
+        compute their sigma vectors in parallel, then project onto
+        ALL Krylov vectors simultaneously via BLAS3.
+
+        Without Q-cache, this replaces O(r·Q) CI expansions with O(Q)
+        expansions. Sigma calls remain at Q total (not r·Q).
+
+        If Q-cache is pre-warmed (prewarm_q_cache), the per-batch
+        expansion step is skipped and cached flat vectors are used.
 
         Args:
-            B: (|Q|, r) matrix.
+            B: (|Q|, r) matrix — r vectors in Q-space.
 
         Returns:
             HQQ_B: (|Q|, r) = H_QQ @ B
@@ -700,11 +670,63 @@ class StreamBuilder:
         if q_dim == 0 or r == 0:
             return np.zeros((q_dim, r))
 
+        use_cache = len(self._q_ci_flat_cache) > 0
+        B_Q = min(self.q_batch_size, q_dim)
         result = np.zeros((q_dim, r))
-        for j in range(r):
-            result[:, j] = self.apply_hqq(B[:, j])
-            if self.verbose and r > 10 and (j + 1) % max(1, r // 10) == 0:
-                print(f"    H_QQ@B col {j+1}/{r}", flush=True)
+
+        if self.verbose:
+            t0 = time.perf_counter()
+            print(f"  [H_QQ batch] |Q|={q_dim}, r={r}, q_batch={B_Q}, "
+                  f"cache={'warm' if use_cache else 'cold'}", flush=True)
+
+        for q_start in range(0, q_dim, B_Q):
+            q_end = min(q_start + B_Q, q_dim)
+            B_Q_actual = q_end - q_start
+            B_sub = B[q_start:q_end, :]  # (B_Q_actual, r)
+
+            # ── Step 1: obtain CI flat vectors for this Q-batch ──
+            if use_cache:
+                C_batch = np.empty((self.M, B_Q_actual))
+                for idx_local in range(B_Q_actual):
+                    q_idx = q_start + idx_local
+                    C_batch[:, idx_local] = self._get_q_ci_flat(q_idx)
+            else:
+                ci_mats_q = self.expand_batch(self.q_basis[q_start:q_end])
+                C_batch = np.empty((self.M, B_Q_actual))
+                for idx_local, ci in enumerate(ci_mats_q):
+                    C_batch[:, idx_local] = ci.reshape(-1)
+
+            # ── Step 2: compute sigma vectors for ALL Q states in batch ──
+            ci_mats_sigma = []
+            for idx_local in range(B_Q_actual):
+                ci_mats_sigma.append(
+                    C_batch[:, idx_local].reshape(
+                        self.n_alpha_strs, self.n_beta_strs))
+            sigmas = self.sigma_batch(ci_mats_sigma)
+            S_batch = np.empty((self.M, B_Q_actual))
+            for idx_local, s in enumerate(sigmas):
+                S_batch[:, idx_local] = s.reshape(-1)
+            del ci_mats_sigma, sigmas
+
+            # ── Step 3: project each Krylov column against S_batch ──
+            # result[Q_batch, k] = C_batch^T @ (S_batch @ B_sub[:, k])
+            # Do column-by-column to keep memory low.
+            for k in range(r):
+                b_sub_k = B_sub[:, k]
+                if np.all(np.abs(b_sub_k) < 1e-14):
+                    continue
+                sigma_combined = S_batch @ b_sub_k  # (M,)
+                result[q_start:q_end, k] = C_batch.T @ sigma_combined
+
+            del C_batch, S_batch
+
+            if self.verbose and (q_end - B_Q) % max(1, q_dim // 10) == 0:
+                elapsed = time.perf_counter() - t0
+                print(f"    Q[{q_start}:{q_end}] / {q_dim} "
+                      f"({elapsed:.0f}s)", flush=True)
+            elif self.verbose and q_end >= q_dim:
+                elapsed = time.perf_counter() - t0
+                print(f"    Q[{0}:{q_dim}] done ({elapsed:.0f}s)", flush=True)
 
         return result
 
@@ -744,22 +766,30 @@ class StreamBuilder:
         Args:
             prewarm_q: If True, pre-expand and cache all Q-basis CI flat
                        vectors. This trades memory (~|Q|×M×8 bytes) for
-                       speed in subsequent H_QQ@v calls.
+                       speed in subsequent H_QQ@v calls. Only use when
+                       |Q|×M fits in RAM (e.g. < 8 GB).
 
         Returns:
             dict with:
               'H_PP': (|P|,|P|) hermitian matrix
               'H_PQ': (|P|,|Q|) matrix
               'H_QQ_matvec': callable (|Q|,) → (|Q|,) for H_QQ@v
-              'H_QQ_batch': callable (|Q|,r) → (|Q|,r) for batch H_QQ@B
+              'H_QQ_batch': callable (|Q|,r) → (|Q|,r) for optimized batch H_QQ@B
               'H_QQ_diag': (|Q|,) array of H_QQ diagonal elements
               'builder': self (for further operations)
         """
         H_PP = self.build_hpp()
         H_PQ = self.build_hpq()
 
+        # Auto-detect: prewarm_q only if memory is manageable
+        mem_gb = self.q_dim * self.M * 8 / (1024**3)
         if prewarm_q:
-            self.prewarm_q_cache()
+            if mem_gb > 8.0:
+                if self.verbose:
+                    print(f"  [Q cache] SKIPPED: {mem_gb:.1f} GB would exceed "
+                          f"8 GB limit. Use --prewarm-q to override.", flush=True)
+            else:
+                self.prewarm_q_cache()
 
         H_QQ_diag = self.get_hqq_diag()
 

@@ -470,8 +470,17 @@ def run_dm_svd_dci(
         H_PP = blocks['H_PP'] + sys_data['ecore'] * np.eye(part['p_dim'])
         H_PQ = blocks['H_PQ']
         H_QQ_diag_stream = blocks['H_QQ_diag'] + sys_data['ecore']
-        # Store the builder for later Krylov matvec use
-        H_QQ_matvec = blocks['H_QQ_matvec']
+        # Store the builder for later Krylov matvec use.
+        # CRITICAL: raw matvec only computes ⟨CI_q| H_active | ψ⟩, it lacks
+        # the ecore (nuclear+core) diagonal contribution.  In scheme A the
+        # dense H_QQ sub-block inherits ecore from H^emb, so we must add
+        # ecore*I here so that resolvent (E0·I - H_KK) correctly cancels
+        # ecore in the denominator.
+        _raw_matvec = blocks['H_QQ_matvec']
+        _raw_batch = blocks['H_QQ_batch']
+        _ecore = sys_data['ecore']
+        H_QQ_matvec = lambda v: _raw_matvec(v) + _ecore * v
+        H_QQ_batch_fn = lambda B: _raw_batch(B) + _ecore * B
         H_QQ = None  # No dense H_QQ available in streaming mode
 
     else:
@@ -520,11 +529,13 @@ def run_dm_svd_dci(
     use_matvec = (H_QQ_matvec is not None)
     if use_matvec:
         from dm_svd_dci.krylov_propagator import build_krylov_full_matvec as _bld_krylov
+        from dm_svd_dci.krylov_propagator import propagate_krylov_mgs_matvec as _prop_krylov
         from dm_svd_dci.effective_ham import run_effective_ham_at_m_matvec as _run_eff
         from dm_svd_dci.effective_ham import run_effective_ham_per_state_matvec as _run_per_state
         H_QQ_diag = H_QQ_diag_stream  # from streaming builder
     else:
         from dm_svd_dci.krylov_propagator import build_krylov_full as _bld_krylov
+        from dm_svd_dci.krylov_propagator import propagate_krylov_mgs as _prop_krylov
         from dm_svd_dci.effective_ham import run_effective_ham_at_m as _run_eff
         from dm_svd_dci.effective_ham import run_effective_ham_per_state as _run_per_state
         H_QQ_diag = np.diag(H_QQ)
@@ -539,7 +550,8 @@ def run_dm_svd_dci(
     if use_matvec:
         B0, layers0, A_q = _bld_krylov(
             H_PQ, H_QQ_matvec, H_QQ_diag, E0, m_max=0,
-            lindep_threshold=lindep_threshold, verbose=verbose)
+            lindep_threshold=lindep_threshold, verbose=verbose,
+            H_QQ_batch=H_QQ_batch_fn)
     else:
         B0, layers0, A_q = _bld_krylov(
             H_PQ, H_QQ, H_QQ_diag, E0, m_max=0,
@@ -550,7 +562,8 @@ def run_dm_svd_dci(
         res_m0 = _run_eff(
             H_PP, H_PQ, H_QQ_matvec, E0, B0,
             delta=delta, n_states=min(sa_states, len(E_P)),
-            C_ref=C_P, verbose=verbose)
+            C_ref=C_P, verbose=verbose,
+            H_QQ_batch=H_QQ_batch_fn)
     else:
         res_m0 = _run_eff(
             H_PP, H_PQ, H_QQ, E0, B0,
@@ -576,7 +589,8 @@ def run_dm_svd_dci(
         if use_matvec:
             B1, layer_sizes, _ = _bld_krylov(
                 H_PQ, H_QQ_matvec, H_QQ_diag, E0, m_max=1,
-                lindep_threshold=lindep_threshold, verbose=verbose)
+                lindep_threshold=lindep_threshold, verbose=verbose,
+                H_QQ_batch=H_QQ_batch_fn)
         else:
             B1, layer_sizes, _ = _bld_krylov(
                 H_PQ, H_QQ, H_QQ_diag, E0, m_max=1,
@@ -586,7 +600,8 @@ def run_dm_svd_dci(
             res_m1 = _run_eff(
                 H_PP, H_PQ, H_QQ_matvec, E0, B1,
                 delta=delta, n_states=min(sa_states, len(E_P)),
-                C_ref=C_P, verbose=verbose)
+                C_ref=C_P, verbose=verbose,
+                H_QQ_batch=H_QQ_batch_fn)
         else:
             res_m1 = _run_eff(
                 H_PP, H_PQ, H_QQ, E0, B1,
@@ -617,7 +632,8 @@ def run_dm_svd_dci(
             res_per_state = _run_per_state(
                 H_PP, H_PQ, H_QQ_matvec, B_per,
                 E0_list=E0_list, delta=delta,
-                n_states=sa_states, C_ref=C_P, verbose=verbose)
+                n_states=sa_states, C_ref=C_P, verbose=verbose,
+                H_QQ_batch=H_QQ_batch_fn)
         else:
             res_per_state = _run_per_state(
                 H_PP, H_PQ, H_QQ, B_per,
@@ -726,4 +742,6 @@ def _make_serializable(obj):
         return int(obj)
     elif isinstance(obj, (np.floating,)):
         return float(obj)
+    elif callable(obj):
+        return '<callable>'  # lambda / function — not serializable
     return obj

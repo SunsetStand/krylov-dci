@@ -383,14 +383,28 @@ def run_effective_ham_per_state(
 def build_projected_hqq_matvec(
     H_QQ_matvec: Callable[[np.ndarray], np.ndarray],
     B: np.ndarray,
+    H_QQ_batch: Optional[Callable[[np.ndarray], np.ndarray]] = None,
 ) -> np.ndarray:
-    """Compute H_Q̃Q̃ = B^T @ H_QQ @ B using matrix-free matvec."""
+    """Compute H_Q̃Q̃ = B^T @ H_QQ @ B using matrix-free matvec.
+
+    Args:
+        H_QQ_matvec: Callable (|Q|,) → (|Q|,) for single-vector H_QQ @ v.
+        B: (|Q|, r) orthonormal Krylov basis.
+        H_QQ_batch: Optional callable (|Q|, r) → (|Q|, r) for optimized
+                    batch H_QQ @ B. If provided, computes all columns at once.
+
+    Returns:
+        H_KK: (r, r) hermitian projected H_QQ.
+    """
     if B.shape[1] == 0:
         return np.zeros((0, 0))
     r = B.shape[1]
-    HQ_B = np.empty((B.shape[0], r))
-    for j in range(r):
-        HQ_B[:, j] = H_QQ_matvec(B[:, j])
+    if H_QQ_batch is not None:
+        HQ_B = H_QQ_batch(B)  # batch: O(|Q|) sigma
+    else:
+        HQ_B = np.empty((B.shape[0], r))
+        for j in range(r):
+            HQ_B[:, j] = H_QQ_matvec(B[:, j])
     H_KK = B.T @ HQ_B
     return 0.5 * (H_KK + H_KK.T)
 
@@ -405,13 +419,18 @@ def run_effective_ham_at_m_matvec(
     n_states: int = 1,
     C_ref: Optional[np.ndarray] = None,
     verbose: bool = True,
+    H_QQ_batch: Optional[Callable[[np.ndarray], np.ndarray]] = None,
 ) -> Dict:
-    """Same as run_effective_ham_at_m but with H_QQ_matvec instead of dense H_QQ."""
+    """Same as run_effective_ham_at_m but with H_QQ_matvec instead of dense H_QQ.
+
+    Args:
+        H_QQ_batch: Optional batch matvec (|Q|,r)→(|Q|,r) for efficiency.
+    """
     r = B.shape[1]
     if r == 0:
         H_eff = 0.5 * (H_PP + H_PP.T)
     else:
-        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B)
+        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B, H_QQ_batch=H_QQ_batch)
         H_PK = build_projected_hpq(H_PQ, B)
         E = E0 + delta
         resolvent = inv(E * np.eye(r) - H_KK)
@@ -446,8 +465,13 @@ def run_effective_ham_per_state_matvec(
     n_states: int = 1,
     C_ref: Optional[np.ndarray] = None,
     verbose: bool = True,
+    H_QQ_batch: Optional[Callable[[np.ndarray], np.ndarray]] = None,
 ) -> Dict:
-    """Same as run_effective_ham_per_state but with H_QQ_matvec."""
+    """Same as run_effective_ham_per_state but with H_QQ_matvec.
+
+    Args:
+        H_QQ_batch: Optional batch matvec (|Q|,r)→(|Q|,r) for efficiency.
+    """
     if C_ref is None:
         _, C_ref = eigh(H_PP)
     N = H_PP.shape[0]
@@ -455,7 +479,7 @@ def run_effective_ham_per_state_matvec(
     n_track = min(n_states, len(E0_list))
 
     if r > 0:
-        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B)
+        H_KK = build_projected_hqq_matvec(H_QQ_matvec, B, H_QQ_batch=H_QQ_batch)
         H_PK = build_projected_hpq(H_PQ, B)
     else:
         H_KK = np.zeros((0, 0))

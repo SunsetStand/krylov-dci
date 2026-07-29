@@ -315,6 +315,7 @@ def propagate_krylov_mgs_matvec(
     A_q: np.ndarray,
     lindep_threshold: float = 1e-10,
     verbose: bool = True,
+    H_QQ_batch: Optional[Callable[[np.ndarray], np.ndarray]] = None,
 ) -> Tuple[np.ndarray, int]:
     """Propagate Krylov basis using matrix-free H_QQ via matvec callback.
 
@@ -323,11 +324,14 @@ def propagate_krylov_mgs_matvec(
 
     Args:
         B_current:        (|Q|, r_current) current orthonormal Krylov basis.
-        H_QQ_matvec:      Callable: (|Q|,) → (|Q|,) computing H_QQ @ v.
+        H_QQ_matvec:      Callable: (|Q|,) → (|Q|,) computing H_QQ @ v
+                          (single-vector fallback if H_QQ_batch not provided).
         H_QQ_diag:        (|Q|,) diagonal of H_QQ.
         A_q:              (|Q|,) diagonal resolvent from build_krylov_basis_mgs.
         lindep_threshold: Linear dependence threshold.
         verbose:          Print progress.
+        H_QQ_batch:       Optional callable: (|Q|, r) → (|Q|, r) for batch
+                          H_QQ @ B. If provided, computes all columns at once.
 
     Returns:
         (B_new, r_new):
@@ -342,13 +346,18 @@ def propagate_krylov_mgs_matvec(
 
     if verbose:
         t0 = time.perf_counter()
-        print(f"  [m=1] Propagating {r_current} basis vectors (matvec)...", flush=True)
+        if H_QQ_batch is not None:
+            print(f"  [m=1] Propagating {r_current} basis vectors (matvec batch)...", flush=True)
+        else:
+            print(f"  [m=1] Propagating {r_current} basis vectors (matvec)...", flush=True)
 
     # ── Step 1: residual = H_QQ @ B - diag(H_QQ) * B ──
-    # Use matvec for each column
-    HQQ_B = np.empty((q_dim, r_current))
-    for j in range(r_current):
-        HQQ_B[:, j] = H_QQ_matvec(B_current[:, j])
+    if H_QQ_batch is not None:
+        HQQ_B = H_QQ_batch(B_current)  # batch call: O(|Q|) sigma
+    else:
+        HQQ_B = np.empty((q_dim, r_current))
+        for j in range(r_current):
+            HQQ_B[:, j] = H_QQ_matvec(B_current[:, j])
 
     residual = HQQ_B - H_QQ_diag[:, np.newaxis] * B_current
 
@@ -390,6 +399,7 @@ def build_krylov_full_matvec(
     m_max: int = 1,
     lindep_threshold: float = 1e-10,
     verbose: bool = True,
+    H_QQ_batch: Optional[Callable[[np.ndarray], np.ndarray]] = None,
 ) -> Tuple[np.ndarray, List[int], np.ndarray]:
     """Build full Krylov basis up to m=m_max using matrix-free H_QQ.
 
@@ -404,6 +414,7 @@ def build_krylov_full_matvec(
         m_max:       Max Krylov order (0 or 1 typical).
         lindep_threshold: Linear dependence threshold.
         verbose:     Print progress.
+        H_QQ_batch:  Optional callable (|Q|, r) → (|Q|, r) for batch matvec.
 
     Returns:
         (B_final, layer_sizes, A_q):
@@ -429,7 +440,7 @@ def build_krylov_full_matvec(
         r_before = r_current
         B_current, r_current = propagate_krylov_mgs_matvec(
             B_current, H_QQ_matvec, H_QQ_diag, A_q,
-            lindep_threshold, verbose)
+            lindep_threshold, verbose, H_QQ_batch=H_QQ_batch)
         r_incr = r_current - r_before
         layer_sizes.append(r_incr)
 
