@@ -246,10 +246,9 @@ def _run_bootstrap(
     part = partition_schmidt_basis(schmidt, p_blocks=p_blocks)
     q_partition = partition_qspace_by_n(part, schmidt, p_blocks=p_blocks)
 
-    # Build full H^emb and extract Q blocks
-    from dm_svd_dci._legacy_pipeline import build_hemb_parallel
+    # Use H_S already built during bootstrap as H^emb
     D = ops.D
-    H_emb = ops.H_S  # already built during bootstrap
+    H_emb = ops.H_S
 
     q_blocks_data = extract_q_blocks_scheme_a(
         H_emb, part, q_partition, p_blocks=p_blocks, verbose=verbose)
