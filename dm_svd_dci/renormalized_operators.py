@@ -131,8 +131,8 @@ class RenormalizedOperators:
         t0 = time.perf_counter()
 
         # ── Get determinant string info ──
-        alpha_strs = backend.alpha_strs
-        beta_strs = backend.beta_strs
+        alpha_strs = backend.q_idx.alpha_strs
+        beta_strs = backend.q_idx.beta_strs
         alpha_to_idx = {int(s): i for i, s in enumerate(alpha_strs)}
         beta_to_idx = {int(s): i for i, s in enumerate(beta_strs)}
 
@@ -299,8 +299,8 @@ class RenormalizedOperators:
         from pyscf.fci import cistring
 
         # Get old alpha/beta strings
-        old_alpha_strs = backend.alpha_strs
-        old_beta_strs = backend.beta_strs
+        old_alpha_strs = backend.q_idx.alpha_strs
+        old_beta_strs = backend.q_idx.beta_strs
 
         n_alpha_old = old_alpha_strs.shape[0]
         n_beta_old = old_beta_strs.shape[0]
@@ -519,8 +519,8 @@ class RenormalizedOperators:
         # For now, build them fresh
 
         from pyscf.fci import cistring
-        old_alpha_strs = backend.alpha_strs
-        old_beta_strs = backend.beta_strs
+        old_alpha_strs = backend.q_idx.alpha_strs
+        old_beta_strs = backend.q_idx.beta_strs
         new_orb_idx = self.n_orbitals  # appended at end
 
         na_old_elec = old_alpha_strs[0].bit_count() if old_alpha_strs.shape[0] > 0 else 0
@@ -604,8 +604,8 @@ class RenormalizedOperators:
 
     def _get_elec_counts(self, backend):
         """Extract (na, nb) from backend."""
-        na = backend.nelec[0]
-        nb = backend.nelec[1]
+        na = backend.q_idx.nelec[0]
+        nb = backend.q_idx.nelec[1]
         return na, nb
 
     def _get_backend_classes(self):
