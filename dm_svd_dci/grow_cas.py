@@ -73,10 +73,7 @@ def run_single_round(
         setup_partition, build_block_matrices)
     from dm_svd_embedding.density_matrix import (
         compute_schmidt_decomposition, compute_compression_metrics)
-    from dm_svd_dci.schmidt_partition import partition_schmidt_basis
-    from dm_svd_dci.qspace_partition import (
-        partition_qspace_by_n, extract_q_blocks_scheme_a,
-        extract_q_blocks_scheme_b)
+    from dm_svd_dci.schmidt_partition import partition_schmidt_basis, extract_subblocks
     from dm_svd_dci.neumann_effective_ham import (
         build_effective_hamiltonian_neumann)
 
@@ -134,41 +131,34 @@ def run_single_round(
               f"compression={metrics['compression_ratio']:.4%}, "
               f"{time.perf_counter()-t_svd:.1f}s", flush=True)
 
-    # ── Schmidt partition + Q-space subdivision ──
+    # ── Schmidt P/Q partition (flat, no Q-subdivision by n) ──
     t_part = time.perf_counter()
     part = partition_schmidt_basis(schmidt, p_blocks=p_blocks)
-    q_partition = partition_qspace_by_n(part, schmidt, p_blocks=p_blocks)
 
     if verbose:
-        print(f"    Partition: |P|={part['p_dim']}, |Q|={part['q_dim']}, "
-              f"active Q_n: {q_partition['active_q']}")
+        print(f"    Partition: |P|={part['p_dim']}, |Q|={part['q_dim']}")
 
-    if scheme == 'A':
-        from dm_svd_dci._legacy_pipeline import build_hemb_parallel
-        H_emb, basis_info, hemb_norms = build_hemb_parallel(
-            schmidt, partition, q_idx, backend,
-            h1_full=h1eff, h2_full=h2_4d,
-            n_occ=n_occ_A, n_act=n_act,
-            n_workers=n_workers, verbose=verbose)
-        if D_schmidt > 0:
-            H_emb += ecore * np.eye(D_schmidt)
-        q_blocks_data = extract_q_blocks_scheme_a(
-            H_emb, part, q_partition, p_blocks=p_blocks, verbose=verbose)
-    else:
-        q_blocks_data = extract_q_blocks_scheme_b(
-            schmidt, partition, part, q_partition,
-            p_blocks, backend, n_occ_A, n_act,
-            n_workers=n_workers, ecore=float(ecore), verbose=verbose)
+    from dm_svd_dci._legacy_pipeline import build_hemb_parallel
+    H_emb, basis_info, hemb_norms = build_hemb_parallel(
+        schmidt, partition, q_idx, backend,
+        h1_full=h1eff, h2_full=h2_4d,
+        n_occ=n_occ_A, n_act=n_act,
+        n_workers=n_workers, verbose=verbose)
+    if D_schmidt > 0:
+        H_emb += ecore * np.eye(D_schmidt)
+    # Extract H_PP, H_PQ, H_QQ directly from full H^emb
+    H_PP, H_PQ_mat, H_QQ = extract_subblocks(H_emb, part)
 
-    H_PP = q_blocks_data['H_PP']
-    H_PQ = q_blocks_data['H_PQ']
-    H_QQ_blocks = q_blocks_data['H_QQ_blocks']
-    H_QQ_diag = q_blocks_data['H_QQ_diag']
+    # Wrap for Neumann (single flat block, key=0)
+    p_dim = H_PP.shape[0]
+    q_dim = H_PQ_mat.shape[1]
+    H_PQ = {0: H_PQ_mat}
+    H_QQ_blocks = {(0, 0): H_QQ}
+    H_QQ_diag = {0: np.diag(H_QQ)}
 
     if verbose:
-        print(f"    Blocks: H_PP {H_PP.shape}, "
-              f"H_PQ: {{{', '.join(f'{n}:{m.shape}' for n,m in H_PQ.items())}}}, "
-              f"{time.perf_counter()-t_part:.1f}s", flush=True)
+        print(f"    Blocks: H_PP {H_PP.shape}, H_PQ {H_PQ_mat.shape}, "
+              f"H_QQ {H_QQ.shape}, {time.perf_counter()-t_part:.1f}s", flush=True)
 
     # ── Bare H_PP energy ──
     E_bare = eigh(H_PP)[0][0] if H_PP.shape[0] > 0 else 0.0
