@@ -261,13 +261,20 @@ def _run_bootstrap(
     # Bare H_PP energy
     E_bare = eigh(H_PP)[0][0] if H_PP.shape[0] > 0 else 0.0
 
-    # Single-shot Neumann (no SCF)
-    res_neumann = build_effective_hamiltonian_neumann(
-        H_PP, H_PQ, H_QQ_blocks, H_QQ_diag,
-        E_bare, delta=0.0, k_max=k_max, verbose=verbose)
-
-    H_eff = res_neumann['H_eff']
-    E_neumann = eigh(H_eff)[0][0] if H_eff.shape[0] > 0 else 0.0
+    # Single-shot Neumann (no SCF) — handle empty Q
+    active_n = sorted(H_PQ.keys())
+    if len(active_n) == 0 or all(H_PQ[n].shape[1] == 0 for n in active_n):
+        # Q is empty: Neumann correction is zero
+        if verbose:
+            print(f"\n    ⚠ Q-space empty (all blocks in P). "
+                  f"Neumann = bare H_PP.")
+        E_neumann = E_bare
+    else:
+        res_neumann = build_effective_hamiltonian_neumann(
+            H_PP, H_PQ, H_QQ_blocks, H_QQ_diag,
+            E_bare, delta=0.0, k_max=k_max, verbose=verbose)
+        H_eff = res_neumann['H_eff']
+        E_neumann = eigh(H_eff)[0][0] if H_eff.shape[0] > 0 else 0.0
 
     if verbose:
         dE_bare = (E_bare - cas_data['E_fci']) * 1000
