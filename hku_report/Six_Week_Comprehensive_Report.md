@@ -303,16 +303,15 @@ Concretely, for Config 1 (A₀=5, B₀=2, B_t=2, ε=10⁻³):
 
 **Round 0 — CAS(7,10):** M = 441 determinants. After occ/virt partition (5 occ, 2 virt) and SVD:
 
-| n_A | dim(C^(n)) | r_n | Physical interpretation |
-|:--|:--|--:|:--|
-| 5 | 1 × 1 | 1 | HF reference (no excitation) |
-| 6 | 100 × 1 | 4 | Single excitation (1 hole in A, 1 particle in B) |
-| 7 | 100 × 4 | 6 | Double excitation — largest entanglement block |
-| 8 | 45 × 6 | 1 | Triple excitation — weakly occupied |
-| 9 | 10 × 4 | 0 | Below threshold |
-| 10 | 1 × 1 | 0 | Below threshold |
+| n_A | dim(C) | frob_norm | r_n | Physical interpretation |
+|:--|:--|--:|--:|:--|
+| 10 | 1 × 1 | **0.972** | 1 | **HF reference — 94.5% weight, KEPT** |
+| 9 | 10 × 4 | 2.7×10⁻¹⁴ | 0 | Single excitation — Brillouin-forbidden, correctly dropped |
+| 8 | 45 × 6 | 0.233 | 1 | Double excitation — 5.4% weight |
+| 7 | 100 × 4 | 0.023 | 6 | Triple excitation — 0.05% weight |
+| 6 | 100 × 1 | 0.033 | 4 | Quadruple excitation — 0.1% weight |
 
-**r_total = 12, D_emb = Σ r_n² = 54.** 441 determinants compressed to 12 Schmidt states and 54 product basis states — a **12× compression**. Crucially, the discarded singular values (n_A=9,10) are literally below 10⁻³, meaning they carry zero physical weight in the CAS(7,10) ground state.
+**r_total = 12, D_emb = Σ r_n² = 54.** 441 determinants compressed to 12 Schmidt states — a **37× compression**. The singular value spectrum has a natural gap: the HF reference (n_A=10, frob=0.972) dominates; double excitations contribute 5.4%; higher excitations carry <0.2%. The only block genuinely dropped (n_A=9) has frob=2.7×10⁻¹⁴ — literal numerical zero, since single excitations from the HF reference are forbidden by Brillouin's theorem.
 
 The ChainedTransform T₀ stores the mapping from these 12 Schmidt states back to the raw 441 determinants: T₀^(n)[:, α] = U[:,α] ⊗ V[:,α] (outer product of Schmidt vectors). This is the DMRG-style "renormalized basis."
 
