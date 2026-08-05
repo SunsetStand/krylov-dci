@@ -1,0 +1,373 @@
+{
+  "config": {
+    "n_active": 10,
+    "n_elec": [
+      5,
+      5
+    ],
+    "n_core": 2,
+    "n_occ_A": 5,
+    "n_orb_B0": 1,
+    "n_orb_Bt": 1,
+    "eps_svd": 0.001,
+    "name": "A5_B01_Bt1_eps3",
+    "id": 1
+  },
+  "fci_ref": {
+    "E": -109.04806426611347,
+    "M": 63504
+  },
+  "E_history": [
+    -108.97980578087663,
+    -109.02761763570537,
+    -109.03440704368826,
+    -109.04012397150561,
+    -109.04806426611351
+  ],
+  "D_history": [
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "dE_final_mH": -4.263256414560601e-11,
+  "n_rounds": 5,
+  "total_time_s": 1132.4126797378995,
+  "per_round": [
+    {
+      "round": 0,
+      "n_act": 6,
+      "n_occ": 5,
+      "n_B": 1,
+      "M_casci": 36,
+      "E_casci": -108.97980578087663,
+      "E_hemb": -108.97980578087663,
+      "dE_casci_mH": 0.0,
+      "D_k": 2,
+      "D_emb": 2,
+      "r_total": 2,
+      "D_prod": 2,
+      "compression_ratio": 0.05555555555555555,
+      "t_hemb_s": 0.0049057891592383385,
+      "blocks": {
+        "8": {
+          "dim_A": 25,
+          "dim_B": 1,
+          "product": 25,
+          "nnz": 25,
+          "frob_norm": 0.1587816643541603
+        },
+        "9": {
+          "dim_A": 10,
+          "dim_B": 2,
+          "product": 20,
+          "nnz": 10,
+          "frob_norm": 2.315497962501224e-14
+        },
+        "10": {
+          "dim_A": 1,
+          "dim_B": 1,
+          "product": 1,
+          "nnz": 1,
+          "frob_norm": 0.9873137206911099
+        }
+      },
+      "svd": {
+        "8": {
+          "r": 1,
+          "dim_A": 25,
+          "dim_B": 1,
+          "sigma_1": 0.1587816643541603,
+          "sigma_min": 0.1587816643541603,
+          "sigma_kept_min": 0.1587816643541603,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        },
+        "9": {
+          "r": 0,
+          "dim_A": 10,
+          "dim_B": 2,
+          "sigma_1": 0.0,
+          "sigma_min": 0.0,
+          "sigma_kept_min": 0.0,
+          "n_kept": 0,
+          "n_total": 0,
+          "discarded_weight": 0.0
+        },
+        "10": {
+          "r": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "sigma_1": 0.9873137206911099,
+          "sigma_min": 0.9873137206911099,
+          "sigma_kept_min": 0.9873137206911099,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        }
+      }
+    },
+    {
+      "round": 1,
+      "n_act": 7,
+      "n_occ": 6,
+      "n_B": 1,
+      "M_casci": 441,
+      "E_casci": -109.02761763570507,
+      "E_hemb": -109.02761763570537,
+      "dE_casci_mH": -2.984279490192421e-10,
+      "D_k": 2,
+      "D_emb": 6,
+      "t_hemb_s": 0.23589745699428022,
+      "blocks": {
+        "8": {
+          "dim_A": 225,
+          "dim_B": 1,
+          "product": 225
+        },
+        "9": {
+          "dim_A": 180,
+          "dim_B": 2,
+          "product": 360
+        },
+        "10": {
+          "dim_A": 36,
+          "dim_B": 1,
+          "product": 36
+        }
+      },
+      "svd": {
+        "8": {
+          "pre_compressed": false,
+          "d_old": 225,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.13474549089502144,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        },
+        "9": {
+          "pre_compressed": false,
+          "d_old": 180,
+          "d_B": 2,
+          "r_current": 0,
+          "D_new": 2,
+          "sigma_1": 0.10200562313766412,
+          "n_kept": 2,
+          "n_total": 2,
+          "discarded_weight": 0.0
+        },
+        "10": {
+          "pre_compressed": false,
+          "d_old": 36,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.9803230887722952,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        }
+      }
+    },
+    {
+      "round": 2,
+      "n_act": 8,
+      "n_occ": 7,
+      "n_B": 1,
+      "M_casci": 3136,
+      "E_casci": -109.03440704368484,
+      "E_hemb": -109.03440704368826,
+      "dE_casci_mH": -3.424815986363683e-09,
+      "D_k": 2,
+      "D_emb": 6,
+      "t_hemb_s": 5.318317705066875,
+      "blocks": {
+        "8": {
+          "dim_A": 1225,
+          "dim_B": 1,
+          "product": 1225
+        },
+        "9": {
+          "dim_A": 1470,
+          "dim_B": 2,
+          "product": 2940
+        },
+        "10": {
+          "dim_A": 441,
+          "dim_B": 1,
+          "product": 441
+        }
+      },
+      "svd": {
+        "8": {
+          "pre_compressed": false,
+          "d_old": 1225,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.020077853860730622,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        },
+        "9": {
+          "pre_compressed": false,
+          "d_old": 1470,
+          "d_B": 2,
+          "r_current": 0,
+          "D_new": 2,
+          "sigma_1": 0.03658872317424848,
+          "n_kept": 2,
+          "n_total": 2,
+          "discarded_weight": 0.0
+        },
+        "10": {
+          "pre_compressed": false,
+          "d_old": 441,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.998458517143954,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        }
+      }
+    },
+    {
+      "round": 3,
+      "n_act": 9,
+      "n_occ": 8,
+      "n_B": 1,
+      "M_casci": 15876,
+      "E_casci": -109.04012397150473,
+      "E_hemb": -109.04012397150561,
+      "dE_casci_mH": -8.810729923425242e-10,
+      "D_k": 2,
+      "D_emb": 6,
+      "t_hemb_s": 84.12441442394629,
+      "blocks": {
+        "8": {
+          "dim_A": 4900,
+          "dim_B": 1,
+          "product": 4900
+        },
+        "9": {
+          "dim_A": 7840,
+          "dim_B": 2,
+          "product": 15680
+        },
+        "10": {
+          "dim_A": 3136,
+          "dim_B": 1,
+          "product": 3136
+        }
+      },
+      "svd": {
+        "8": {
+          "pre_compressed": false,
+          "d_old": 4900,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.02733130107008439,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        },
+        "9": {
+          "pre_compressed": false,
+          "d_old": 7840,
+          "d_B": 2,
+          "r_current": 0,
+          "D_new": 2,
+          "sigma_1": 0.03070197380344545,
+          "n_kept": 2,
+          "n_total": 2,
+          "discarded_weight": 0.0
+        },
+        "10": {
+          "pre_compressed": false,
+          "d_old": 3136,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.9986830215794005,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        }
+      }
+    },
+    {
+      "round": 4,
+      "n_act": 10,
+      "n_occ": 9,
+      "n_B": 1,
+      "M_casci": 63504,
+      "E_casci": -109.04806426611347,
+      "E_hemb": -109.04806426611351,
+      "dE_casci_mH": -4.263256414560601e-11,
+      "D_k": 2,
+      "D_emb": 6,
+      "t_hemb_s": 1040.589940196136,
+      "blocks": {
+        "8": {
+          "dim_A": 15876,
+          "dim_B": 1,
+          "product": 15876
+        },
+        "9": {
+          "dim_A": 31752,
+          "dim_B": 2,
+          "product": 63504
+        },
+        "10": {
+          "dim_A": 15876,
+          "dim_B": 1,
+          "product": 15876
+        }
+      },
+      "svd": {
+        "8": {
+          "pre_compressed": false,
+          "d_old": 15876,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.02989005609680944,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        },
+        "9": {
+          "pre_compressed": false,
+          "d_old": 31752,
+          "d_B": 2,
+          "r_current": 0,
+          "D_new": 2,
+          "sigma_1": 0.034007083714439716,
+          "n_kept": 2,
+          "n_total": 2,
+          "discarded_weight": 0.0
+        },
+        "10": {
+          "pre_compressed": false,
+          "d_old": 15876,
+          "d_B": 1,
+          "r_current": 0,
+          "D_new": 1,
+          "sigma_1": 0.9983955233578564,
+          "n_kept": 1,
+          "n_total": 1,
+          "discarded_weight": 0.0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "config": {
+    "n_active": 10,
+    "n_elec": [
+      5,
+      5
+    ],
+    "n_core": 2,
+    "n_occ_A": 4,
+    "n_orb_B0": 3,
+    "n_orb_Bt": 2,
+    "eps_svd": 0.001,
+    "name": "A4_B03_Bt2_eps3",
+    "id": 6
+  },
+  "fci_ref": {
+    "E": -109.04806426611347,
+    "M": 63504
+  },
+  "n_rounds": 3,
+  "D_history": [
+    9,
+    14,
+    14
+  ],
+  "dE_final_mH": -4.263256414560601e-11,
+  "total_time_s": 1078.5476427269168,
+  "D_emb_per_round": [
+    19,
+    70,
+    6
+  ],
+  "r_total_per_round": [
+    9,
+    0,
+    0
+  ],
+  "D_prod_per_round": [
+    19,
+    0,
+    0
+  ]
+}
