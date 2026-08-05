@@ -16,7 +16,7 @@ Over six weeks (2026-06-27 → 2026-08-05), we developed and tested a family of 
 |:------|:----------|:-------|:----------|:--------|
 | **1** | Jun 27 – Jul 17 | **Krylov-dCI** | Bloch effective Hamiltonian via Krylov subspace compression of H_QP | Chemical accuracy for ground states; excited states fixed by CIS seed; SVD truncation of H_QP found hopeless |
 | **2** | Jul 17 – Jul 27 | **dmSVD-dCI** | Schmidt decomposition of CI coefficient matrix (occ/virt partition) → embedded Hamiltonian + Krylov downfolding | **Chemical accuracy for ALL states (GS + excited)** with 0.2–0.36% compression; this is the most successful phase |
-| **3** | Jul 28 – Aug 5 | **Growing CAS dmSVD (DMRG-style) + Neumann** | Sequentially expand active space, each round does independent dmSVD; optional Neumann series correction for remaining env orbitals | Phase 2 (no Neumann): **7/7 configs FCI-precise**, fast (~1000s). Phase 3 (with Neumann): sigma-vector computation bottlenecked; results pending |
+| **3** | Jul 28 – Aug 5 | **Growing CAS dmSVD (DMRG-style) + Neumann** | Sequentially expand active space, each round does independent dmSVD; optional Neumann series correction for remaining env orbitals | Phase 2 (no Neumann, CAS10): **7/7 configs FCI-precise**, ~1000s. Phase 3 (with Neumann, CAS14): **both jobs OOM killed** — CI expansion memory exceeded 503 GB node limit; Neumann never reached |
 
 ---
 
@@ -291,37 +291,49 @@ Phase 2's dmSVD-dCI gives chemical accuracy but requires a **full CASCI referenc
 - No need for full-CAS CASCI until the final comparison round
 - Each round's H^emb diagonalization (D=6–70) is 1000× cheaper than one-shot (D=15,198)
 
-### 3.4 Phase 3 Results (With Neumann): Inconclusive So Far
+### 3.4 Phase 3 Results (With Neumann): **OOM Failure — No Results**
 
-**Current status (2026-08-05):**
+All Phase 3 jobs attempting CAS(14,10) with Neumann correction were killed by the Linux OOM killer. **Zero Neumann results were obtained.**
 
-| Job | Config | Status | Key Observation |
-|:----|:-------|:-------|:----------------|
-| 15564_0 | C1 (A₀=3,B₀=3,B_t=4) | Running (~6h) | Round 2: computing 12,870 sigma vectors, D_emb too large |
-| 15564_1 | C2 (A₀=3,B₀=3,B_t=2) | Held (resource) | Launch failed — node occupied |
-| 15564_3 | C3 (A₀=4,B₀=4,B_t=3) | Running (~6h) | Round 2: 920/924 sigma done, near completion |
+**Job outcomes (2026-08-05):**
 
-**Preliminary observations:**
+| Job | Config | A/B Split | D_emb | Status | Peak RSS |
+|:----|:-------|:--|--:|:-------|--:|
+| 15564_3 | C3 (A₀=4,B₀=4,B_t=3) | 11A/3B | 924 | OOM killed at sigma 920/924 | ~287 GB |
+| 15564_0 | C1 (A₀=3,B₀=3,B_t=4) | 10A/4B | 12,870 | OOM killed after sigma done, during projection | ~222 GB |
+| 15564_1 | C2 (A₀=3,B₀=3,B_t=2) | — | — | Held (launch failed twice) | — |
 
-1. **Partition asymmetry drastically affects D_emb:**
-   - C1 (10A/4B): D_emb = 12,870 — sigma computation dominates (~14h projected)
-   - C3 (11A/3B): D_emb = 924 — sigma computation nearly done (~1.5h for 924 vectors)
-   - The product D ∝ r_A² × r_B² is highly sensitive to A/B asymmetry
+**Timeline of failure:**
+- Both 15564_3 and 15564_0 ran together on `amd-cpu` (128 cores, 503 GB RAM)
+- Combined RSS: 222 GB + 287 GB = **509 GB > 503 GB** — node memory exhausted, swap thrashing began
+- 15564_3 killed first after ~7h; 15564_0 continued solo
+- 15564_0 survived the sigma computation (12,870 vectors, 17.6h) but was killed during BLAS3 projection where additional memory was allocated
 
-2. **D_emb control failed:** The binary search for ε (1e-3 → 5e-2) couldn't reduce D_emb below 12,870 for C1. The Schmidt product basis is inherently large when both A and B subspaces have significant dimension.
+**Root cause — two compounding factors:**
 
-3. **Neumann effects unknown:** No results yet showing whether Neumann k=1 correction helps or hurts accuracy in the growing-CAS context.
+1. **CI expansion memory explosion.** The dmSVD sigma-vector step for CAS(14,10) requires expanding each Schmidt product basis state to the full 4,008,004-determinant CI space. Even with modest D_emb=924, the CI coefficient matrices consume ~200+ GB. With D_emb=12,870, the expansion and the subsequent BLAS3 projection (12870² matrix elements) push well beyond node memory.
+
+2. **Partition asymmetry dependency.** C1 (10A/4B) produces D_emb=12,870 — 14× larger than C3 (11A/3B) with D_emb=924. The Schmidt product basis dimension D = Σ r_n² is dominated by mid-filling blocks (n ≈ N/2), where r_n scales with the smaller subspace dimension. Slightly shifting the A/B boundary dramatically changes D_emb — this is not a controllable parameter in the current implementation.
+
+**What was NOT tested:** The actual Neumann k=1 correction could not be evaluated because no job reached that stage. The growing-CAS pipeline itself (without Neumann) remains validated at CAS(10,10) scale (Phase 2, §3.3).
+
+**Mitigations for future attempts:**
+- Run only one CAS(14,10) job at a time on the amd-cpu node
+- Use Scheme B (matrix-free H_QQ @ v) instead of building full H^emb to avoid the BLAS3 projection memory spike
+- Implement on-the-fly CI expansion: expand Schmidt states one at a time, compute sigma, project, discard — never store M×D CI matrices
+- For larger active spaces, the one-shot Phase 2 approach (which was validated at CAS(10,10)) may be the practical ceiling without these memory optimizations
 
 ### 3.5 Comparison: One-shot vs Growing CAS
 
-| Aspect | One-shot (Phase 2) | Growing CAS (Phase 3) |
-|:-------|:---|:---|
-| **CASCI needed** | Full CAS(14,10) → 4M dets | Only small rounds (max ~4M at final round) |
-| **D_emb** | 4,668 (GS) / 15,198 (SA) | 6–70 per round (Phase 2) |
-| **H^emb diagonalization** | Direct (4.6k–15k × 4.6k–15k) | Instant (6–70 × 6–70) |
-| **Accuracy** | +0.144 mH (GS), ±0.2–0.8 mH (excited) | **0.000 mH** (all 7 configs, Phase 2) |
-| **Total time** | ~5,000 s (SA) | ~1,000–1,200 s |
-| **Scalability** | Limited by full CASCI | Scales with round count × round-dimension |
+| Aspect | One-shot (Phase 2) | Growing CAS (Phase 2, no Neumann) | Growing CAS (Phase 3, +Neumann) |
+|:-------|:---|:---|:---|
+| **CASCI needed** | Full active space (max at final round) | Small rounds only | Small rounds + final round (4M dets) |
+| **D_emb** | 4,668 (GS) / 15,198 (SA) | 6–70 per round | 924–12,870 per round |
+| **H^emb diagonalization** | Direct (4.6k–15k × 4.6k–15k) | Instant (6–70 × 6–70) | ~924–12,870 (manageable) |
+| **Peak memory (CAS14)** | ~80 GB (estimate) | ~20 GB | **>503 GB → OOM** ❌ |
+| **Accuracy** | +0.144 mH (GS), ±0.2–0.8 mH (excited) | **0.000 mH** (7/7 configs, CAS10) | Untested (OOM) |
+| **Total time (CAS10)** | ~5,000 s (SA) | ~1,000–1,200 s | Failed before completion |
+| **Scalability bottleneck** | Full-CAS CASCI | Round count × round-dimension | CI expansion memory (M×D matrices) |
 
 ---
 
@@ -335,7 +347,9 @@ Phase 2's dmSVD-dCI gives chemical accuracy but requires a **full CASCI referenc
 
 3. **Per-state E₀ Löwdin works for excited states.** Using each state's own H_PP eigenvalue as the Bloch resolvent center gives chemical accuracy for all states. The earlier "excited states degrade with m" was an artifact of shared Krylov bases.
 
-4. **Growing CAS is the scalable direction.** One-shot dmSVD requires full CASCI; growing-CAS distributes the CASCI cost across rounds with tiny intermediate diagonalizations. Phase 2's 0.000 mH across 7 configs proves the approach is sound.
+4. **Growing CAS works at CAS(10,10) but stalls at CAS(14,10) due to memory.** Phase 2's 0.000 mH across 7 configs proves the approach is sound for moderate active spaces. However, the CI expansion step for sigma-vector computation requires storing M×D matrices in memory — at CAS(14,10) with 4M determinants, this exceeds 200 GB even for modest D_emb. Matrix-free operations (Scheme B) are essential for scaling beyond CAS(10,10).
+
+5. **Neumann correction remains untested in the growing-CAS context.** The Phase 3 OOM failures occurred before reaching the Neumann step. All accuracy claims about the growing-CAS approach are based on the H^emb diagonalization alone (no Neumann). Whether Neumann k=1 helps or hurts remains an open question.
 
 ### Engineering
 
@@ -346,6 +360,12 @@ Phase 2's dmSVD-dCI gives chemical accuracy but requires a **full CASCI referenc
 7. **BLAS3 for projection.** D² Python-level dot products → single dgemm → 100–1000× speedup.
 
 8. **Memmap order must match access pattern.** C-order memmap + column-wise writes → crash at M=4M (Phase 1 CAS14 bug).
+
+9. **Single-node memory is the real scaling limit.** Two CAS(14,10) jobs together consumed 509 GB RSS on a 503 GB node → swap thrashing → OOM kill. Always check `sinfo` for node memory and submit one job at a time for large active spaces. SLURM `--mem` requests are not hard limits — they only affect scheduling, not enforcement.
+
+10. **D_emb is highly sensitive to A/B partition asymmetry.** C1 (10A/4B) vs C3 (11A/3B): D_emb jumped from 924 to 12,870 (14×). The Schmidt product basis dimension is dominated by near-half-filling blocks where r_n ~ min(dim_A, dim_B). A single orbital shifted between A and B can dramatically change D_emb — this is not a controllable parameter without restructuring the pipeline.
+
+11. **Python stdout buffering hides HPC progress.** Both Phase 3 jobs appeared hung for hours because stdout was fully buffered (not connected to TTY). Use `PYTHONUNBUFFERED=1` or `flush=True` on all print calls in SLURM scripts.
 
 ---
 
