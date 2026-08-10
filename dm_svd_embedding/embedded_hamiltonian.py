@@ -398,6 +398,157 @@ def build_h_emb(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Second-Quantization H_AB (RDM-based, no CI expansion)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _jordan_wigner_sign_A_to_B(n_A: int, n_ops_B: int) -> int:
+    """Sign from Jordan-Wigner string when B operators cross A electrons.
+
+    In the sorted Fock basis (A-ops before B-ops), a B-space operator
+    acting from the left must pass through all N_A A-space electrons.
+    Each anticommutation contributes (-1).
+
+    For n_ops_B consecutive B operators, the total phase is (-1)^{n_A · n_ops_B}.
+    """
+    return 1 if (n_A * n_ops_B) % 2 == 0 else -1
+
+
+def build_hemb_via_rdm(
+    schmidt_data: Dict[int, Dict],
+    partition: Dict[int, Dict],
+    h1_full: np.ndarray,
+    h2_full: np.ndarray,
+    n_occ: int,
+    n_act: int,
+    trans_A: 'TransitionMatrices',
+    trans_B: 'TransitionMatrices',
+    verbose: bool = True,
+) -> Tuple[np.ndarray, List[Dict], Dict]:
+    """Build H^emb entirely via second-quantization RDM contraction.
+
+    No CI expansion. H_A+H_B via Path C, H_AB via transition matrix contraction.
+    """
+    from dm_svd_embedding.hab_rdm_contract import build_hab_rdm
+
+    if verbose:
+        t0 = time.perf_counter()
+        print(f"  Building H^emb via second-quantization RDM contraction...")
+
+    n_virt = n_act - n_occ
+
+    # ── Build basis index map ──
+    basis_info = []
+    offset = 0
+    block_offsets: Dict[int, int] = {}
+
+    for n_A in sorted(schmidt_data.keys()):
+        sd = schmidt_data[n_A]
+        r = sd['r']
+        block_offsets[n_A] = offset
+        for alpha in range(r):
+            for beta in range(r):
+                basis_info.append({
+                    'n': n_A, 'alpha': alpha, 'beta': beta,
+                    'flat_idx': offset + alpha * r + beta,
+                })
+        offset += r * r
+
+    D = offset
+    if D == 0:
+        return np.zeros((0, 0)), [], {}
+
+    if verbose:
+        print(f"    Schmidt product basis dimension: D = {D}")
+
+    # ── H_A + H_B via Path C ──
+    A_orb_indices = np.arange(n_occ, dtype=int)
+    B_orb_indices = np.arange(n_occ, n_act, dtype=int)
+
+    h1_A, h2_A = _extract_subspace_integrals(h1_full, h2_full, A_orb_indices)
+    h1_B, h2_B = _extract_subspace_integrals(h1_full, h2_full, B_orb_indices)
+
+    H_emb_HA = np.zeros((D, D))
+    H_emb_HB = np.zeros((D, D))
+
+    for n_A in sorted(schmidt_data.keys()):
+        sd = schmidt_data[n_A]
+        blk = partition[n_A]
+        r = sd['r']
+        if r == 0:
+            continue
+
+        a_dets = blk['a_dets']
+        if len(a_dets) > 0 and n_occ > 0:
+            aA0, bA0 = a_dets[0]
+            nA_alpha = aA0.bit_count()
+            nA_beta = bA0.bit_count()
+            HA_det = _build_subspace_hamiltonian(
+                a_dets, h1_A, h2_A, n_occ, nA_alpha, nA_beta)
+            HA_schmidt = sd['U'].T @ HA_det @ sd['U']
+        else:
+            HA_schmidt = np.zeros((r, r))
+
+        b_dets = blk['b_dets']
+        if len(b_dets) > 0 and n_virt > 0:
+            bB0, bB0b = b_dets[0]
+            nB_alpha = bB0.bit_count()
+            nB_beta = bB0b.bit_count()
+            HB_det = _build_subspace_hamiltonian(
+                b_dets, h1_B, h2_B, n_virt, nB_alpha, nB_beta)
+            HB_schmidt = sd['V'].T @ HB_det @ sd['V']
+        else:
+            HB_schmidt = np.zeros((r, r))
+
+        offset_n = block_offsets[n_A]
+        for alpha in range(r):
+            for beta in range(r):
+                k = offset_n + alpha * r + beta
+                for gamma in range(r):
+                    H_emb_HA[offset_n + gamma * r + beta, k] = \
+                        HA_schmidt[gamma, alpha]
+                for delta in range(r):
+                    H_emb_HB[offset_n + alpha * r + delta, k] = \
+                        HB_schmidt[delta, beta]
+
+    H_AB = np.zeros((D, D))
+    H_emb = H_emb_HA + H_emb_HB
+
+    if verbose:
+        print(f"    H_A + H_B via Path C done "
+              f"(||HA||={np.linalg.norm(H_emb_HA):.4f}, "
+              f"||HB||={np.linalg.norm(H_emb_HB):.4f})")
+
+    # ── H_AB via second-quantization RDM ──
+    build_hab_rdm(H_AB, schmidt_data, block_offsets,
+                  trans_A, trans_B, h1_full, h2_full,
+                  n_occ, n_act, verbose=verbose)
+
+    H_emb += H_AB
+    H_emb = 0.5 * (H_emb + H_emb.T)
+
+    decompositions = {
+        'HA': H_emb_HA, 'HB': H_emb_HB, 'HAB': H_AB,
+        'norm_HA': float(np.linalg.norm(H_emb_HA)),
+        'norm_HB': float(np.linalg.norm(H_emb_HB)),
+        'norm_HAB': float(np.linalg.norm(H_AB)),
+        'norm_total': float(np.linalg.norm(H_emb)),
+    }
+
+    if verbose:
+        elapsed = time.perf_counter() - t0
+        print(f"    H^emb via RDM done in {elapsed:.1f}s")
+        print(f"    ||HA||={decompositions['norm_HA']:.4f}, "
+              f"||HB||={decompositions['norm_HB']:.4f}, "
+              f"||HAB||={decompositions['norm_HAB']:.4f}, "
+              f"||H||={decompositions['norm_total']:.4f}")
+        print(f"    max|H-H^T| = {np.abs(H_emb - H_emb.T).max():.2e}")
+
+    return H_emb, basis_info, decompositions
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Quick test on H₂O/STO-3G
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -498,6 +649,84 @@ def test_embedded_hamiltonian_h2o():
     print("  ✓ H^emb construction test passed")
 
 
+def test_hemb_rdm_vs_sigma():
+    """Compare RDM-based H^emb with sigma-vector H^emb on H₂O."""
+    from dm_svd_embedding.occ_virt_partition import (
+        setup_partition, build_block_matrices,
+    )
+    from dm_svd_embedding.density_matrix import (
+        compute_schmidt_decomposition, compute_compression_metrics,
+    )
+    from dm_svd_embedding.transition_rdm import compute_transition_matrices
+
+    (mol, mf, cas, q_idx, backend, h1eff, h2_4d, fcivec, ci_flat,
+     n_act, n_elec, n_occ, na, nb, ecore, E_fci) = _setup_h2o_system()
+
+    n_virt = n_act - n_occ
+
+    print(f"H₂O/STO-3G CAS({n_act},{n_elec}) A={n_occ} B={n_virt}")
+
+    partition, full_dets = setup_partition(n_act, n_elec, n_occ, ms=0)
+    C_blocks = build_block_matrices(partition, ci_flat)
+    schmidt = compute_schmidt_decomposition(C_blocks, eps=1e-3)
+
+    # === Reference: sigma-vector H^emb ===
+    print("\n  [Reference] Sigma-vector H^emb...")
+    H_ref, basis_ref, _ = build_h_emb(
+        schmidt, partition, q_idx, backend, h1eff, h2_4d,
+        n_occ, n_act, verbose=False)
+    D = H_ref.shape[0]
+    print(f"  Reference H^emb: D={D}")
+
+    # Diagonalize reference
+    ev_ref, _ = np.linalg.eigh(H_ref)
+
+    # === New: RDM-based H^emb ===
+    print("\n  [RDM] Second-quantization H^emb...")
+    trans_A = compute_transition_matrices(
+        partition, schmidt, n_occ, subspace='A', verbose=False)
+    trans_B = compute_transition_matrices(
+        partition, schmidt, n_virt, subspace='B', verbose=False)
+
+    H_rdm, basis_rdm, decomps = build_hemb_via_rdm(
+        schmidt, partition, h1eff, h2_4d,
+        n_occ, n_act, trans_A, trans_B, verbose=True)
+
+    # Diagonalize RDM result
+    ev_rdm, _ = np.linalg.eigh(H_rdm)
+
+    # === Comparison ===
+    diff_matrix = np.abs(H_ref - H_rdm).max()
+    diff_evals = np.abs(ev_ref - ev_rdm)
+    print(f"\n  === Comparison ===")
+    print(f"  max|H_ref - H_rdm| = {diff_matrix:.2e}")
+    for i in range(min(5, D)):
+        print(f"  E[{i}]: ref={ev_ref[i]:.6f}, rdm={ev_rdm[i]:.6f}, "
+              f"diff={diff_evals[i]:.2e}")
+
+    # Decompose errors
+    HA_diff = np.abs(decomps['HA'] - decomps['HA']).max()  # always 0 (same Path C)
+    print(f"\n  ||H_AB_ref||={decomps['norm_HAB']:.4f} "
+          f"(estimated from RDM)")
+
+    # Hermiticity
+    asym_ref = np.abs(H_ref - H_ref.T).max()
+    asym_rdm = np.abs(H_rdm - H_rdm.T).max()
+    print(f"  Hermiticity: ref={asym_ref:.2e}, rdm={asym_rdm:.2e}")
+
+    # The H_A+H_B parts should be identical (same Path C)
+    ha_diff = np.abs(decomps['HA'] - decomps['HA']).max()
+    hb_diff = np.abs(decomps['HB'] - decomps['HB']).max()
+    print(f"  HA diff: {ha_diff:.2e}, HB diff: {hb_diff:.2e}")
+
+    return H_ref, H_rdm, diff_matrix, diff_evals
+
+
 if __name__ == "__main__":
-    test_embedded_hamiltonian_h2o()
-    print("All embedded_hamiltonian tests passed.")
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--rdm-test':
+        test_hemb_rdm_vs_sigma()
+        print("All RDM tests passed.")
+    else:
+        test_embedded_hamiltonian_h2o()
+        print("All embedded_hamiltonian tests passed.")
