@@ -498,7 +498,11 @@ def _add_1e_cross_block_rdm(
 
 def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
                        TA, TB, h1_full, n_occ, rev_B=False):
-    """Add 1e cross contribution."""
+    """Add 1e cross contribution.
+
+    rev_B=False: h_{pr} a_p†(A) a_r(B), JW = (-1)^{n_A}
+    rev_B=True:  h_{rp} a_r†(B) a_p(A), JW = (-1)^{n_A-1}
+    """
     os = block_offsets.get(n_A_src)
     od = block_offsets.get(n_A_dst)
     if os is None or od is None:
@@ -506,6 +510,11 @@ def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
 
     r_dA, r_sA = TA.shape[0], TA.shape[1]
     r_dB, r_sB = TB.shape[0], TB.shape[1]
+
+    # JW sign: single B operator crosses n_A electrons
+    jw = (1 if (n_A_src % 2 == 0) else -1)  # (-1)^{n_A_src}
+    if rev_B:
+        jw = -jw  # (-1)^{n_A_src-1} = -(-1)^{n_A_src}
 
     for a_dst in range(r_dA):
         for a_src in range(r_sA):
@@ -528,4 +537,4 @@ def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
                     if abs(val) > 1e-15:
                         s = os + a_src * r_sA + b_src
                         d = od + a_dst * r_dA + b_dst
-                        H_AB[d, s] += val
+                        H_AB[d, s] += jw * val
