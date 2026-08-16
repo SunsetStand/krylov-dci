@@ -548,10 +548,10 @@ def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
     r_dA, r_sA = TA['a'].shape[0], TA['a'].shape[1]
     r_dB, r_sB = TB['a'].shape[0], TB['a'].shape[1]
 
-    # JW sign: single B operator crosses n_A electrons
-    jw = (1 if (n_A_src % 2 == 0) else -1)  # (-1)^{n_A_src}
-    if rev_B:
-        jw = -jw  # (-1)^{n_A_src-1} = -(-1)^{n_A_src}
+    # JW sign is now baked into the A-side transition matrices
+    # (spin-dependent (-1)^{n_σ(A_src)} / (-1)^{n_σ(A_src)-1} in
+    # transition_rdm.py).  No extra factor here.
+    jw = 1
 
     for a_dst in range(r_dA):
         for a_src in range(r_sA):

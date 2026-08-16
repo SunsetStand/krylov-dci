@@ -773,6 +773,14 @@ def compute_transition_matrices(
             T_det = _compute_det_creation(dets_n, dets_dst, idx_dst, n_orb)
             result.create_1[n_A] = _transform_1body_to_schmidt(T_det, U_dst, U)
             T_exp = _compute_det_creation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                # JW phase for the B-side operator crossing fragment A:
+                # a†_pσ on A carries an extra (-1)^{n_σ(A_src)} relative to the
+                # separate-fragment contraction (α/β strings are ordered A-then-B
+                # in the full space).  σ=α for 'a', σ=β for 'b'.
+                for j, (aA_j, bA_j) in enumerate(dets_n):
+                    T_exp['a'][:, j, :] *= (-1) ** aA_j.bit_count()
+                    T_exp['b'][:, j, :] *= (-1) ** bA_j.bit_count()
             result.create_1_explicit[n_A] = {
                 k: _transform_1body_to_schmidt(T_exp[k], U_dst, U)
                 for k in ('a', 'b')
@@ -794,6 +802,12 @@ def compute_transition_matrices(
             T_det = _compute_det_annihilation(dets_n, dets_dst, idx_dst, n_orb)
             result.annihilate_1[n_A] = _transform_1body_to_schmidt(T_det, U_dst, U)
             T_exp = _compute_det_annihilation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                # JW phase: a_pσ on A carries (-1)^{n_σ(A_src)-1} (one electron
+                # removed before the B-side operator crosses A).
+                for j, (aA_j, bA_j) in enumerate(dets_n):
+                    T_exp['a'][:, j, :] *= (-1) ** (aA_j.bit_count() - 1)
+                    T_exp['b'][:, j, :] *= (-1) ** (bA_j.bit_count() - 1)
             result.annihilate_1_explicit[n_A] = {
                 k: _transform_1body_to_schmidt(T_exp[k], U_dst, U)
                 for k in ('a', 'b')
