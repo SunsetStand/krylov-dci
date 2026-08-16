@@ -178,6 +178,20 @@ class Hamiltonian:
         Returns:
             <det1|H|det2>.
         """
+        # ── Spin conservation ──────────────────────────────────────────────
+        # H = Σ h_pq (a†_pα a_qα + a†_pβ a_qβ)
+        #   + ½ Σ (pq|rs) Σ_στ a†_pσ a†_rτ a_sτ a_qσ
+        # Every term contains equal numbers of α (β) creation and annihilation
+        # operators, so H conserves n_α and n_β SEPARATELY.  Hence <det1|H|det2>
+        # vanishes identically whenever the two determinants live in different
+        # (n_α, n_β) sectors.  Without this guard, a spin-flip pair (a_diff and
+        # b_diff both odd) is misclassified by excitation_level as a single
+        # excitation and produces a spurious nonzero matrix element.
+        a1, b1 = det1
+        a2, b2 = det2
+        if a1.bit_count() != a2.bit_count() or b1.bit_count() != b2.bit_count():
+            return 0.0
+
         level = excitation_level(det1, det2)
 
         if level == 0:

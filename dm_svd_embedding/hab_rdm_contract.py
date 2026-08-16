@@ -99,18 +99,26 @@ def _add_nconserved_complementary(
     H_AB, offset, n_A, trans_A, trans_B,
     h2_full, n_occ, n_act, n_virt
 ):
-    """n_A-conserved 2e terms using complementary operators.
+    """n_A-conserved 2e terms (block2 normal/complementary, Chan et al. 2016).
 
-    Term (b): + Σ_{ij∈A} B_{ij} ⊗ Q_{ij}^B
-      B_{ij} = Σ_σ a_{iσ}† a_{jσ}
-      Q_{ij}^B = Σ_{kl∈B} v_{ijkl} · Σ_{σ'} a_{kσ'}† a_{lσ'}
+    Same-spin (direct), coefficient +1:
+        + Σ_{ij∈A} B_ij ⊗ Q^B_ij
+          B_ij = Σ_σ a†_iσ a_jσ,   Q^B_ij = Σ_{kl∈B,σ'} v_ijkl a†_kσ' a_lσ'
 
-    Term (c): - Σ_{il∈A} B_{il} ⊗ Q'^B_{il}
-      Q'^B_{il} = Σ_{jk∈B} v_{ijkl} · Σ_{σ'} a_{kσ'}† a_{jσ'}
+    Exchange (complementary) term, spin-explicit:
+        − Σ_{il∈A} Σ_{σσ'} B'_il,σσ' ⊗ Q'^B_il,σσ'
+          B'_il,σσ' = a†_iσ a_lσ',   Q'^B_il,σσ' = Σ_{jk∈B} v_ijkl a†_kσ' a_jσ
 
-    These are computed in the Schmidt basis using spin-summed
-    transition matrices (trans_1). The integral weights are
-    pre-contracted into the complementary operators Q and Q'.
+    The direct term uses spin-SUMMED transitions (trans_1).  The exchange term
+    uses spin-EXPLICIT transitions (trans_1_explicit) because its A-side
+    operator a†_iσ a_lσ' mixes spins (σ ≠ σ').
+
+    SIGN STRUCTURE: the −1 coefficient applies only to the SAME-SPIN (σ = σ')
+    exchange, which is the genuine Fermi-exchange contribution.  The CROSS-SPIN
+    (σ ≠ σ') terms carry +1 — they are the spin-flip Coulomb terms, not Fermi
+    exchange, so the −1 does NOT apply.  (Verified numerically: flipping the
+    cross-spin sign fixes the odd-n_A diagonal blocks of H^emb to machine
+    precision against the Slater-Condon reference.)
     """
     TA = trans_A.trans_1.get(n_A)
     TB = trans_B.trans_1.get(n_A)
@@ -118,9 +126,8 @@ def _add_nconserved_complementary(
         return
 
     r, _, nA_orb, _ = TA.shape
-    nB_orb = TB.shape[2]
 
-    # ── Term (b): same-spin ──
+    # ── Term (b): same-spin (direct), spin-summed, coefficient +1 ──
     # Q[i,j,b_dst,b_src] = Σ_{k,l∈B} h2_full[i,j,k_B,l_B] × TB[b_dst,b_src,k,l]
     Q = np.zeros((n_occ, n_occ, r, r))
     for i in range(n_occ):
@@ -134,19 +141,39 @@ def _add_nconserved_complementary(
 
     _contract_A_tensor_B(H_AB, offset, r, TA, Q, n_occ, sign=+1.0)
 
-    # ── Term (c): cross-spin (same-spin part with spin-summed ops) ──
-    # Q'[i,l,b_dst,b_src] = Σ_{j,k∈B} h2_full[i,j_B,k_B,l] × TB[b_dst,b_src,k,j]
-    Qp = np.zeros((n_occ, n_occ, r, r))
+    # ── Term (c): exchange (complementary), spin-explicit ──
+    TAe = trans_A.trans_1_explicit.get(n_A)
+    TBe = trans_B.trans_1_explicit.get(n_A)
+    if TAe is None or TBe is None:
+        return
+
+    # Spin pairing (A-side create σ / annihilate σ', B-side create σ' / annihilate σ):
+    #   A 'aa' ↔ B 'aa', A 'bb' ↔ B 'bb', A 'ab' ↔ B 'ba', A 'ba' ↔ B 'ab'
+    # Sign: −1 for same-spin (Fermi exchange).  The cross-spin (σ ≠ σ') terms
+    # carry an extra JW phase (−1)^{n_A} from the B-side spin-flip operator
+    # crossing the n_A electrons of fragment A, giving overall (−1)^{n_A+1}.
+    spin_pairs = [('aa', 'aa'), ('bb', 'bb'), ('ab', 'ba'), ('ba', 'ab')]
+    cross_sign = -1.0 if (n_A % 2 == 0) else +1.0
+    spin_sign = {('aa', 'aa'): -1.0, ('bb', 'bb'): -1.0,
+                 ('ab', 'ba'): cross_sign, ('ba', 'ab'): cross_sign}
+
+    # Pre-contract the integral-weighted B-side operator per spin pair:
+    #   Qp[sA][i, l, b_dst, b_src] = Σ_{j,k∈B} h2_full[i,j_B,k_B,l] · TBe[sB][b_dst,b_src,k,j]
+    Qp = {sA: np.zeros((n_occ, n_occ, r, r)) for sA, _ in spin_pairs}
     for i in range(n_occ):
-        for l_idx in range(n_occ):
+        for l in range(n_occ):
             for j in range(n_virt):
                 for k in range(n_virt):
-                    v = h2_full[i, j + n_occ, k + n_occ, l_idx]
+                    v = h2_full[i, j + n_occ, k + n_occ, l]
                     if abs(v) < 1e-14:
                         continue
-                    Qp[i, l_idx] -= v * TB[:, :, k, j]
+                    for sA, sB in spin_pairs:
+                        Qp[sA][i, l] += v * TBe[sB][:, :, k, j]
 
-    _contract_A_tensor_B(H_AB, offset, r, TA, Qp, n_occ, sign=+1.0)
+    # Contract A-side: H_AB[αβ,γδ] += sign × Σ_{i,l} TAe[sA][α,γ,i,l] · Qp[sA][i,l,β,δ]
+    for sA, sB in spin_pairs:
+        _contract_A_tensor_B(H_AB, offset, r, TAe[sA], Qp[sA], n_occ,
+                             sign=spin_sign[(sA, sB)])
 
 
 def _contract_A_tensor_B(H_AB, offset, r, TA, QB, n_indices, sign):
@@ -482,15 +509,22 @@ def _add_1e_cross_block_rdm(
     H_AB, block_offsets, n_A,
     trans_A, trans_B, h1_full, n_occ, n_act, n_virt
 ):
-    """1e cross: h_pr a_p†(A) a_r(B) + h.c."""
-    cre_A = trans_A.create_1.get(n_A)
-    ann_B = trans_B.annihilate_1.get(n_A)
+    """1e cross: h_pr a_p†(A) a_r(B) + h.c.  (SPIN-DIAGONAL).
+
+    H_1e = Σ_{pq} h_pq Σ_σ a†_pσ a_qσ.  The cross part (p∈A, r∈B) is
+      Σ_{p∈A,r∈B,σ} h_pr a†_pσ a_rσ  +  h.c.
+    which is spin-diagonal (σ on both create and annihilate).  A spin-SUMMED
+    contraction (Σ_σ a†_pσ)(Σ_σ' a_rσ') would spuriously include σ≠σ' terms, so
+    we use the spin-explicit transitions and contract same-spin only.
+    """
+    cre_A = trans_A.create_1_explicit.get(n_A)
+    ann_B = trans_B.annihilate_1_explicit.get(n_A)
     if cre_A is not None and ann_B is not None:
         _add_1e_cross_pair(H_AB, block_offsets, n_A, n_A + 1,
                            cre_A, ann_B, h1_full, n_occ, rev_B=False)
 
-    ann_A = trans_A.annihilate_1.get(n_A)
-    cre_B = trans_B.create_1.get(n_A)
+    ann_A = trans_A.annihilate_1_explicit.get(n_A)
+    cre_B = trans_B.create_1_explicit.get(n_A)
     if ann_A is not None and cre_B is not None:
         _add_1e_cross_pair(H_AB, block_offsets, n_A, n_A - 1,
                            ann_A, cre_B, h1_full, n_occ, rev_B=True)
@@ -498,7 +532,10 @@ def _add_1e_cross_block_rdm(
 
 def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
                        TA, TB, h1_full, n_occ, rev_B=False):
-    """Add 1e cross contribution.
+    """Add the 1e cross contribution with spin-explicit transitions.
+
+    TA, TB: dict {'a','b'} of spin-explicit single (create/annihilate)
+    transitions in Schmidt basis, shape (r_dst, r_src, n_orb).
 
     rev_B=False: h_{pr} a_p†(A) a_r(B), JW = (-1)^{n_A}
     rev_B=True:  h_{rp} a_r†(B) a_p(A), JW = (-1)^{n_A-1}
@@ -508,8 +545,8 @@ def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
     if os is None or od is None:
         return
 
-    r_dA, r_sA = TA.shape[0], TA.shape[1]
-    r_dB, r_sB = TB.shape[0], TB.shape[1]
+    r_dA, r_sA = TA['a'].shape[0], TA['a'].shape[1]
+    r_dB, r_sB = TB['a'].shape[0], TB['a'].shape[1]
 
     # JW sign: single B operator crosses n_A electrons
     jw = (1 if (n_A_src % 2 == 0) else -1)  # (-1)^{n_A_src}
@@ -522,19 +559,19 @@ def _add_1e_cross_pair(H_AB, block_offsets, n_A_src, n_A_dst,
                 for b_src in range(r_sB):
                     val = 0.0
                     for p in range(n_occ):
-                        ta = TA[a_dst, a_src, p]
-                        if abs(ta) < 1e-15:
-                            continue
-                        for r_sub in range(TB.shape[2]):
-                            tb = TB[b_dst, b_src, r_sub]
-                            if abs(tb) < 1e-15:
-                                continue
+                        for r_sub in range(TB['a'].shape[2]):
                             r_full = r_sub + n_occ
                             if rev_B:
-                                val += h1_full[r_full, p] * ta * tb
+                                h = h1_full[r_full, p]
                             else:
-                                val += h1_full[p, r_full] * ta * tb
+                                h = h1_full[p, r_full]
+                            if abs(h) < 1e-15:
+                                continue
+                            # same-spin contraction (αα + ββ), no σ≠σ' terms
+                            s = (TA['a'][a_dst, a_src, p] * TB['a'][b_dst, b_src, r_sub]
+                                 + TA['b'][a_dst, a_src, p] * TB['b'][b_dst, b_src, r_sub])
+                            val += h * s
                     if abs(val) > 1e-15:
-                        s = os + a_src * r_sA + b_src
-                        d = od + a_dst * r_dA + b_dst
-                        H_AB[d, s] += jw * val
+                        s_idx = os + a_src * r_sA + b_src
+                        d_idx = od + a_dst * r_dA + b_dst
+                        H_AB[d_idx, s_idx] += jw * val

@@ -167,6 +167,101 @@ def _expand_schmidt_product_to_ci_matrix(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Spin-sector bookkeeping for the Schmidt product basis
+# ═══════════════════════════════════════════════════════════════════════════
+
+def schmidt_spin_sectors(
+    schmidt_data: Dict[int, Dict],
+    partition: Dict[int, Dict],
+) -> Dict[int, Tuple[List, List]]:
+    """Return the (n_alpha, n_beta) spin sector of each Schmidt vector.
+
+    The CI coefficient matrix C^(n) of each electron-number block is block-
+    diagonal in spin sector (the Hamiltonian conserves n_alpha and n_beta
+    separately).  Consequently every left singular vector U[:, alpha] lives in
+    a single A-sector and every right singular vector V[:, beta] lives in a
+    single B-sector.  We recover those sectors from the determinant support of
+    each column.
+
+    Returns:
+        Dict[n_A] -> (a_sectors, b_sectors), where each is a list of length r
+        of (n_alpha, n_beta) tuples.
+    """
+    sectors: Dict[int, Tuple[List, List]] = {}
+    for n_A in sorted(schmidt_data.keys()):
+        sd = schmidt_data[n_A]
+        blk = partition[n_A]
+        r = sd['r']
+        U = sd['U']
+        V = sd['V']
+        a_dets = blk['a_dets']
+        b_dets = blk['b_dets']
+
+        a_sec = []
+        for alpha in range(r):
+            sec = None
+            for i, d in enumerate(a_dets):
+                if abs(U[i, alpha]) > 1e-12:
+                    sec = (d[0].bit_count(), d[1].bit_count())
+                    break
+            a_sec.append(sec)
+
+        b_sec = []
+        for beta in range(r):
+            sec = None
+            for k, d in enumerate(b_dets):
+                if abs(V[k, beta]) > 1e-12:
+                    sec = (d[0].bit_count(), d[1].bit_count())
+                    break
+            b_sec.append(sec)
+
+        sectors[n_A] = (a_sec, b_sec)
+    return sectors
+
+
+def compatible_product_mask(
+    schmidt_data: Dict[int, Dict],
+    partition: Dict[int, Dict],
+    nelec: Tuple[int, int],
+) -> np.ndarray:
+    """Boolean mask over the flat Schmidt-product basis: True iff physical.
+
+    A product state |A_alpha^(n)> |B_beta^(n)> lies in the fixed (n_alpha,
+    n_beta) total sector only when
+
+        n_alpha^A(alpha) + n_alpha^B(beta) == n_alpha_total
+        n_beta^A(alpha)  + n_beta^B(beta)  == n_beta_total
+
+    Incompatible products have zero support in the full CI space, so all their
+    matrix elements vanish identically.  The flat index order matches the
+    r x r product layout used in build_h_emb / build_hemb_via_rdm.
+    """
+    sectors = schmidt_spin_sectors(schmidt_data, partition)
+    na_tot, nb_tot = nelec
+    mask = []
+    for n_A in sorted(schmidt_data.keys()):
+        r = schmidt_data[n_A]['r']
+        a_sec, b_sec = sectors[n_A]
+        for alpha in range(r):
+            for beta in range(r):
+                sa = a_sec[alpha]
+                sb = b_sec[beta]
+                ok = (sa is not None and sb is not None
+                      and sa[0] + sb[0] == na_tot
+                      and sa[1] + sb[1] == nb_tot)
+                mask.append(ok)
+    return np.asarray(mask, dtype=bool)
+
+
+def _project_physical_subspace(mat: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Zero out rows/columns of `mat` corresponding to unphysical products."""
+    mat = np.array(mat, copy=True)
+    mat[~mask, :] = 0.0
+    mat[:, ~mask] = 0.0
+    return mat
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Main H^emb construction
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -365,6 +460,18 @@ def build_h_emb(
                     l_alpha_delta = offset_n + alpha * r + delta
                     H_emb_HB[l_alpha_delta, k_alpha_beta] = HB_schmidt[delta, beta]
 
+    # ── Project onto the physical (spin-sector-compatible) subspace ──
+    # H conserves (n_alpha, n_beta) separately, so products |A_alpha B_beta>
+    # whose sectors do not sum to the total have identically zero support in
+    # the full CI space and zero coupling to everything.  Path C naively places
+    # H_A/H_B into ALL r x r products (including incompatible ones), which must
+    # be zeroed out.
+    nelec = qspace_index.nelec
+    phys_mask = compatible_product_mask(schmidt_data, partition, nelec)
+    H_emb = _project_physical_subspace(H_emb, phys_mask)
+    H_emb_HA = _project_physical_subspace(H_emb_HA, phys_mask)
+    H_emb_HB = _project_physical_subspace(H_emb_HB, phys_mask)
+
     # Diagnose: how much of H_emb is from H_A + H_B vs H_AB?
     H_emb_diag = H_emb_HA + H_emb_HB
     H_emb_HAB = H_emb - H_emb_diag
@@ -518,13 +625,35 @@ def build_hemb_via_rdm(
               f"(||HA||={np.linalg.norm(H_emb_HA):.4f}, "
               f"||HB||={np.linalg.norm(H_emb_HB):.4f})")
 
-    # ── H_AB via second-quantization RDM ──
+    # ── H_AB via second-quantization RDM (diagnostic split) ──
     build_hab_rdm(H_AB, schmidt_data, block_offsets,
                   trans_A, trans_B, h1_full, h2_full,
                   n_occ, n_act, verbose=verbose)
 
     H_emb += H_AB
     H_emb = 0.5 * (H_emb + H_emb.T)
+
+    # ── Project onto the physical (spin-sector-compatible) subspace ──
+    # Same reasoning as build_h_emb: incompatible products have zero support in
+    # the full CI space and zero coupling.  Path C and the RDM H_AB contraction
+    # place spurious nonzero entries there; they must be zeroed.
+    # Total (n_alpha, n_beta) = A-electron counts + B-electron counts for any
+    # block (constant across blocks).
+    na_tot = nb_tot = 0
+    for n_A in sorted(schmidt_data.keys()):
+        blk = partition[n_A]
+        if len(blk['a_dets']) > 0:
+            a0 = blk['a_dets'][0]
+            b0 = blk['b_dets'][0] if len(blk['b_dets']) > 0 else (0, 0)
+            na_tot = a0[0].bit_count() + b0[0].bit_count()
+            nb_tot = a0[1].bit_count() + b0[1].bit_count()
+            break
+    phys_mask = compatible_product_mask(
+        schmidt_data, partition, (na_tot, nb_tot))
+    H_emb = _project_physical_subspace(H_emb, phys_mask)
+    H_emb_HA = _project_physical_subspace(H_emb_HA, phys_mask)
+    H_emb_HB = _project_physical_subspace(H_emb_HB, phys_mask)
+    H_AB = _project_physical_subspace(H_AB, phys_mask)
 
     decompositions = {
         'HA': H_emb_HA, 'HB': H_emb_HB, 'HAB': H_AB,

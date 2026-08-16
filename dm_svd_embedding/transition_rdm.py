@@ -154,6 +154,73 @@ def _compute_det_annihilation(
     return T
 
 
+def _compute_det_creation_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT single creation: returns {'a','b'} arrays.
+
+    T['a'][i,j,p] = ⟨d_dst| a_pα† |d_src⟩
+    T['b'][i,j,p] = ⟨d_dst| a_pβ† |d_src⟩
+    The spin-summed create_1 is 'a' + 'b'.
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    Ta = np.zeros((d_dst, d_src, n_orb))
+    Tb = np.zeros((d_dst, d_src, n_orb))
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        for p in range(n_orb):
+            phase, aA_i = _create_sign(aA_j, p)
+            if phase != 0:
+                key = (aA_i, bA_j)
+                i = a_index_dst.get(key)
+                if i is not None:
+                    Ta[i, j, p] = phase
+        for p in range(n_orb):
+            phase, bA_i = _create_sign(bA_j, p)
+            if phase != 0:
+                key = (aA_j, bA_i)
+                i = a_index_dst.get(key)
+                if i is not None:
+                    Tb[i, j, p] = phase
+    return {'a': Ta, 'b': Tb}
+
+
+def _compute_det_annihilation_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT single annihilation: returns {'a','b'} arrays.
+
+    T['a'][i,j,p] = ⟨d_dst| a_pα |d_src⟩
+    T['b'][i,j,p] = ⟨d_dst| a_pβ |d_src⟩
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    Ta = np.zeros((d_dst, d_src, n_orb))
+    Tb = np.zeros((d_dst, d_src, n_orb))
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        for p in range(n_orb):
+            phase, aA_i = _annihilate_sign(aA_j, p)
+            if phase != 0:
+                key = (aA_i, bA_j)
+                i = a_index_dst.get(key)
+                if i is not None:
+                    Ta[i, j, p] = phase
+        for p in range(n_orb):
+            phase, bA_i = _annihilate_sign(bA_j, p)
+            if phase != 0:
+                key = (aA_j, bA_i)
+                i = a_index_dst.get(key)
+                if i is not None:
+                    Tb[i, j, p] = phase
+    return {'a': Ta, 'b': Tb}
+
+
 def _compute_det_pair_creation(
     a_dets_src: List[Tuple[int, int]],
     a_dets_dst: List[Tuple[int, int]],
@@ -344,6 +411,105 @@ def _compute_det_1body_transition(
     return T
 
 
+def _compute_det_1body_transition_explicit(
+    a_dets: List[Tuple[int, int]],
+    a_index: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Compute spin-EXPLICIT 1-body transitions ⟨d_i| a_p,σ† a_q,σ' |d_j⟩.
+
+    Returns a dict with four (d, d, n_orb, n_orb) arrays, one per spin pair:
+      'aa': a_p,α† a_q,α   (same-spin alpha)
+      'bb': a_p,β† a_q,β   (same-spin beta)
+      'ab': a_p,α† a_q,β   (spin-flip: create alpha, annihilate beta)
+      'ba': a_p,β† a_q,α   (spin-flip: create beta, annihilate alpha)
+
+    Index convention matches _compute_det_1body_transition:
+      T[dst, src, p, q] = ⟨d_dst| a_p† a_q |d_src⟩.
+    The spin-summed trans_1 is 'aa' + 'bb'.
+
+    In the (alpha-string, beta-string) representation the alpha and beta
+    operators act on independent strings, so no cross fermion sign arises:
+    the phase of a mixed operator is the product of the individual
+    create/annihilate phases.
+    """
+    d = len(a_dets)
+    comps = {k: np.zeros((d, d, n_orb, n_orb)) for k in ('aa', 'ab', 'ba', 'bb')}
+
+    for j, (aA_j, bA_j) in enumerate(a_dets):
+        # ── 'aa': a_p,α† a_q,α ──
+        for q in range(n_orb):
+            if not ((aA_j >> q) & 1):
+                continue
+            phase_q, a1 = _annihilate_sign(aA_j, q)
+            for p in range(n_orb):
+                if (a1 >> p) & 1:
+                    continue
+                if p == q:
+                    comps['aa'][j, j, p, q] = 1.0
+                    continue
+                phase_p, a2 = _create_sign(a1, p)
+                if phase_p == 0:
+                    continue
+                key = (a2, bA_j)
+                i = a_index.get(key)
+                if i is not None:
+                    comps['aa'][i, j, p, q] = phase_q * phase_p
+
+        # ── 'bb': a_p,β† a_q,β ──
+        for q in range(n_orb):
+            if not ((bA_j >> q) & 1):
+                continue
+            phase_q, b1 = _annihilate_sign(bA_j, q)
+            for p in range(n_orb):
+                if (b1 >> p) & 1:
+                    continue
+                if p == q:
+                    comps['bb'][j, j, p, q] = 1.0
+                    continue
+                phase_p, b2 = _create_sign(b1, p)
+                if phase_p == 0:
+                    continue
+                key = (aA_j, b2)
+                i = a_index.get(key)
+                if i is not None:
+                    comps['bb'][i, j, p, q] = phase_q * phase_p
+
+        # ── 'ab': a_p,α† a_q,β (create alpha, annihilate beta) ──
+        for q in range(n_orb):
+            if not ((bA_j >> q) & 1):
+                continue
+            phase_q, b1 = _annihilate_sign(bA_j, q)
+            for p in range(n_orb):
+                if (aA_j >> p) & 1:
+                    continue
+                phase_p, a2 = _create_sign(aA_j, p)
+                if phase_p == 0:
+                    continue
+                key = (a2, b1)
+                i = a_index.get(key)
+                if i is not None:
+                    comps['ab'][i, j, p, q] = phase_q * phase_p
+
+        # ── 'ba': a_p,β† a_q,α (create beta, annihilate alpha) ──
+        for q in range(n_orb):
+            if not ((aA_j >> q) & 1):
+                continue
+            phase_q, a1 = _annihilate_sign(aA_j, q)
+            for p in range(n_orb):
+                if (bA_j >> p) & 1:
+                    continue
+                phase_p, b2 = _create_sign(bA_j, p)
+                if phase_p == 0:
+                    continue
+                key = (a1, b2)
+                i = a_index.get(key)
+                if i is not None:
+                    comps['ba'][i, j, p, q] = phase_q * phase_p
+
+    return comps
+
+
 def _compute_det_create2_annih1(
     a_dets_src: List[Tuple[int, int]],
     a_dets_dst: List[Tuple[int, int]],
@@ -500,7 +666,12 @@ class TransitionMatrices:
     blocks: List[int] = field(default_factory=list)
     create_1: Dict[int, np.ndarray] = field(default_factory=dict)
     annihilate_1: Dict[int, np.ndarray] = field(default_factory=dict)
+    # Spin-explicit single creation/annihilation: n_A -> {'a','b'} -> (r_dst,r_src,n_orb)
+    create_1_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
+    annihilate_1_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
     trans_1: Dict[int, np.ndarray] = field(default_factory=dict)
+    # Spin-explicit 1-body transitions: n_A -> {'aa','ab','ba','bb'} -> (r,r,n_orb,n_orb)
+    trans_1_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
     create_2: Dict[int, np.ndarray] = field(default_factory=dict)
     annihilate_2: Dict[int, np.ndarray] = field(default_factory=dict)
     # 3-body: create 2 + annihilate 1 (n→n+1): ⟨α| a_p† a_q† a_r |γ⟩
@@ -601,6 +772,11 @@ def compute_transition_matrices(
 
             T_det = _compute_det_creation(dets_n, dets_dst, idx_dst, n_orb)
             result.create_1[n_A] = _transform_1body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_creation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            result.create_1_explicit[n_A] = {
+                k: _transform_1body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('a', 'b')
+            }
 
         # ── Single annihilation ──
         blk_annih_dst = partition.get(n_A + dk_annih)
@@ -617,11 +793,23 @@ def compute_transition_matrices(
 
             T_det = _compute_det_annihilation(dets_n, dets_dst, idx_dst, n_orb)
             result.annihilate_1[n_A] = _transform_1body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_annihilation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            result.annihilate_1_explicit[n_A] = {
+                k: _transform_1body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('a', 'b')
+            }
 
         # ── 1-body transition (n → n, same block) ──
         T_det = _compute_det_1body_transition(dets_n, idx_n, n_orb)
         # T_det: (d, d, n_orb, n_orb)
         result.trans_1[n_A] = _transform_2body_to_schmidt(T_det, U, U)
+
+        # ── Spin-explicit 1-body transitions (for the exchange term) ──
+        T_exp = _compute_det_1body_transition_explicit(dets_n, idx_n, n_orb)
+        result.trans_1_explicit[n_A] = {
+            k: _transform_2body_to_schmidt(T_exp[k], U, U)
+            for k in ('aa', 'ab', 'ba', 'bb')
+        }
 
         # ── Pair creation ──
         blk_create2_dst = partition.get(n_A + dk2_create)
