@@ -373,10 +373,11 @@ def _contract_3A1B(H_AB, os, od, TA3, TB1, r_src, r_dst, h2_full, n_occ, n_virt,
     for combo, spin in pairs:
         TA = TA3[combo]
         TB = TB1[spin]
-        # Same-spin combos ('aaa','bbb') in the 'sB' sub-case (c2a1, B annihilate SECOND):
-        # the B operator crosses one fewer A electron because the A-side annihilated the
-        # SAME spin first.  Extra (-1) only for this sub-case.
-        extra = -1.0 if (combo in ('aaa', 'bbb') and integ_kind == 'sB') else 1.0
+        # Same-spin combos ('aaa','bbb') cross the A/B boundary with an extra (-1)
+        # when the B operator acts BEFORE the A-side operator of the SAME spin.
+        #   c2a1 'sB' (B annihilate SECOND)  -> extra (-1)
+        #   c1a2 'qB' (B create 2nd)         -> extra (-1)
+        extra = -1.0 if (combo in ('aaa', 'bbb') and integ_kind in ('sB', 'qB')) else 1.0
         P = np.zeros((n_occ, n_occ, n_occ, rB_dst, rB_src))
         for x in range(n_occ):
             for y in range(n_occ):
@@ -425,7 +426,14 @@ def _contract_1A3B(H_AB, os, od, TA1, TB3, r_src, r_dst, h2_full, n_occ, n_virt,
     for spin, combo in pairs:
         TA = TA1[spin]
         TB = TB3[combo]
-        P = np.zeros((n_virt, n_virt, n_virt, rB_dst, rB_src))
+        # Same-spin combos ('aaa','bbb') cross the A/B boundary with an extra (-1)
+        # when the A-side operator acts AFTER the B operator of the SAME spin.
+        #   c2a1 'sA' (A annihilate 2nd) -> extra (-1)
+        #   c1a2 'qA' (A create 2nd)      -> extra (-1)
+        extra = -1.0 if (combo in ('aaa', 'bbb') and integ_kind in ('sA', 'qA')) else 1.0
+        # P is built from the A-side single operator (TA), so its Schmidt indices
+        # are A-side (a_dst, a_src), NOT B-side.  (rA == rB so shape mismatch was silent.)
+        P = np.zeros((n_virt, n_virt, n_virt, rA_dst, rA_src))
         for x in range(n_virt):
             for y in range(n_virt):
                 for z in range(n_virt):
@@ -452,10 +460,10 @@ def _contract_1A3B(H_AB, os, od, TA1, TB3, r_src, r_dst, h2_full, n_occ, n_virt,
                                     tb = TB[b_dst, b_src, x, y, z]
                                     if abs(tb) < 1e-14:
                                         continue
-                                    val += tb * P[x, y, z, b_dst, b_src]
+                                    val += tb * P[x, y, z, a_dst, a_src]
                         if abs(val) > 1e-14:
                             H_AB[od + a_dst * r_dst + b_dst,
-                                  os + a_src * r_src + b_src] += 0.5 * val
+                                  os + a_src * r_src + b_src] += 0.5 * extra * val
 
 
 # ═══════════════════════════════════════════════════════════════════════════
