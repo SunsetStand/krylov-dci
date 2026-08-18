@@ -620,9 +620,452 @@ def _compute_det_create1_annih2(
     return T
 
 
+def _jw_phase(dn_a, dn_b, aA_j, bA_j):
+    """Jordan-Wigner phase baked into A-side transition matrices.
+
+    A B-space operator crosses the n_σ(A) A-space σ-electrons.  Whether it
+    crosses before or after the A operators act depends on their ordering, but
+    the net effect only depends on the A-side operator's NET spin change:
+      Δn_σ = +1 (net create) -> factor (-1)^{n_σ}
+      Δn_σ = -1 (net annih)  -> factor (-1)^{n_σ - 1}
+      Δn_σ =  0              -> factor +1
+    """
+    na = aA_j.bit_count()
+    nb = bA_j.bit_count()
+    e = 0
+    if dn_a > 0:
+        e += na
+    elif dn_a < 0:
+        e += na - 1
+    if dn_b > 0:
+        e += nb
+    elif dn_b < 0:
+        e += nb - 1
+    return -1 if (e & 1) else 1
+
+
+def _compute_det_pair_creation_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT pair creation.
+
+    Returns dict {'aa','ab','ba','bb'}, each (d_dst, d_src, n_orb, n_orb):
+      T['ab'][i,j,p,q] = ⟨d_i| a†_pα a†_qβ |d_j⟩   (a†_qβ acts first, then a†_pα)
+    The spin-summed create_2 is 'aa'+'ab'+'ba'+'bb'.
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    comps = {k: np.zeros((d_dst, d_src, n_orb, n_orb))
+             for k in ('aa', 'ab', 'ba', 'bb')}
+
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        # 'aa': a†_pα a†_qα  -> create q (α) first, then p (α)
+        for q in range(n_orb):
+            ph_q, a1 = _create_sign(aA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                if p == q:
+                    continue
+                ph_p, a2 = _create_sign(a1, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a2, bA_j))
+                if i is not None:
+                    comps['aa'][i, j, p, q] = ph_q * ph_p
+
+        # 'bb': a†_pβ a†_qβ  -> create q (β) first, then p (β)
+        for q in range(n_orb):
+            ph_q, b1 = _create_sign(bA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                if p == q:
+                    continue
+                ph_p, b2 = _create_sign(b1, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((aA_j, b2))
+                if i is not None:
+                    comps['bb'][i, j, p, q] = ph_q * ph_p
+
+        # 'ab': a†_pα a†_qβ  -> create q (β) first, then p (α)
+        for q in range(n_orb):
+            ph_q, b1 = _create_sign(bA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                ph_p, a1 = _create_sign(aA_j, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a1, b1))
+                if i is not None:
+                    comps['ab'][i, j, p, q] = ph_q * ph_p
+
+        # 'ba': a†_pβ a†_qα  -> create q (α) first, then p (β)
+        for q in range(n_orb):
+            ph_q, a1 = _create_sign(aA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                ph_p, b1 = _create_sign(bA_j, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a1, b1))
+                if i is not None:
+                    comps['ba'][i, j, p, q] = ph_q * ph_p
+
+    return comps
+
+
+def _compute_det_pair_annihilation_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT pair annihilation.
+
+    Returns dict {'aa','ab','ba','bb'}, each (d_dst, d_src, n_orb, n_orb):
+      T['ab'][i,j,p,q] = ⟨d_i| a_pα a_qβ |d_j⟩   (a_qβ acts first, then a_pα)
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    comps = {k: np.zeros((d_dst, d_src, n_orb, n_orb))
+             for k in ('aa', 'ab', 'ba', 'bb')}
+
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        # 'aa': a_pα a_qα  -> annihilate q (α) first, then p (α)
+        for q in range(n_orb):
+            ph_q, a1 = _annihilate_sign(aA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                if p == q:
+                    continue
+                ph_p, a2 = _annihilate_sign(a1, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a2, bA_j))
+                if i is not None:
+                    comps['aa'][i, j, p, q] = ph_q * ph_p
+
+        # 'bb': a_pβ a_qβ  -> annihilate q (β) first, then p (β)
+        for q in range(n_orb):
+            ph_q, b1 = _annihilate_sign(bA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                if p == q:
+                    continue
+                ph_p, b2 = _annihilate_sign(b1, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((aA_j, b2))
+                if i is not None:
+                    comps['bb'][i, j, p, q] = ph_q * ph_p
+
+        # 'ab': a_pα a_qβ  -> annihilate q (β) first, then p (α)
+        for q in range(n_orb):
+            ph_q, b1 = _annihilate_sign(bA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                ph_p, a1 = _annihilate_sign(aA_j, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a1, b1))
+                if i is not None:
+                    comps['ab'][i, j, p, q] = ph_q * ph_p
+
+        # 'ba': a_pβ a_qα  -> annihilate q (α) first, then p (β)
+        for q in range(n_orb):
+            ph_q, a1 = _annihilate_sign(aA_j, q)
+            if ph_q == 0:
+                continue
+            for p in range(n_orb):
+                ph_p, b1 = _annihilate_sign(bA_j, p)
+                if ph_p == 0:
+                    continue
+                i = a_index_dst.get((a1, b1))
+                if i is not None:
+                    comps['ba'][i, j, p, q] = ph_q * ph_p
+
+    return comps
+
+
+def _compute_det_create2_annih1_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT create2+annih1 (n -> n+1).
+
+    Returns dict of 6 combos {'aaa','aba','abb','bab','baa','bbb'}, each
+    (d_dst, d_src, n_orb, n_orb, n_orb):
+      T['abb'][i,j,p,q,r] = ⟨d_i| a†_pα a†_qβ a_rβ |d_j⟩
+    (a_rβ acts first, then a†_qβ, then a†_pα).
+    Combos (create1, create2, annih):
+      aaa=(α,α,α) aba=(α,β,α) abb=(α,β,β) bab=(β,α,β) baa=(β,α,α) bbb=(β,β,β)
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    keys = ('aaa', 'aba', 'abb', 'bab', 'baa', 'bbb')
+    comps = {k: np.zeros((d_dst, d_src, n_orb, n_orb, n_orb)) for k in keys}
+
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        # aaa: annih r(α), create q(α), create p(α)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a2 = _create_sign(a1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a3 = _create_sign(a2, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a3, bA_j))
+                    if i is not None:
+                        comps['aaa'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # aba: annih r(α), create q(β), create p(α)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b1 = _create_sign(bA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a2 = _create_sign(a1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a2, b1))
+                    if i is not None:
+                        comps['aba'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # abb: annih r(β), create q(β), create p(α)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b2 = _create_sign(b1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a1 = _create_sign(aA_j, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a1, b2))
+                    if i is not None:
+                        comps['abb'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # bab: annih r(β), create q(α), create p(β)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a1 = _create_sign(aA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b2 = _create_sign(b1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a1, b2))
+                    if i is not None:
+                        comps['bab'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # baa: annih r(α), create q(α), create p(β)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a2 = _create_sign(a1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b1 = _create_sign(bA_j, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a2, b1))
+                    if i is not None:
+                        comps['baa'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # bbb: annih r(β), create q(β), create p(β)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b2 = _create_sign(b1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b3 = _create_sign(b2, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((aA_j, b3))
+                    if i is not None:
+                        comps['bbb'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+    return comps
+
+
+def _compute_det_create1_annih2_explicit(
+    a_dets_src: List[Tuple[int, int]],
+    a_dets_dst: List[Tuple[int, int]],
+    a_index_dst: Dict[Tuple[int, int], int],
+    n_orb: int,
+) -> Dict[str, np.ndarray]:
+    """Spin-EXPLICIT create1+annih2 (n -> n-1).
+
+    Returns dict of 6 combos {'aaa','aab','aba','bab','bba','bbb'}, each
+    (d_dst, d_src, n_orb, n_orb, n_orb):
+      T['aab'][i,j,p,q,r] = ⟨d_i| a†_pα a_qα a_rβ |d_j⟩
+    (a_rβ acts first, then a_qα, then a†_pα).
+    Combos (create, annih1, annih2):
+      aaa=(α,α,α) aab=(α,α,β) aba=(α,β,α) bab=(β,α,β) bba=(β,β,α) bbb=(β,β,β)
+    """
+    d_dst = len(a_dets_dst)
+    d_src = len(a_dets_src)
+    keys = ('aaa', 'aab', 'aba', 'bab', 'bba', 'bbb')
+    comps = {k: np.zeros((d_dst, d_src, n_orb, n_orb, n_orb)) for k in keys}
+
+    for j, (aA_j, bA_j) in enumerate(a_dets_src):
+        # aaa: annih r(α), annih q(α), create p(α)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a2 = _annihilate_sign(a1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a3 = _create_sign(a2, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a3, bA_j))
+                    if i is not None:
+                        comps['aaa'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # aab: annih r(β), annih q(α), create p(α)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a1 = _annihilate_sign(aA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a2 = _create_sign(a1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a2, b1))
+                    if i is not None:
+                        comps['aab'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # aba: annih r(α), annih q(β), create p(α)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b1 = _annihilate_sign(bA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, a2 = _create_sign(a1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a2, b1))
+                    if i is not None:
+                        comps['aba'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # bab: annih r(β), annih q(α), create p(β)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, a1 = _annihilate_sign(aA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b2 = _create_sign(b1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a1, b2))
+                    if i is not None:
+                        comps['bab'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # bba: annih r(α), annih q(β), create p(β)
+        for r in range(n_orb):
+            ph_r, a1 = _annihilate_sign(aA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b1 = _annihilate_sign(bA_j, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b2 = _create_sign(b1, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((a1, b2))
+                    if i is not None:
+                        comps['bba'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+        # bbb: annih r(β), annih q(β), create p(β)
+        for r in range(n_orb):
+            ph_r, b1 = _annihilate_sign(bA_j, r)
+            if ph_r == 0:
+                continue
+            for q in range(n_orb):
+                ph_q, b2 = _annihilate_sign(b1, q)
+                if ph_q == 0:
+                    continue
+                for p in range(n_orb):
+                    ph_p, b3 = _create_sign(b2, p)
+                    if ph_p == 0:
+                        continue
+                    i = a_index_dst.get((aA_j, b3))
+                    if i is not None:
+                        comps['bbb'][i, j, p, q, r] = ph_r * ph_q * ph_p
+
+    return comps
+
+
 def _transform_3body_to_schmidt(T_det, U_dst, U_src):
     """Transform 3-body transition to Schmidt basis."""
     return np.einsum('ijpqr,ia,jg->agpqr', T_det, U_dst, U_src)
+
+
+def _apply_jw_phase_A(comp, dn_table, dets_n):
+    """Bake the Jordan-Wigner phase into A-side spin-explicit transition matrices.
+
+    comp: dict combo -> ndarray (d_dst, d_src, ...)  (mutated in place)
+    dn_table: dict combo -> (dn_alpha, dn_beta) net spin change of the A operator
+    dets_n: list of (alpha_str, beta_str) source determinants (columns)
+    """
+    for j, (aA_j, bA_j) in enumerate(dets_n):
+        for k, (dn_a, dn_b) in dn_table.items():
+            if _jw_phase(dn_a, dn_b, aA_j, bA_j) == -1:
+                comp[k][:, j] *= -1
+    return comp
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -674,10 +1117,18 @@ class TransitionMatrices:
     trans_1_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
     create_2: Dict[int, np.ndarray] = field(default_factory=dict)
     annihilate_2: Dict[int, np.ndarray] = field(default_factory=dict)
+    # Spin-explicit pair creation/annihilation: n_A -> {'aa','ab','ba','bb'} -> (r_dst,r_src,n_orb,n_orb)
+    create_2_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
+    annihilate_2_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
     # 3-body: create 2 + annihilate 1 (n→n+1): ⟨α| a_p† a_q† a_r |γ⟩
     create2_annih1: Dict[int, np.ndarray] = field(default_factory=dict)
     # 3-body: create 1 + annihilate 2 (n→n-1): ⟨α| a_p† a_q a_r |γ⟩
     create1_annih2: Dict[int, np.ndarray] = field(default_factory=dict)
+    # Spin-explicit 3-body: n_A -> combo -> (r_dst,r_src,n_orb,n_orb,n_orb)
+    #   create2_annih1 combos: aaa,aba,abb,bab,baa,bbb
+    #   create1_annih2 combos: aaa,aab,aba,bab,bba,bbb
+    create2_annih1_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
+    create1_annih2_explicit: Dict[int, Dict[str, np.ndarray]] = field(default_factory=dict)
     U_blocks: Dict[int, np.ndarray] = field(default_factory=dict)
     r_blocks: Dict[int, int] = field(default_factory=dict)
 
@@ -840,6 +1291,13 @@ def compute_transition_matrices(
 
             T_det = _compute_det_pair_creation(dets_n, dets_dst, idx_dst, n_orb)
             result.create_2[n_A] = _transform_2body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_pair_creation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                _apply_jw_phase_A(T_exp, {'ab': (1, 1), 'ba': (1, 1)}, dets_n)
+            result.create_2_explicit[n_A] = {
+                k: _transform_2body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('aa', 'ab', 'ba', 'bb')
+            }
 
         # ── Pair annihilation ──
         blk_annih2_dst = partition.get(n_A + dk2_annih)
@@ -856,6 +1314,13 @@ def compute_transition_matrices(
 
             T_det = _compute_det_pair_annihilation(dets_n, dets_dst, idx_dst, n_orb)
             result.annihilate_2[n_A] = _transform_2body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_pair_annihilation_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                _apply_jw_phase_A(T_exp, {'ab': (-1, -1), 'ba': (-1, -1)}, dets_n)
+            result.annihilate_2_explicit[n_A] = {
+                k: _transform_2body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('aa', 'ab', 'ba', 'bb')
+            }
 
         # ── 3-body: create 2 + annihilate 1 (n → n+1) ──
         blk_3b_dst = partition.get(n_A + dk_create)  # same direction as single creation
@@ -871,6 +1336,16 @@ def compute_transition_matrices(
                 U_dst = sd_3b_dst['V']
             T_det = _compute_det_create2_annih1(dets_n, dets_dst, idx_dst, n_orb)
             result.create2_annih1[n_A] = _transform_3body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_create2_annih1_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                _apply_jw_phase_A(T_exp, {
+                    'aaa': (1, 0), 'aba': (0, 1), 'abb': (1, 0),
+                    'bab': (1, 0), 'baa': (0, 1), 'bbb': (0, 1),
+                }, dets_n)
+            result.create2_annih1_explicit[n_A] = {
+                k: _transform_3body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('aaa', 'aba', 'abb', 'bab', 'baa', 'bbb')
+            }
 
         # ── 3-body: create 1 + annihilate 2 (n → n-1) ──
         blk_3b2_dst = partition.get(n_A + dk_annih)
@@ -886,6 +1361,16 @@ def compute_transition_matrices(
                 U_dst = sd_3b2_dst['V']
             T_det = _compute_det_create1_annih2(dets_n, dets_dst, idx_dst, n_orb)
             result.create1_annih2[n_A] = _transform_3body_to_schmidt(T_det, U_dst, U)
+            T_exp = _compute_det_create1_annih2_explicit(dets_n, dets_dst, idx_dst, n_orb)
+            if subspace == 'A':
+                _apply_jw_phase_A(T_exp, {
+                    'aaa': (-1, 0), 'aab': (0, -1), 'aba': (0, -1),
+                    'bab': (-1, 0), 'bba': (-1, 0), 'bbb': (0, -1),
+                }, dets_n)
+            result.create1_annih2_explicit[n_A] = {
+                k: _transform_3body_to_schmidt(T_exp[k], U_dst, U)
+                for k in ('aaa', 'aab', 'aba', 'bab', 'bba', 'bbb')
+            }
 
     if verbose:
         elapsed = time.perf_counter() - t0

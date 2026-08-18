@@ -207,81 +207,83 @@ def _add_pair_transfer_complementary(
     H_AB, block_offsets, n_A, trans_A, trans_B,
     h2_full, n_occ, n_act, n_virt
 ):
-    """Term (a): ½ Σ_{ik∈A} A_{ik} ⊗ P_{ik}^B + h.c.
+    """2e pair transfer (2A+2B, n_A → n_A ± 2), spin-explicit.
 
-    A_{ik} = a_i† a_k† (pair creation on A)
-    P_{ik}^B = Σ_{jl∈B} v_{ijkl} a_l a_j (pair annihilation on B, weighted)
+    n_A → n_A+2:  ½ Σ_{ik∈A} Σ_{jl∈B} Σ_{στ} (ik|jl) c2_A[σ,τ][i,k] · a2_B[τ,σ][l,j]
+    n_A → n_A-2:  ½ Σ_{jl∈B} Σ_{ik∈A} Σ_{στ} (jl|ik) a2_A[τ,σ][k,i] · c2_B[σ,τ][j,l]
 
-    n_A → n_A+2: TA.create_2 × P_B (direct)
-    n_A → n_A-2: TA.annihilate_2 × P_B† (Hermitian conjugate)
+    Spin pairing A[s1,s2] ↔ B[s2,s1]: aa↔aa, ab↔ba, ba↔ab, bb↔bb.
     """
-    # n_A → n_A+2
-    TA_cre = trans_A.create_2.get(n_A)
-    TB_ann = trans_B.annihilate_2.get(n_A)
-    sd_src = block_offsets.get(n_A)
-    sd_dst = block_offsets.get(n_A + 2)
-    if TA_cre is not None and TB_ann is not None and sd_src is not None and sd_dst is not None:
-        r_dst_A, r_src_A, nA_orb, _ = TA_cre.shape
-        r_dst_B, r_src_B = TB_ann.shape[0], TB_ann.shape[1]
+    spin_pairs = [('aa', 'aa'), ('ab', 'ba'), ('ba', 'ab'), ('bb', 'bb')]
 
-        # P[i,k,b_dst,b_src] = Σ_{j,l∈B} h2_full[i,j_B,k,l_B] × TB_ann[b_dst,b_src,j,l]
-        P = np.zeros((n_occ, n_occ, r_dst_B, r_src_B))
-        for i in range(n_occ):
-            for k in range(n_occ):
-                for j in range(n_virt):
-                    for l_idx in range(n_virt):
-                        v = h2_full[i, j + n_occ, k, l_idx + n_occ]
-                        if abs(v) < 1e-14:
-                            continue
-                        # TB_ann[b_dst,b_src,j,l] = ⟨b_dst| a_l a_j |b_src⟩
-                        P[i, k] += 0.5 * v * TB_ann[:, :, j, l_idx]
+    # ---- n_A → n_A + 2 : A creates 2, B annihilates 2 ----
+    c2_A = trans_A.create_2_explicit.get(n_A)
+    a2_B = trans_B.annihilate_2_explicit.get(n_A)
+    os = block_offsets.get(n_A)
+    od = block_offsets.get(n_A + 2)
+    if c2_A is not None and a2_B is not None and os is not None and od is not None:
+        r_src = c2_A['aa'].shape[1]
+        r_dst = c2_A['aa'].shape[0]
+        for sA, sB in spin_pairs:
+            TA = c2_A[sA]
+            TB = a2_B[sB]
+            rB_dst, rB_src = TB.shape[0], TB.shape[1]
+            # P[i,k,b_dst,b_src] = Σ_{j,l∈B} (ik|jl) · TB[b_dst,b_src,l,j]
+            P = np.zeros((n_occ, n_occ, rB_dst, rB_src))
+            for i in range(n_occ):
+                for k in range(n_occ):
+                    for j in range(n_virt):
+                        for l in range(n_virt):
+                            v = h2_full[i, j + n_occ, k, l + n_occ]
+                            if abs(v) < 1e-14:
+                                continue
+                            P[i, k] += v * TB[:, :, l, j]
+            _contract_pair_block(H_AB, os, od, TA, P, r_src, r_dst, 0.5)
 
-        _contract_pair(H_AB, sd_src, sd_dst,
-                       r_dst_A, r_src_A, r_dst_B, r_src_B,
-                       TA_cre, P, n_occ)
-
-    # n_A → n_A-2 (Hermitian conjugate: TA.annihilate_2 × P_B†)
-    TA_ann = trans_A.annihilate_2.get(n_A)
-    TB_cre = trans_B.create_2.get(n_A)
-    sd_src2 = block_offsets.get(n_A)
-    sd_dst2 = block_offsets.get(n_A - 2)
-    if TA_ann is not None and TB_cre is not None and sd_src2 is not None and sd_dst2 is not None:
-        r_dst_A, r_src_A = TA_ann.shape[0], TA_ann.shape[1]
-        r_dst_B, r_src_B = TB_cre.shape[0], TB_cre.shape[1]
-
-        # Pdag[i,k,b_dst,b_src] = Σ_{j,l∈B} h2_full[i,j_B,k,l_B] × TB_cre[b_dst,b_src,j,l]
-        Pdag = np.zeros((n_occ, n_occ, r_dst_B, r_src_B))
-        for i in range(n_occ):
-            for k in range(n_occ):
-                for j in range(n_virt):
-                    for l_idx in range(n_virt):
-                        v = h2_full[i, j + n_occ, k, l_idx + n_occ]
-                        if abs(v) < 1e-14:
-                            continue
-                        Pdag[i, k] += 0.5 * v * TB_cre[:, :, j, l_idx]
-
-        _contract_pair(H_AB, sd_src2, sd_dst2,
-                       r_dst_A, r_src_A, r_dst_B, r_src_B,
-                       TA_ann, Pdag, n_occ)
+    # ---- n_A → n_A - 2 : A annihilates 2, B creates 2 ----
+    a2_A = trans_A.annihilate_2_explicit.get(n_A)
+    c2_B = trans_B.create_2_explicit.get(n_A)
+    os2 = block_offsets.get(n_A)
+    od2 = block_offsets.get(n_A - 2)
+    if a2_A is not None and c2_B is not None and os2 is not None and od2 is not None:
+        r_src = a2_A['aa'].shape[1]
+        r_dst = a2_A['aa'].shape[0]
+        for sA, sB in spin_pairs:
+            TA = a2_A[sA]   # [a_dst, a_src, k, i]
+            TB = c2_B[sB]   # [b_dst, b_src, j, l]
+            rB_dst, rB_src = TB.shape[0], TB.shape[1]
+            # P[k,i,b_dst,b_src] = Σ_{j,l∈B} (jl|ik) · TB[b_dst,b_src,j,l]
+            P = np.zeros((n_occ, n_occ, rB_dst, rB_src))
+            for i in range(n_occ):
+                for k in range(n_occ):
+                    for j in range(n_virt):
+                        for l in range(n_virt):
+                            v = h2_full[j + n_occ, i, l + n_occ, k]
+                            if abs(v) < 1e-14:
+                                continue
+                            P[k, i] += v * TB[:, :, j, l]
+            _contract_pair_block(H_AB, os2, od2, TA, P, r_src, r_dst, 0.5)
 
 
-def _contract_pair(H_AB, os, od, rA_dst, rA_src, rB_dst, rB_src, TA, PB, n_indices):
-    """H_AB[α_dst,β_dst, α_src,β_src] += Σ_{i,k} TA[α_dst,α_src,i,k] × PB[i,k,β_dst,β_src]."""
+def _contract_pair_block(H_AB, os, od, TA, P, r_src, r_dst, sign):
+    """H_AB[od+a_dst*r_dst+b_dst, os+a_src*r_src+b_src] += sign·Σ_{i,k} TA[a_dst,a_src,i,k]·P[i,k,b_dst,b_src]."""
+    rA_dst, rA_src = TA.shape[0], TA.shape[1]
+    n_i, n_k = P.shape[0], P.shape[1]
+    rB_dst, rB_src = P.shape[2], P.shape[3]
     for a_dst in range(rA_dst):
         for a_src in range(rA_src):
             for b_dst in range(rB_dst):
                 for b_src in range(rB_src):
                     val = 0.0
-                    for i in range(n_indices):
-                        for k in range(n_indices):
+                    for i in range(n_i):
+                        for k in range(n_k):
                             ta = TA[a_dst, a_src, i, k]
                             if abs(ta) < 1e-14:
                                 continue
-                            val += ta * PB[i, k, b_dst, b_src]
+                            val += ta * P[i, k, b_dst, b_src]
                     if abs(val) > 1e-14:
-                        s = os + a_src * rB_src + b_src
-                        d = od + a_dst * rB_dst + b_dst
-                        H_AB[d, s] += val
+                        H_AB[od + a_dst * r_dst + b_dst,
+                              os + a_src * r_src + b_src] += sign * val
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -292,213 +294,168 @@ def _add_3body_patterns(
     H_AB, block_offsets, n_A,
     trans_A, trans_B, h2_full, n_occ, n_act, n_virt
 ):
-    """3A+1B (n_A→n_A+1 with 3 A ops) and 3A+1B-rev (n_A→n_A-1)."""
-    TA3 = trans_A.create2_annih1.get(n_A)
-    TB1 = trans_B.annihilate_1.get(n_A)
-    if TA3 is not None and TB1 is not None:
-        _contract_3body(H_AB, block_offsets, n_A, n_A + 1,
-                        TA3, TB1, h2_full, n_occ, n_act, n_virt)
+    """3A+1B (n_A→n_A±1): A-side 3-body op, B-side single op (spin-explicit)."""
+    # n_A → n_A+1 : A create2_annih1, B annihilate_1
+    TA3 = trans_A.create2_annih1_explicit.get(n_A)
+    TB1 = trans_B.annihilate_1_explicit.get(n_A)
+    os = block_offsets.get(n_A)
+    od = block_offsets.get(n_A + 1)
+    if TA3 is not None and TB1 is not None and os is not None and od is not None:
+        r_src = TA3['aaa'].shape[1]
+        r_dst = TA3['aaa'].shape[0]
+        _contract_3A1B(H_AB, os, od, TA3, TB1, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('aaa', 'a'), ('abb', 'a'), ('baa', 'b'), ('bbb', 'b')], 'rB')
+        _contract_3A1B(H_AB, os, od, TA3, TB1, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('aaa', 'a'), ('aba', 'b'), ('bab', 'a'), ('bbb', 'b')], 'sB')
 
-    TA3b = trans_A.create1_annih2.get(n_A)
-    TB1b = trans_B.create_1.get(n_A)
-    if TA3b is not None and TB1b is not None:
-        _contract_3body(H_AB, block_offsets, n_A, n_A - 1,
-                        TA3b, TB1b, h2_full, n_occ, n_act, n_virt, swap=True)
+    # n_A → n_A-1 : A create1_annih2, B create_1
+    TA3b = trans_A.create1_annih2_explicit.get(n_A)
+    TB1b = trans_B.create_1_explicit.get(n_A)
+    os2 = block_offsets.get(n_A)
+    od2 = block_offsets.get(n_A - 1)
+    if TA3b is not None and TB1b is not None and os2 is not None and od2 is not None:
+        r_src = TA3b['aaa'].shape[1]
+        r_dst = TA3b['aaa'].shape[0]
+        _contract_3A1B(H_AB, os2, od2, TA3b, TB1b, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('aaa', 'a'), ('bba', 'a'), ('aab', 'b'), ('bbb', 'b')], 'pB')
+        _contract_3A1B(H_AB, os2, od2, TA3b, TB1b, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('aaa', 'a'), ('aba', 'b'), ('bab', 'a'), ('bbb', 'b')], 'qB')
 
 
 def _add_1a3b_patterns(
     H_AB, block_offsets, n_A,
     trans_A, trans_B, h2_full, n_occ, n_act, n_virt
 ):
-    """1A+3B (1 A op + 3 B ops, n_A→n_A±1)."""
-    cre_A = trans_A.create_1.get(n_A)
-    cre1_ann2_B = trans_B.create1_annih2.get(n_A)
-    if cre_A is not None and cre1_ann2_B is not None:
-        _contract_1a3b(
-            H_AB, block_offsets, n_A, n_A + 1,
-            cre_A, cre1_ann2_B, h2_full, n_occ, n_act, n_virt,
-            sign=1, net_A_create=True
-        )
+    """1A+3B (n_A→n_A±1): A-side single op, B-side 3-body op (spin-explicit)."""
+    # n_A → n_A+1 : A create_1, B create1_annih2
+    cre_A = trans_A.create_1_explicit.get(n_A)
+    c1a2_B = trans_B.create1_annih2_explicit.get(n_A)
+    os = block_offsets.get(n_A)
+    od = block_offsets.get(n_A + 1)
+    if cre_A is not None and c1a2_B is not None and os is not None and od is not None:
+        r_src = cre_A['a'].shape[1]
+        r_dst = cre_A['a'].shape[0]
+        _contract_1A3B(H_AB, os, od, cre_A, c1a2_B, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('a', 'aaa'), ('a', 'bba'), ('b', 'aab'), ('b', 'bbb')], 'pA')
+        _contract_1A3B(H_AB, os, od, cre_A, c1a2_B, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('a', 'aaa'), ('b', 'aba'), ('a', 'bab'), ('b', 'bbb')], 'qA')
 
-    ann_A = trans_A.annihilate_1.get(n_A)
-    cre2_ann1_B = trans_B.create2_annih1.get(n_A)
-    if ann_A is not None and cre2_ann1_B is not None:
-        _contract_1a3b(
-            H_AB, block_offsets, n_A, n_A - 1,
-            ann_A, cre2_ann1_B, h2_full, n_occ, n_act, n_virt,
-            sign=1, net_A_create=False
-        )
+    # n_A → n_A-1 : A annihilate_1, B create2_annih1
+    ann_A = trans_A.annihilate_1_explicit.get(n_A)
+    c2a1_B = trans_B.create2_annih1_explicit.get(n_A)
+    os2 = block_offsets.get(n_A)
+    od2 = block_offsets.get(n_A - 1)
+    if ann_A is not None and c2a1_B is not None and os2 is not None and od2 is not None:
+        r_src = ann_A['a'].shape[1]
+        r_dst = ann_A['a'].shape[0]
+        _contract_1A3B(H_AB, os2, od2, ann_A, c2a1_B, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('a', 'aaa'), ('a', 'abb'), ('b', 'baa'), ('b', 'bbb')], 'rA')
+        _contract_1A3B(H_AB, os2, od2, ann_A, c2a1_B, r_src, r_dst, h2_full, n_occ, n_virt,
+                       [('a', 'aaa'), ('b', 'aba'), ('a', 'bab'), ('b', 'bbb')], 'sA')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Low-level contraction helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _contract_3body(H_AB, block_offsets, n_A_src, n_A_dst,
-                    TA, TB, h2_full, n_occ, n_act, n_virt, swap=False):
-    """Contract 3A+1B (swap=False) or rev (swap=True)."""
-    os = block_offsets.get(n_A_src)
-    od = block_offsets.get(n_A_dst)
-    if os is None or od is None:
-        return
+def _contract_3A1B(H_AB, os, od, TA3, TB1, r_src, r_dst, h2_full, n_occ, n_virt,
+                   pairs, integ_kind):
+    """Contract 3A+1B: A-side 3-body (TA3: combo→5D), B-side single (TB1: spin→3D).
 
-    r_dA, r_sA = TA.shape[0], TA.shape[1]
-    r_dB, r_sB = TB.shape[0], TB.shape[1]
-    nA = TA.shape[2]
-    nB = TB.shape[2]
-
-    if swap:
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for p in range(nA):
-                            for q in range(nA):
-                                for r in range(nA):
-                                    ta = TA[a_dst, a_src, p, q, r]
-                                    if abs(ta) < 1e-15:
+    integ_kind selects the B-orbital slot in (p,q,r,s):
+      'rB': B=3rd slot, A indices (p,q,s)  — c2a1, n→n+1
+      'sB': B=4th slot, A indices (p,q,r)  — c2a1, n→n+1
+      'pB': B=1st slot, A indices (q,s,r)  — c1a2, n→n-1
+      'qB': B=2nd slot, A indices (p,s,r)  — c1a2, n→n-1
+    """
+    rA_dst, rA_src = TA3['aaa'].shape[0], TA3['aaa'].shape[1]
+    rB_dst, rB_src = TB1['a'].shape[0], TB1['a'].shape[1]
+    for combo, spin in pairs:
+        TA = TA3[combo]
+        TB = TB1[spin]
+        # Same-spin combos ('aaa','bbb') in the 'sB' sub-case (c2a1, B annihilate SECOND):
+        # the B operator crosses one fewer A electron because the A-side annihilated the
+        # SAME spin first.  Extra (-1) only for this sub-case.
+        extra = -1.0 if (combo in ('aaa', 'bbb') and integ_kind == 'sB') else 1.0
+        P = np.zeros((n_occ, n_occ, n_occ, rB_dst, rB_src))
+        for x in range(n_occ):
+            for y in range(n_occ):
+                for z in range(n_occ):
+                    for b in range(n_virt):
+                        if integ_kind == 'rB':
+                            v = h2_full[x, b + n_occ, y, z]
+                        elif integ_kind == 'sB':
+                            v = h2_full[x, z, y, b + n_occ]
+                        elif integ_kind == 'pB':
+                            v = h2_full[b + n_occ, z, x, y]
+                        else:  # 'qB'
+                            v = h2_full[x, z, b + n_occ, y]
+                        if abs(v) < 1e-14:
+                            continue
+                        P[x, y, z] += v * TB[:, :, b]
+        for a_dst in range(rA_dst):
+            for a_src in range(rA_src):
+                for b_dst in range(rB_dst):
+                    for b_src in range(rB_src):
+                        val = 0.0
+                        for x in range(n_occ):
+                            for y in range(n_occ):
+                                for z in range(n_occ):
+                                    ta = TA[a_dst, a_src, x, y, z]
+                                    if abs(ta) < 1e-14:
                                         continue
-                                    for s in range(nB):
-                                        tb = TB[b_dst, b_src, s]
-                                        if abs(tb) < 1e-15:
-                                            continue
-                                        integ = 0.5 * h2_full[p, s + n_occ, q, r]
-                                        v += integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
-    else:
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for p in range(nA):
-                            for q in range(nA):
-                                for r in range(nA):
-                                    ta = TA[a_dst, a_src, p, q, r]
-                                    if abs(ta) < 1e-15:
+                                    val += ta * P[x, y, z, b_dst, b_src]
+                        if abs(val) > 1e-14:
+                            H_AB[od + a_dst * r_dst + b_dst,
+                                  os + a_src * r_src + b_src] += 0.5 * extra * val
+
+
+def _contract_1A3B(H_AB, os, od, TA1, TB3, r_src, r_dst, h2_full, n_occ, n_virt,
+                   pairs, integ_kind):
+    """Contract 1A+3B: A-side single (TA1: spin→3D), B-side 3-body (TB3: combo→5D).
+
+    integ_kind selects the A-orbital slot in (p,q,r,s):
+      'pA': A=1st slot, B indices (q,s,r)  — c1a2, n→n+1
+      'qA': A=2nd slot, B indices (p,s,r)  — c1a2, n→n+1
+      'rA': A=3rd slot, B indices (p,q,s)  — c2a1, n→n-1
+      'sA': A=4th slot, B indices (p,q,r)  — c2a1, n→n-1
+    """
+    rA_dst, rA_src = TA1['a'].shape[0], TA1['a'].shape[1]
+    rB_dst, rB_src = TB3['aaa'].shape[0], TB3['aaa'].shape[1]
+    for spin, combo in pairs:
+        TA = TA1[spin]
+        TB = TB3[combo]
+        P = np.zeros((n_virt, n_virt, n_virt, rB_dst, rB_src))
+        for x in range(n_virt):
+            for y in range(n_virt):
+                for z in range(n_virt):
+                    for a in range(n_occ):
+                        if integ_kind == 'pA':
+                            v = h2_full[a, z + n_occ, x + n_occ, y + n_occ]
+                        elif integ_kind == 'qA':
+                            v = h2_full[x + n_occ, z + n_occ, a, y + n_occ]
+                        elif integ_kind == 'rA':
+                            v = h2_full[x + n_occ, a, y + n_occ, z + n_occ]
+                        else:  # 'sA'
+                            v = h2_full[x + n_occ, z + n_occ, y + n_occ, a]
+                        if abs(v) < 1e-14:
+                            continue
+                        P[x, y, z] += v * TA[:, :, a]
+        for a_dst in range(rA_dst):
+            for a_src in range(rA_src):
+                for b_dst in range(rB_dst):
+                    for b_src in range(rB_src):
+                        val = 0.0
+                        for x in range(n_virt):
+                            for y in range(n_virt):
+                                for z in range(n_virt):
+                                    tb = TB[b_dst, b_src, x, y, z]
+                                    if abs(tb) < 1e-14:
                                         continue
-                                    for s in range(nB):
-                                        tb = TB[b_dst, b_src, s]
-                                        if abs(tb) < 1e-15:
-                                            continue
-                                        integ = 0.5 * h2_full[p, q, s + n_occ, r]
-                                        v += integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
-
-
-def _contract_1a3b(H_AB, block_offsets, n_A_src, n_A_dst,
-                   TA, TB, h2_full, n_occ, n_act, n_virt,
-                   sign, net_A_create):
-    """Contract 1A+3B."""
-    os = block_offsets.get(n_A_src)
-    od = block_offsets.get(n_A_dst)
-    if os is None or od is None:
-        return
-
-    r_dA, r_sA = TA.shape[0], TA.shape[1]
-    nA_orb = TA.shape[2]
-    r_dB, r_sB = TB.shape[0], TB.shape[1]
-    nB_orb = TB.shape[2]
-
-    if net_A_create:
-        # Sub-case 1: p ∈ A, (q,s,r) ∈ B
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for p_sub in range(nA_orb):
-                            ta = TA[a_dst, a_src, p_sub]
-                            if abs(ta) < 1e-15: continue
-                            for qb in range(nB_orb):
-                                for sb in range(nB_orb):
-                                    for rb in range(nB_orb):
-                                        tb = TB[b_dst, b_src, qb, sb, rb]
-                                        if abs(tb) < 1e-15: continue
-                                        integ = 0.5 * h2_full[
-                                            p_sub, qb + n_occ,
-                                            rb + n_occ, sb + n_occ]
-                                        v += sign * integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
-
-        # Sub-case 2: q ∈ A, (p,s,r) ∈ B
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for q_sub in range(nA_orb):
-                            ta = TA[a_dst, a_src, q_sub]
-                            if abs(ta) < 1e-15: continue
-                            for pb in range(nB_orb):
-                                for sb in range(nB_orb):
-                                    for rb in range(nB_orb):
-                                        tb = TB[b_dst, b_src, pb, sb, rb]
-                                        if abs(tb) < 1e-15: continue
-                                        integ = 0.5 * h2_full[
-                                            pb + n_occ, q_sub,
-                                            rb + n_occ, sb + n_occ]
-                                        v += sign * integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
-    else:
-        # Sub-case 1: r ∈ A, (p,q,s) ∈ B
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for r_sub in range(nA_orb):
-                            ta = TA[a_dst, a_src, r_sub]
-                            if abs(ta) < 1e-15: continue
-                            for pb in range(nB_orb):
-                                for qb in range(nB_orb):
-                                    for sb in range(nB_orb):
-                                        tb = TB[b_dst, b_src, pb, qb, sb]
-                                        if abs(tb) < 1e-15: continue
-                                        integ = 0.5 * h2_full[
-                                            pb + n_occ, qb + n_occ,
-                                            sb + n_occ, r_sub]
-                                        v += sign * integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
-
-        # Sub-case 2: s ∈ A, (p,q,r) ∈ B
-        for a_dst in range(r_dA):
-            for a_src in range(r_sA):
-                for b_dst in range(r_dB):
-                    for b_src in range(r_sB):
-                        v = 0.0
-                        for s_sub in range(nA_orb):
-                            ta = TA[a_dst, a_src, s_sub]
-                            if abs(ta) < 1e-15: continue
-                            for pb in range(nB_orb):
-                                for qb in range(nB_orb):
-                                    for rb in range(nB_orb):
-                                        tb = TB[b_dst, b_src, pb, qb, rb]
-                                        if abs(tb) < 1e-15: continue
-                                        integ = 0.5 * h2_full[
-                                            pb + n_occ, qb + n_occ,
-                                            rb + n_occ, s_sub]
-                                        v += sign * integ * ta * tb
-                        if abs(v) > 1e-15:
-                            s = os + a_src * r_sA + b_src
-                            d = od + a_dst * r_dA + b_dst
-                            H_AB[d, s] += v
+                                    val += tb * P[x, y, z, b_dst, b_src]
+                        if abs(val) > 1e-14:
+                            H_AB[od + a_dst * r_dst + b_dst,
+                                  os + a_src * r_src + b_src] += 0.5 * val
 
 
 # ═══════════════════════════════════════════════════════════════════════════
