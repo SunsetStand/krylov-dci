@@ -14,7 +14,7 @@ export OMP_NUM_THREADS=16
 export MKL_NUM_THREADS=16
 export OPENBLAS_NUM_THREADS=16
 
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/phaseA_cas10_v10_sacis.py \
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts/archived/phaseA_cas10_v10_sacis.py \
     --P 400,800,1200,2000 \
     --m-max 1 \
     --tag sacis_m1

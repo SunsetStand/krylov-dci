@@ -8,7 +8,7 @@ Tests different (A₀, B₀, B_t, eps_svd) configurations and outputs:
   - Summary: compression ratios, dimension evolution, error convergence
 
 Usage:
-    python scripts_new/run_growing_cas_sweep.py --config-id 0 --output-dir ./results/sweep_xxx
+    python scripts/archived/run_growing_cas_sweep.py --config-id 0 --output-dir ./results/sweep_xxx
 """
 
 import sys, os, time, json, argparse

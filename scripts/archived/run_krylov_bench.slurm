@@ -17,5 +17,5 @@ mkdir -p logs
 
 echo "===== Krylov + Per-State Bloch Benchmark ====="
 echo "Started at $(date)"
-$PYTHON scripts_new/step3_bloch_krylov.py
+$PYTHON scripts/archived/step3_bloch_krylov.py
 echo "Done at $(date)"

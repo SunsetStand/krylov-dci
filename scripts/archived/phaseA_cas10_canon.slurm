@@ -14,7 +14,7 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
 
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/phaseA_cas10_svd.py \
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts/archived/phaseA_cas10_svd.py \
     --P 400,800,1600,2000 \
     --m-max 1 \
     --tag cas10_canon

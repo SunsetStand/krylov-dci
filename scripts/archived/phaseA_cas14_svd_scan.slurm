@@ -16,6 +16,6 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
 
-python scripts_new/phaseA_cas14_svd_scan.py --P 200,400,800,1600,3200 --svd-threshold 1e-3
+python scripts/archived/phaseA_cas14_svd_scan.py --P 200,400,800,1600,3200 --svd-threshold 1e-3
 
 echo "Done: $(date)"

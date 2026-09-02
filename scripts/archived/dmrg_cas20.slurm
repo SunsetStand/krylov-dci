@@ -10,4 +10,4 @@
 #SBATCH --error=/data/home/wangcx/krylov-dci/slurm_outputs/dmrg_c20_%j.err
 
 export OMP_NUM_THREADS=8
-/data/home/wangcx/LiYF4_Er3+/env/bin/python /data/home/wangcx/krylov-dci/scripts_new/dmrg_cas20.py
+/data/home/wangcx/LiYF4_Er3+/env/bin/python /data/home/wangcx/krylov-dci/scripts/archived/dmrg_cas20.py

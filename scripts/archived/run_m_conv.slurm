@@ -13,5 +13,5 @@ PYTHON=/data/home/wangcx/LiYF4_Er3+/env/bin/python
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTHONUNBUFFERED=1
 mkdir -p logs
-$PYTHON scripts_new/test_m_convergence.py
+$PYTHON scripts/archived/test_m_convergence.py
 echo "Done at $(date)"

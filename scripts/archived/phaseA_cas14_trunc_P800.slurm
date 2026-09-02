@@ -16,5 +16,5 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
 
-python scripts_new/phaseA_cas14_truncation_error.py --target-p 800
+python scripts/archived/phaseA_cas14_truncation_error.py --target-p 800
 echo "Done: $(date)"

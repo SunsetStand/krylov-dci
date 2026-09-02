@@ -37,7 +37,7 @@ echo ""
 echo "Configuration index: ${SLURM_ARRAY_TASK_ID}"
 echo ""
 
-$PY scripts_new/run_growing_cas_sweep.py \
+$PY scripts/archived/run_growing_cas_sweep.py \
     --config-id ${SLURM_ARRAY_TASK_ID} \
     --output-dir "$OUT_DIR"
 

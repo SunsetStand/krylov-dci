@@ -25,7 +25,7 @@ echo "Node: $(hostname)"
 echo "CPUs: $SLURM_CPUS_PER_TASK"
 echo "============================================================"
 
-$PY scripts_new/run_growing_cas_neumann.py \
+$PY scripts/archived/run_growing_cas_neumann.py \
     --config-id $SLURM_ARRAY_TASK_ID \
     --output-dir ./results/phase3_neumann
 

@@ -16,7 +16,7 @@ every root by `<S^2>` so singlet/triplet character is explicit.
 
 ```bash
 export PATH=/data/home/wangcx/LiYF4_Er3+/env/bin:$PATH
-python scripts_new/phaseA_cas10_v10_sacis.py \
+python scripts/archived/phaseA_cas10_v10_sacis.py \
     --P 400,800,1200,2000 \
     --m-max 1 \
     --tag mytag
@@ -42,7 +42,7 @@ state-ordering mismatch; not yet tracked.)
 ## Smoke test
 
 ```bash
-python tests/smoke_sacis.py
+python tests/integration/smoke_sacis.py
 ```
 
 Fast check (P=400, m=1, ~2 min): asserts the pipeline runs, the per-root table is

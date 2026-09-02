@@ -14,7 +14,7 @@ export MKL_NUM_THREADS=16
 export OPENBLAS_NUM_THREADS=16
 
 /data/home/wangcx/LiYF4_Er3+/env/bin/python \
-  /data/home/wangcx/krylov-dci/scripts_new/phaseA_cas10_v3.py \
+  /data/home/wangcx/krylov-dci/scripts/archived/phaseA_cas10_v3.py \
   --P 200,500,1000,2000 \
   --svd-threshold 1e-3 \
   --m-max 1 \

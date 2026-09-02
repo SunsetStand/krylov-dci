@@ -15,10 +15,10 @@ For each config, runs the Growing CAS DMRG pipeline WITH Neumann k=1 correction
 applied to the LAST round (where env orbitals still exist).
 
 Usage:
-    python scripts_new/run_growing_cas_neumann.py --config-id 0 --output-dir ./results/phase3_neumann_xxx
+    python scripts/archived/run_growing_cas_neumann.py --config-id 0 --output-dir ./results/phase3_neumann_xxx
     # Or run all sequentially:
     for i in 0 1 2 3; do
-        python scripts_new/run_growing_cas_neumann.py --config-id $i --output-dir ./results/phase3_neumann
+        python scripts/archived/run_growing_cas_neumann.py --config-id $i --output-dir ./results/phase3_neumann
     done
 """
 

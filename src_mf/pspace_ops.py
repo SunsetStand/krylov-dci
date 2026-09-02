@@ -2,7 +2,7 @@
 
 Drop-in replacements for the per-iteration scalar Python hot loops in the
 phaseA state-average pipeline. Numerically equivalent to the original scalar
-reference (see tests/test_pspace_ops.py), but use numpy vectorization (SIMD/BLAS)
+reference (see tests/unit/test_pspace_ops.py), but use numpy vectorization (SIMD/BLAS)
 instead of Python-level per-determinant loops over M (M ~ 4e6 for CAS(14,10)).
 """
 import numpy as np

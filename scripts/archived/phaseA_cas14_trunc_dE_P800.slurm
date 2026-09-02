@@ -13,5 +13,5 @@ PYTHON=/data/home/wangcx/LiYF4_Er3+/env/bin/python
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTHONUNBUFFERED=1
 mkdir -p logs
-$PYTHON scripts_new/phaseA_cas14_trunc_dE.py --target-p 800 --m-max 3 --tag truncP800
+$PYTHON scripts/archived/phaseA_cas14_trunc_dE.py --target-p 800 --m-max 3 --tag truncP800
 echo "Done at $(date)"

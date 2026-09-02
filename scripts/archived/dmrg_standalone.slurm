@@ -10,4 +10,4 @@
 
 export OMP_NUM_THREADS=32
 cd /data/home/wangcx/krylov-dci
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/dmrg_standalone.py
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts/archived/dmrg_standalone.py

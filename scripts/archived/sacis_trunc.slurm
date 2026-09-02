@@ -13,4 +13,4 @@ export MKL_NUM_THREADS=12
 export OPENBLAS_NUM_THREADS=12
 
 cd /data/home/wangcx/krylov-dci
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/sacis_trunc.py
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts/archived/sacis_trunc.py

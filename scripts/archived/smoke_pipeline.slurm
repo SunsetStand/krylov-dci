@@ -9,4 +9,4 @@
 #SBATCH -e /data/home/wangcx/krylov-dci/slurm_outputs/smoke_refactor.err
 export OMP_NUM_THREADS=12; export MKL_NUM_THREADS=12; export OPENBLAS_NUM_THREADS=12
 cd /data/home/wangcx/krylov-dci
-/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/smoke_pipeline.py
+/data/home/wangcx/LiYF4_Er3+/env/bin/python scripts/archived/smoke_pipeline.py
