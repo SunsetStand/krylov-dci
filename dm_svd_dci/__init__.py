@@ -40,7 +40,19 @@ from .self_consistent_solver import (
     solve_self_consistent,
     evaluate_excited_states,
 )
+from .wave_operator import (
+    assemble_qspace_hamiltonian,
+    graph_ritz,
+    compute_state_residuals,
+    solve_state_averaged_wave_operator,
+)
+from .state_averaged_solver import (
+    solve_state_averaged_schmidt,
+    schmidt_product_coefficients_to_blocks,
+    assemble_embedded_state_coefficients,
+)
 from .pipeline_v2 import run_neumann_dci
+from .pipeline_state_averaged import run_state_averaged_dci
 
 # ── Legacy Krylov modules (archived, kept for reference) ──
 from ._legacy_krylov_propagator import (
@@ -56,8 +68,16 @@ from ._legacy_pipeline import run_dm_svd_dci
 __all__ = [
     # New entries
     'run_neumann_dci',
+    'run_state_averaged_dci',
     'solve_self_consistent',
     'evaluate_excited_states',
+    'solve_state_averaged_wave_operator',
+    'solve_state_averaged_schmidt',
+    'assemble_qspace_hamiltonian',
+    'graph_ritz',
+    'compute_state_residuals',
+    'schmidt_product_coefficients_to_blocks',
+    'assemble_embedded_state_coefficients',
     'build_effective_hamiltonian_neumann',
     'build_neumann_correction_k0',
     'build_neumann_correction_k1',

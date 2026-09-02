@@ -130,27 +130,30 @@ def build_hemb_parallel(
 
     for n_A in sorted(schmidt_data.keys()):
         sd = schmidt_data[n_A]
-        r = sd['r']
-        block_offsets[n_A] = (offset, r)
-        for alpha in range(r):
-            for beta in range(r):
+        r_A = sd.get('r_A', sd['r'])
+        r_B = sd.get('r_B', sd['r'])
+        block_offsets[n_A] = (offset, r_A, r_B)
+        for alpha in range(r_A):
+            for beta in range(r_B):
                 basis_info.append({
                     'n': n_A, 'alpha': alpha, 'beta': beta,
-                    'flat_idx': offset + alpha * r + beta,
+                    'flat_idx': offset + alpha * r_B + beta,
                 })
-        offset += r * r
+        offset += r_A * r_B
 
     D = offset
     if D == 0:
         return np.zeros((0, 0)), [], {}
 
     if verbose:
-        print(f"  Schmidt product basis dimension: D = Σ_n r_n² = {D}")
-        print(f"  {'n':>4} {'r_n':>5} {'r_n²':>7}")
-        print(f"  {'-'*18}")
+        print(f"  Schmidt product basis dimension: D = Σ_n r_A(n)r_B(n) = {D}")
+        print(f"  {'n':>4} {'r_A':>5} {'r_B':>5} {'product':>8}")
+        print(f"  {'-'*26}")
         for n_A in sorted(schmidt_data.keys()):
-            r = schmidt_data[n_A]['r']
-            print(f"  {n_A:>4} {r:>5} {r*r:>7}")
+            sd = schmidt_data[n_A]
+            r_A = sd.get('r_A', sd['r'])
+            r_B = sd.get('r_B', sd['r'])
+            print(f"  {n_A:>4} {r_A:>5} {r_B:>5} {r_A*r_B:>8}")
 
     # ── Full CAS string info ──
     alpha_strs = q_idx.alpha_strs
@@ -240,8 +243,9 @@ def build_hemb_parallel(
     for n_A_val in sorted(schmidt_data.keys()):
         sd = schmidt_data[n_A_val]
         blk = partition[n_A_val]
-        r = sd['r']
-        if r == 0:
+        r_A = sd.get('r_A', sd['r'])
+        r_B = sd.get('r_B', sd['r'])
+        if r_A == 0 or r_B == 0:
             continue
 
         a_dets = blk['a_dets']
@@ -258,7 +262,7 @@ def build_hemb_parallel(
                 a_dets, h1_A, h2_A, n_occ, nA_alpha, nA_beta)
             HA_schmidt = sd['U'].T @ HA_det @ sd['U']
         else:
-            HA_schmidt = np.zeros((r, r))
+            HA_schmidt = np.zeros((r_A, r_A))
 
         # Build H_B^det in B-subspace determinant basis
         b_dets = blk['b_dets']
@@ -270,21 +274,21 @@ def build_hemb_parallel(
                 b_dets, h1_B, h2_B, n_virt, nB_alpha, nB_beta)
             HB_schmidt = sd['V'].T @ HB_det @ sd['V']
         else:
-            HB_schmidt = np.zeros((r, r))
+            HB_schmidt = np.zeros((r_B, r_B))
 
         # Map to H_emb blocks: H_A = U^† H_A^det U ⊗ I_B
         #                        H_B = I_A ⊗ V^† H_B^det V
-        offset_n, _ = block_offsets[n_A_val]
-        for alpha in range(r):
-            for beta in range(r):
-                k_idx = offset_n + alpha * r + beta
+        offset_n, _, _ = block_offsets[n_A_val]
+        for alpha in range(r_A):
+            for beta in range(r_B):
+                k_idx = offset_n + alpha * r_B + beta
                 # H_A: δ_{βδ} HA_schmidt[α,γ]
-                for gamma in range(r):
-                    l_idx = offset_n + gamma * r + beta
+                for gamma in range(r_A):
+                    l_idx = offset_n + gamma * r_B + beta
                     H_emb_HA[l_idx, k_idx] = HA_schmidt[gamma, alpha]
                 # H_B: δ_{αγ} HB_schmidt[β,δ]
-                for delta in range(r):
-                    l_idx = offset_n + alpha * r + delta
+                for delta in range(r_B):
+                    l_idx = offset_n + alpha * r_B + delta
                     H_emb_HB[l_idx, k_idx] = HB_schmidt[delta, beta]
 
     if verbose:

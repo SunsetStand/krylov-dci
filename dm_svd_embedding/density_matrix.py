@@ -13,8 +13,9 @@ For each electron-number block n, given the CI coefficient matrix C^(n):
       |B̃_α^(n)⟩ = Σ_j V_{jα}^{(n)*} |b_j^(N-n)⟩
 
 For single-state calculations, ρ_A is constructed from one CI vector.
-For multi-state, state-averaged ρ_A^SA = (1/N_states) Σ_k C^(n,k) [C^(n,k)]^†
-is used, then each state is SVD'd in the shared basis.
+For multi-state, state-averaged
+ρ_A^SA = Σ_k w_k C^(n,k) [C^(n,k)]^† is used, then each state is
+represented in the shared basis.  Equal weights remain the default.
 
 References:
   - DensityMatrix_SVD_Embedding_Proposal.md, Sec. 2.3-2.4
@@ -22,6 +23,40 @@ References:
 
 import numpy as np
 from typing import Dict, List, Tuple, Optional
+
+
+def normalize_state_weights(
+    n_states: int,
+    state_weights: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """Validate and normalize state-averaging weights.
+
+    Args:
+        n_states: Number of states in the average.
+        state_weights: Optional non-negative weights.  They need not sum to one.
+
+    Returns:
+        A float64 vector of length ``n_states`` that sums to one.
+    """
+    if n_states <= 0:
+        raise ValueError("state averaging requires at least one state")
+
+    if state_weights is None:
+        return np.full(n_states, 1.0 / n_states, dtype=float)
+
+    weights = np.asarray(state_weights, dtype=float)
+    if weights.ndim != 1 or len(weights) != n_states:
+        raise ValueError(
+            f"state_weights must have length {n_states}, got shape {weights.shape}")
+    if not np.all(np.isfinite(weights)):
+        raise ValueError("state_weights must be finite")
+    if np.any(weights < 0.0):
+        raise ValueError("state_weights must be non-negative")
+
+    total = float(np.sum(weights))
+    if total <= 0.0:
+        raise ValueError("at least one state weight must be positive")
+    return weights / total
 
 
 def singular_value_threshold(s: np.ndarray, eps: float = 1e-3) -> np.ndarray:
@@ -92,6 +127,7 @@ def compute_schmidt_decomposition(
     C_blocks: Dict[int, np.ndarray],
     eps: float = 1e-3,
     state_average: Optional[List[Dict[int, np.ndarray]]] = None,
+    state_weights: Optional[np.ndarray] = None,
 ) -> Dict[int, Dict]:
     """Compute Schmidt decomposition for all electron-number blocks.
 
@@ -105,6 +141,8 @@ def compute_schmidt_decomposition(
         state_average: If provided, list of C_blocks dicts for multiple states.
                        The state-averaged ρ_A is diagonalized to get a common
                        U basis; then each state's C^(n) is compressed in that basis.
+        state_weights: Optional non-negative weights for ``state_average``.
+                       Equal weights are used when omitted.
 
     Returns:
         Dict[n] → schmidt_data dict with keys:
@@ -117,6 +155,9 @@ def compute_schmidt_decomposition(
           'dim_B': int.
     """
     result = {}
+    weights = None
+    if state_average is not None:
+        weights = normalize_state_weights(len(state_average), state_weights)
 
     for n_A in sorted(C_blocks.keys()):
         C = C_blocks[n_A]
@@ -124,11 +165,10 @@ def compute_schmidt_decomposition(
         if state_average is not None:
             # Multi-state: state-averaged density matrix
             rho_SA = np.zeros((C.shape[0], C.shape[0]))
-            for C_k in state_average:
+            for weight, C_k in zip(weights, state_average):
                 Ck = C_k.get(n_A)
                 if Ck is not None and Ck.shape == C.shape:
-                    rho_SA += Ck @ Ck.T
-            rho_SA /= len(state_average)
+                    rho_SA += weight * (Ck @ Ck.T)
 
             # Diagonalize ρ_A^SA to get common U basis
             eigvals, U_SA = np.linalg.eigh(rho_SA)
@@ -146,11 +186,10 @@ def compute_schmidt_decomposition(
 
             # Also diagonalize ρ_B^SA to get common V basis (symmetric to ρ_A^SA)
             rho_B_SA = np.zeros((C.shape[1], C.shape[1]))
-            for C_k in state_average:
+            for weight, C_k in zip(weights, state_average):
                 Ck = C_k.get(n_A)
                 if Ck is not None and Ck.shape == C.shape:
-                    rho_B_SA += Ck.T @ Ck
-            rho_B_SA /= len(state_average)
+                    rho_B_SA += weight * (Ck.T @ Ck)
 
             eigvals_B, V_SA = np.linalg.eigh(rho_B_SA)
             idx_B = np.argsort(-eigvals_B)
@@ -163,16 +202,20 @@ def compute_schmidt_decomposition(
             r_B = int(np.sum(keep_B))
             V_trunc_B = V_SA[:, keep_B]
 
-            # Use common rank r_common = min(r_A, r_B) for paired Schmidt product basis
-            r_common = min(r, r_B)
-            U_common = U_trunc[:, :r_common]
-            V_common = V_trunc_B[:, :r_common]
-            sigma_common = sigma_est[keep][:r_common]
+            # A state average is generally not one pure bipartite state:
+            # rho_A^SA and rho_B^SA can therefore have different ranks.  Keep
+            # both retained subspaces.  The embedded basis for this block is
+            # rectangular, with dimension r_A * r_B.
+            sigma_A = sigma_est[keep]
+            sigma_B = sigma_est_B[keep_B]
+            r_common = min(r, r_B)  # legacy paired-rank diagnostic only
 
             result[n_A] = {
-                'U': U_common,
-                'sigma': sigma_common,
-                'V': V_common,
+                'U': U_trunc,
+                'sigma': sigma_A[:r_common],
+                'sigma_A': sigma_A,
+                'sigma_B': sigma_B,
+                'V': V_trunc_B,
                 'r': r_common,
                 'sigma_full': sigma_est,       # ρ_A eigenvalues for diagnostics
                 'sigma_full_B': sigma_est_B,   # ρ_B eigenvalues for diagnostics
@@ -180,6 +223,9 @@ def compute_schmidt_decomposition(
                 'r_B': r_B,
                 'dim_A': C.shape[0],
                 'dim_B': C.shape[1],
+                'rho_A_state_averaged': rho_SA,
+                'rho_B_state_averaged': rho_B_SA,
+                'state_weights': weights.copy(),
             }
         else:
             # Single-state: direct SVD
@@ -189,6 +235,8 @@ def compute_schmidt_decomposition(
                 'sigma': svd_data['sigma'],
                 'V': svd_data['V'],
                 'r': svd_data['r'],
+                'r_A': svd_data['r'],
+                'r_B': svd_data['r'],
                 'sigma_full': svd_data['sigma_full'],
                 'dim_A': C.shape[0],
                 'dim_B': C.shape[1],
@@ -216,6 +264,11 @@ def compute_compression_metrics(
           'per_block': Dict[n] → (dim_A, dim_B, r_n, dim_full=F_A×F_B).
     """
     r_total = sum(sd['r'] for sd in schmidt_data.values())
+    r_A_total = sum(sd.get('r_A', sd['r']) for sd in schmidt_data.values())
+    r_B_total = sum(sd.get('r_B', sd['r']) for sd in schmidt_data.values())
+    product_dim = sum(
+        sd.get('r_A', sd['r']) * sd.get('r_B', sd['r'])
+        for sd in schmidt_data.values())
     dim_fci = len(ci_vector) if ci_vector is not None else sum(
         blk.shape[0] * blk.shape[1] for blk in C_blocks.values())
 
@@ -236,13 +289,21 @@ def compute_compression_metrics(
             'dim_A': sd['dim_A'],
             'dim_B': sd['dim_B'],
             'r': sd['r'],
+            'r_A': sd.get('r_A', sd['r']),
+            'r_B': sd.get('r_B', sd['r']),
+            'product_dim': (
+                sd.get('r_A', sd['r']) * sd.get('r_B', sd['r'])),
             'dim_product': sd['dim_A'] * sd['dim_B'],
         }
 
     return {
         'r_total': r_total,
+        'r_A_total': r_A_total,
+        'r_B_total': r_B_total,
+        'product_dim': product_dim,
         'dim_fci': dim_fci,
         'compression_ratio': r_total / max(dim_fci, 1),
+        'product_compression_ratio': product_dim / max(dim_fci, 1),
         'discarded_weight': float(discarded_weight),
         'sigma_spectra': sigma_spectra,
         'per_block': per_block,

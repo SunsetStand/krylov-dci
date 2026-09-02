@@ -21,8 +21,9 @@ def partition_schmidt_basis(
 ) -> Dict:
     """Partition Schmidt product basis into P and Q spaces.
 
-    The Schmidt product basis has states |Ã_α^(n)⟩ ⊗ |B̃_β^(n)⟩ for each
-    electron-number block n. Total dimension D = Σ_n r_n².
+The Schmidt product basis has states |Ã_α^(n)⟩ ⊗ |B̃_β^(n)⟩ for each
+electron-number block n.  In state-averaged mode the two reduced densities
+can have different retained ranks, so D = Σ_n r_A(n) r_B(n).
 
     Args:
         schmidt_data: Output of compute_schmidt_decomposition().
@@ -36,7 +37,7 @@ def partition_schmidt_basis(
           'q_basis':     List[dict] — each Q basis state {n, alpha, beta, flat_idx_q}
           'p_dim':       int — |P| = number of Schmidt product states in P
           'q_dim':       int — |Q| = number of Schmidt product states in Q
-          'total_dim':   int — D = Σ_n r_n²
+          'total_dim':   int — D = Σ_n r_A(n) r_B(n)
           'p_indices':   (|P|,) int64 — flat indices in full H^emb
           'q_indices':   (|Q|,) int64 — flat indices in full H^emb
           'block_offsets': Dict[n] → (offset, r_n) — starting flat index and rank
@@ -46,11 +47,17 @@ def partition_schmidt_basis(
     # ── Build global index map ──
     n_sorted = sorted(schmidt_data.keys())
     block_offsets = {}
+    block_shapes = {}
     offset = 0
     for n_A in n_sorted:
-        r = schmidt_data[n_A]['r']
-        block_offsets[n_A] = (offset, r)
-        offset += r * r
+        data = schmidt_data[n_A]
+        r_A = data.get('r_A', data['r'])
+        r_B = data.get('r_B', data['r'])
+        # Keep the historical two-tuple for callers that only consume offset
+        # and paired rank; expose rectangular dimensions separately.
+        block_offsets[n_A] = (offset, data['r'])
+        block_shapes[n_A] = (r_A, r_B)
+        offset += r_A * r_B
 
     total_dim = offset  # D = Σ_n r_n²
 
@@ -61,6 +68,7 @@ def partition_schmidt_basis(
             'p_indices': np.array([], dtype=np.int64),
             'q_indices': np.array([], dtype=np.int64),
             'block_offsets': block_offsets,
+            'block_shapes': block_shapes,
             'p_blocks': list(p_blocks),
             'n_blocks': n_sorted,
         }
@@ -74,15 +82,17 @@ def partition_schmidt_basis(
     q_indices_list = []
 
     for n_A in n_sorted:
-        r = schmidt_data[n_A]['r']
-        if r == 0:
+        data = schmidt_data[n_A]
+        r_A = data.get('r_A', data['r'])
+        r_B = data.get('r_B', data['r'])
+        if r_A == 0 or r_B == 0:
             continue
         offset_n, _ = block_offsets[n_A]
         in_p = (n_A in p_set)
 
-        for alpha in range(r):
-            for beta in range(r):
-                flat_idx = offset_n + alpha * r + beta
+        for alpha in range(r_A):
+            for beta in range(r_B):
+                flat_idx = offset_n + alpha * r_B + beta
                 info = {'n': n_A, 'alpha': alpha, 'beta': beta, 'flat_idx': flat_idx}
                 if in_p:
                     info['flat_idx_p'] = len(p_basis)
@@ -102,6 +112,7 @@ def partition_schmidt_basis(
         'p_indices': np.array(p_indices_list, dtype=np.int64),
         'q_indices': np.array(q_indices_list, dtype=np.int64),
         'block_offsets': block_offsets,
+        'block_shapes': block_shapes,
         'p_blocks': list(p_blocks),
         'n_blocks': n_sorted,
     }
