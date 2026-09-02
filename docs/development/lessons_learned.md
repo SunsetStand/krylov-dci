@@ -126,4 +126,4 @@ For Prof. Yang's group presentations. All `hku_report/` phase reports, code comm
 
 ## References
 
-See `docs/formalisms.md` for the authoritative formulation and `SKILL.md` for full project conventions.
+See `docs/theory/formalisms.md` for the authoritative formulation and `SKILL.md` for full project conventions.

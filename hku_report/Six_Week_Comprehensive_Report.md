@@ -54,7 +54,7 @@ $$H^{\text{eff}} = H_{PP} + H_{P\tilde{Q}} \cdot ((E_0 + \Delta)I - H_{\tilde{Q}
 ### 1.2 Code Architecture
 
 ```
-Application Scripts (scripts_new/phaseA_*.py)
+Archived application scripts (`scripts/archived/phaseA_*.py`)
     ↓
 KDCIBackend (src_mf/pyscf_backend.py)
     ├── QSpaceIndex — C-level determinant enumeration via PySCF cistring
@@ -452,7 +452,7 @@ krylov-dci/
 ├── hku_report/             # Research reports + figures
 ├── docs/                   # Phase-level technical docs
 ├── reports/                # Weekly summaries
-└── scripts_new/            # SLURM job scripts
+└── scripts/archived/       # Historical application and Slurm scripts
 ```
 
 ---

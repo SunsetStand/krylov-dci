@@ -1,212 +1,132 @@
 # Contributing to Krylov-dCI
 
-## Quick Start
+## Start from the intended baseline
+
+Do not assume `main` is the active scientific baseline. Confirm the requested
+base commit and working-tree state before creating a branch:
 
 ```bash
-# Clone
-git clone git@github.com:SunsetStand/krylov-dci.git
-cd krylov-dci
-
-# Install deps
-pip install -r requirements.txt
-
-# Smoke test (2 min)
-python tests/smoke_sacis.py
-
-# Full regression (5 min)
-python tests/test_regression.py
+git status --short --branch
+git log -5 --oneline --decorate
+git switch -c feat/<description> <approved-base>
 ```
 
-## Development Workflow
+Use `chore/<description>` for repository maintenance and `docs/<description>`
+for documentation-only work. Never rewrite shared branch history or force-push.
 
-### 1. Start from a Clean Slate
+## Repository responsibilities
+
+- `src/`: early determinant and Slater-Condon implementation.
+- `src_mf/`: matrix-free Krylov/dCI backend.
+- `dm_svd_embedding/`: Schmidt decomposition and embedded-Hamiltonian code.
+- `dm_svd_dci/`: dmSVD-dCI, Neumann, and growing-CAS code.
+- `scripts/production/`: maintained entry points that import library code.
+- `scripts/diagnostics/`: exploratory investigation tools.
+- `scripts/archived/`: retained historical scripts; do not treat them as current APIs.
+- `tests/unit/`, `tests/integration/`, `tests/regression/`: checks grouped by scope.
+- `batch/production/`, `batch/diagnostics/`, `batch/archived/`: Slurm launchers.
+
+Do not copy backend implementations into scripts. Add or change reusable logic
+in the appropriate package, then call it from an entry point.
+
+## Code conventions
+
+- Python 3.9 or newer.
+- English comments, docstrings, and identifiers.
+- `snake_case` for functions and variables; `PascalCase` for classes.
+- Add type hints where they improve clarity.
+- Use unbuffered output or `flush=True` for long Slurm jobs.
+- Keep mathematical behavior changes separate from repository maintenance.
+
+## Testing
+
+Run Python only in a local environment or on an allocated compute node. The
+maintained direct commands are:
 
 ```bash
-git checkout main
-git pull origin main
-git status         # must be clean
+python tests/unit/test_pspace_ops.py
+python tests/integration/smoke_sacis.py
+python tests/regression/test_kdci.py
+python tests/regression/test_hab_rdm.py
 ```
 
-### 2. Create a Feature Branch
+Backend changes should cover the relevant unit checks, integration smoke test,
+and numerical regression checks. H₂/STO-3G alone is not sufficient because its
+symmetry can hide integral-index and sign errors; include H₂O/STO-3G or a more
+discriminating system when scientific behavior changes.
+
+## PKU server workflow
+
+The configured SSH alias is `tmc-amd`. It resolves to user `wangcx` at
+`10.129.77.222` on port `2933` with the project at
+`/data/home/wangcx/krylov-dci`.
 
 ```bash
-git checkout -b feat/<description>
+ssh -o BatchMode=yes -o ConnectTimeout=15 tmc-amd \
+  "cd /data/home/wangcx/krylov-dci && git status --short --branch"
 ```
 
-**When to branch:**
-- Any change to `src_mf/` (backend code)
-- New algorithms or methodological changes
-- Refactoring
-
-**When NOT to branch:**
-- Script-level parameter tuning
-- Adding new test cases
-- Documentation only
-
-### 3. Code
-
-- Write locally, test locally
-- All new functionality goes into `src_mf/` first
-- Scripts in `scripts_new/` import from `src_mf/`, never reimplement
-- English for all comments, docstrings, variable names
-- Type hints where practical
-
-### 4. Test
+If the alias is unavailable, an explicit diagnostic connection must include the
+non-default port:
 
 ```bash
-# Quick validation
-python tests/smoke_sacis.py
-
-# Full suite
-python tests/test_regression.py
-
-# For backend changes: also run
-python tests/test_hpp_sigma.py
-python tests/test_pspace_ops.py
+ssh -p 2933 wangcx@10.129.77.222
 ```
 
-### 5. Deploy to Remote
+The login node is restricted to lightweight shell, Git, and file-management
+commands. Do not run Python, PySCF, ORCA, CP2K, GROMACS, or quantum-chemistry
+calculations directly there.
 
-```bash
-# Copy to PKU server
-scp scripts_new/<script>.py wangcx@10.129.77.222:~/krylov-dci/scripts_new/
-scp src_mf/<module>.py wangcx@10.129.77.222:~/krylov-dci/src_mf/
-
-# Commit locally
-git add -A
-git commit -m "feat: <description>"
-git push origin feat/<description>
-
-# Commit on remote too
-ssh wangcx@10.129.77.222 "cd ~/krylov-dci && git add -A && git commit -m 'feat: <description>' && git push"
-```
-
-### 6. Submit SLURM Job
-
-```bash
-ssh wangcx@10.129.77.222 "cd ~/krylov-dci && sbatch scripts_new/<script>.slurm"
-```
-
-### 7. After Results
-
-- SCP results back to local
-- Update `reports/` or `hku_report/`
-- If validated: merge to main, delete branch
-
-```bash
-git checkout main
-git merge feat/<description>
-git push origin main
-git branch -d feat/<description>
-git push origin --delete feat/<description>
-```
-
----
-
-## Project Structure
-
-```
-krylov-dci/
-├── src_mf/                  # Core library (backend)
-│   ├── pyscf_backend.py     # PySCF integration, KDCIBackend
-│   ├── kdci_dense.py        # Dense Krylov-dCI
-│   ├── kdci_sparse.py       # Sparse Krylov-dCI
-│   ├── bloch_mf.py          # Bloch resolvent
-│   ├── pspace_ops.py        # P-space selection & scoring
-│   ├── qspace.py            # Q-space operations
-│   ├── sparse_ops.py        # Sparse matrix ops
-│   └── sparse_vector.py     # Sparse vector utilities
-├── scripts_new/             # Production scripts (import from src_mf)
-├── tests/                   # Test suite
-├── docs/                    # Documentation
-│   ├── formalisms.md        # Mathematical formulation (AUTHORITATIVE)
-│   └── lessons_learned.md   # Mistakes and insights
-├── hku_report/              # Phase reports (English, for Prof. Yang)
-├── reports/                 # Weekly summaries
-├── .clinerules              # Rules for Cline (VS Code AI assistant)
-├── SKILL.md                 # Full project conventions (AUTHORITATIVE)
-├── CONTRIBUTING.md          # This file
-└── README.md                # Project overview
-```
-
----
-
-## Code Conventions
-
-### Imports
-
-```python
-# ✅ Correct: import from src_mf
-from src_mf.pyscf_backend import KDCIBackend
-from src_mf.pspace_ops import score_and_select, CISSeeder
-
-# ❌ Wrong: reimplement in script
-def build_hqp(p_idx, q_idx, ...):  # DON'T DO THIS
-    ...
-```
-
-### Print Statements
-
-```python
-# ✅ Always flush
-print(f"P={P}, dE={dE:.4f} mH", flush=True)
-
-# ❌ Don't rely on auto-flush (won't work in SLURM output files)
-print(f"P={P}, dE={dE:.4f} mH")
-```
-
-### Naming
-
-- Functions: `snake_case`
-- Classes: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
-- Variables: descriptive, not single-letter (except loop indices and standard math notation)
-
----
-
-## SLURM Job Template
+Use the existing server environment in Slurm jobs:
 
 ```bash
 #!/bin/bash
-#SBATCH -J kdci_<task>
+#SBATCH -J kdci_check
 #SBATCH -p amd
-#SBATCH -n <N>              # max 32 (single node)
-#SBATCH -t 24:00:00         # default 24h
-#SBATCH -o /data/home/wangcx/krylov-dci/logs/%j.out
-#SBATCH -e /data/home/wangcx/krylov-dci/logs/%j.err
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=2
+#SBATCH -t 00:30:00
+#SBATCH -o /data/home/wangcx/krylov-dci/slurm_outputs/%x_%j.out
+#SBATCH -e /data/home/wangcx/krylov-dci/slurm_outputs/%x_%j.err
 
 export MODULEPATH=/data/modulefiles/softwares:/data/modulefiles/libraries
 source /etc/profile.d/modules.sh
-
 cd /data/home/wangcx/krylov-dci
-
-# CRITICAL: unbuffered Python output
-PYTHONUNBUFFERED=1 /data/home/wangcx/LiYF4_Er3+/env/bin/python scripts_new/<script>.py
+export PYTHONPATH=/data/home/wangcx/krylov-dci:${PYTHONPATH:-}
+PYTHONUNBUFFERED=1 /data/home/wangcx/LiYF4_Er3+/env/bin/python <entry.py>
 ```
 
----
+Submit a maintained launcher with, for example:
 
-## Communication
+```bash
+ssh tmc-amd \
+  "cd /data/home/wangcx/krylov-dci && sbatch batch/diagnostics/reorg_validation.slurm"
+```
 
-### Between Human (站台) and AI (雷塞)
+## Commit and review
 
-- **Discussion & Design:** Feishu → OpenClaw (雷塞)
-- **Code Execution:** VS Code → Cline
-- **Memory & Context:** OpenClaw MEMORY.md (long-term), project docs (for Cline)
+Inspect and stage explicit paths. Do not use `git add -A` in a worktree that may
+contain large untracked scientific artifacts:
 
-### When to Escalate
+```bash
+git diff --check
+git status --short
+git add README.md CONTRIBUTING.md batch/ scripts/ tests/
+git diff --cached --stat
+git diff --cached --check
+git commit -m "chore(repo): describe the change"
+git push -u origin <branch>
+```
 
-If Cline is stuck or producing suspicious results:
-1. Copy the error/output to Feishu
-2. 雷塞 diagnoses (has full memory of the project)
-3. 雷塞 provides a fix or alternative approach
-4. Implement via Cline
+Before committing, confirm that scratch data, checkpoints, memory maps, `.dat`
+files, scheduler logs, and caches are neither staged nor newly tracked. Keep
+documentation, test organization, and scientific algorithm changes in separate
+commits when practical.
 
----
+## Documentation
 
-## Key References
-
-- **SKILL.md** — complete project conventions, benchmark protocols, decision matrix
-- **docs/formalisms.md** — mathematical formulation (source of truth for equations)
-- **docs/lessons_learned.md** — common pitfalls and how to avoid them
-- **.clinerules** — rules auto-loaded by Cline
+- `docs/theory/formalisms.md`: authoritative mathematical formulation.
+- `docs/development/lessons_learned.md`: known implementation pitfalls.
+- `docs/architecture/`: design and performance notes.
+- `docs/archive/`: historical phase documentation.
+- `SKILL.md`: full project conventions and benchmark protocol.

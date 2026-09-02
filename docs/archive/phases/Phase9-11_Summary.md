@@ -57,7 +57,7 @@ Findings: (1) Krylov extension marginal, m=0 captures ~90% of resolvent improvem
 ## Phase 11 (Stage B): P-Convergence with FCI Reference (CI-coefficient P-space)
 
 **Date**: 2026-07-01 | **Job IDs**: 14955, 14972–14978, 14995–14996
-**Script**: `scripts/phase11_stageB.py`
+**Script**: `scripts/archived/phase11_stageB.py`
 
 ### Setup
 
@@ -127,7 +127,7 @@ matrix element `H[i,j]`), but internal sign computations now use `cistring.cre_d
 ## Phase 12 (Stage C): P-Convergence with HF Perturbation P-Space
 
 **Date**: 2026-07-01 | **Job IDs**: 15017–15024
-**Script**: `scripts/phase12_stageC.py`
+**Script**: `scripts/archived/phase12_stageC.py`
 
 ### Motivation
 

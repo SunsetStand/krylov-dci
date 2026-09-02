@@ -3,22 +3,23 @@
 ## Git Workflow (MANDATORY)
 
 ### Before Any Code Change
-1. `git status` — must be clean
-2. Create a feature branch: `git checkout -b feat/<description>`
+1. Inspect `git status`; preserve or map intentional untracked files before moving them
+2. Create a branch from the approved baseline: `git switch -c feat/<description> <base>`
 3. Write code → test → `git add` + `git commit` + `git push`
 4. Only then submit SLURM jobs
 
 ### Branch Conventions
 - Feature/refactor: `feat/<description>`
+- Repository maintenance: `chore/<description>`
 - Phase work: `phase/<N>-<description>`
 - Commit messages in English, descriptive
-- No force push to master
+- No force push to shared branches
 - Delete branch after merge
 
 ### Code Modification Protocol
 - **Never modify code directly on remote via sed/heredoc** — write locally, scp, then run
 - **Always commit before sbatch** — no exceptions
-- Keep remote `git status` clean at all times
+- Stage explicit paths; do not use `git add -A` in artifact-heavy worktrees
 
 ---
 
@@ -68,7 +69,7 @@
 
 ## Mathematical Formulation
 
-See `docs/formalisms.md` for the authoritative equations.
+See `docs/theory/formalisms.md` for the authoritative equations.
 
 ### Key Notation
 - **A** = (E₀I − D_QQ)⁻¹ — diagonal resolvent
@@ -82,18 +83,20 @@ See `docs/formalisms.md` for the authoritative equations.
 
 ### Quick Smoke Test
 ```bash
-python tests/smoke_sacis.py    # P=400, ~2min, validates full pipeline
+python tests/integration/smoke_sacis.py    # P=400, validates full pipeline
 ```
 
 ### Regression Tests
 ```bash
-python tests/test_regression.py  # 7 tests, covers core functionality
+python tests/regression/test_kdci.py
+python tests/regression/test_hab_rdm.py
 ```
 
 ### Test Before Commit
 - Minimum: pass `smoke_sacis.py`
 - For backend changes: pass `test_regression.py`
-- For new features: add a test in `tests/`
+- For new features: add a focused check under `tests/unit/`, `tests/integration/`,
+  or `tests/regression/` according to its scope
 
 ### Critical: Small-system tests don't prove correctness
 H₂/STO-3G (2 orbitals) symmetry hides many bugs. Always test on H₂O/STO-3G (7 orbitals) or larger before trusting results.
@@ -104,7 +107,9 @@ H₂/STO-3G (2 orbitals) symmetry hides many bugs. Always test on H₂O/STO-3G (
 
 ### Remote (PKU Lab Server)
 ```
-Host:      10.129.77.222:2933
+SSH alias: tmc-amd
+Host:      10.129.77.222
+Port:      2933
 User:      wangcx
 Auth:      SSH key (~/.ssh/id_ed25519)
 Project:   /data/home/wangcx/krylov-dci/
@@ -168,6 +173,6 @@ When results don't match expectations:
 - Li & Yang, *JPCL* 2022, 13, 10042 (dCI method)
 - Krylov, A.N. *Izvestiya AN SSSR* 1931, No. 4, 491-539
 - Sun et al., *WIREs Comput. Mol. Sci.* 2018, 8, e1340 (PySCF)
-- `docs/formalisms.md` — authoritative mathematical formulation
-- `docs/lessons_learned.md` — detailed lessons from the project
+- `docs/theory/formalisms.md` — authoritative mathematical formulation
+- `docs/development/lessons_learned.md` — detailed lessons from the project
 - `SKILL.md` — full project conventions (authoritative)

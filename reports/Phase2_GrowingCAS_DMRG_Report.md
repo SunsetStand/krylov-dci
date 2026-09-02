@@ -5,7 +5,7 @@
 **Date:** 2026-08-03  
 **SLURM Job:** 15545 (7-configuration parameter sweep, all completed)  
 **Code:** `dm_svd_dci/growing_cas_dmrg.py`, `dm_svd_dci/block_svd_general.py`  
-**Test Script:** `scripts_new/run_growing_cas_sweep.py`  
+**Test Script:** `scripts/archived/run_growing_cas_sweep.py`
 **Results:** `results/grow_sweep_15545/`
 
 ---
@@ -351,9 +351,9 @@ All configurations achieve **dE_final = 0.000 mH** — the embedded Hamiltonian 
 |------|-------|---------|
 | `dm_svd_dci/block_svd_general.py` | 151 | Multi-orbital block SVD (generalizes d_B=4 → arbitrary) |
 | `dm_svd_dci/growing_cas_dmrg.py` | 1010 | Complete pipeline: ChainedTransform + GrowingCASDMRG |
-| `scripts_new/run_growing_cas_sweep.py` | 370 | Diagnostic sweep with per-block JSON output |
-| `scripts_new/grow_cas_sweep.slurm` | 48 | SLURM array job (7 configs × 32 cores × 120 GB) |
-| `tests/test_growing_cas_dmrg.py` | 337 | Unit + smoke tests (11 tests, 2 system tests) |
+| `scripts/archived/run_growing_cas_sweep.py` | 370 | Diagnostic sweep with per-block JSON output |
+| `scripts/archived/grow_cas_sweep.slurm` | 48 | SLURM array job (7 configs × 32 cores × 120 GB) |
+| `tests/integration/test_growing_cas_dmrg.py` | 337 | Unit + smoke tests (11 tests, 2 system tests) |
 | `reports/Phase2_GrowingCAS_DMRG_Report.md` | this file | Comprehensive phase report |
 
 ### 7.2 Key Classes and Their Roles

@@ -29,12 +29,18 @@ Develop and benchmark a **Krylov subspace downfolding method** that constructs a
 ### Primary Compute: PKU Lab Server
 
 ```
-Host:      10.129.77.222:2933
+SSH alias: tmc-amd
+Host:      10.129.77.222
+Port:      2933
 User:      wangcx
 Work dir:  /data/home/wangcx/krylov-dci/
-Partition: amd (128 cores, single node)
+Partition: amd
 Scheduler: SLURM
 ```
+
+Use `ssh -o BatchMode=yes -o ConnectTimeout=15 tmc-amd`. The login node is
+limited to lightweight shell, Git, and file-management commands; Python and
+scientific validation must run through Slurm.
 
 ### SLURM Job Template
 
@@ -51,7 +57,8 @@ export MODULEPATH=/data/modulefiles/softwares:/data/modulefiles/libraries
 source /etc/profile.d/modules.sh
 
 cd /data/home/wangcx/krylov-dci
-python src/<script>.py
+export PYTHONPATH=/data/home/wangcx/krylov-dci:${PYTHONPATH:-}
+PYTHONUNBUFFERED=1 /data/home/wangcx/LiYF4_Er3+/env/bin/python <entry.py>
 ```
 
 ### Core Count Guidelines
@@ -86,29 +93,34 @@ Remote: /data/home/wangcx/krylov-dci/
 
 ```
 krylov-dci/
-├── src/
-│   ├── determinants.py      # Slater determinant representation
-│   ├── hamiltonian.py       # H matrix construction (Slater-Condon rules)
-│   ├── partitioning.py      # P/Q space partition
-│   ├── krylov.py            # Krylov layer generation
-│   ├── svd_compression.py   # Weighted SVD + truncation
-│   ├── effective_h.py       # Effective Hamiltonian + self-consistency
-│   ├── solver.py            # Diagonalization + eigenstate extraction
-│   └── utils.py             # I/O, logging, helpers
-├── test/
-│   ├── test_determinants.py
-│   ├── test_hamiltonian.py
-│   ├── test_partitioning.py
-│   ├── test_krylov.py
-│   └── test_effective_h.py
-├── data/
-│   └── benchmarks/          # Benchmark test cases
+├── src/                         # Early determinant / Slater-Condon backend
+├── src_mf/                      # Matrix-free Krylov/dCI backend
+├── dm_svd_embedding/            # Schmidt decomposition and H_emb
+├── dm_svd_dci/                  # dmSVD-dCI, Neumann, growing-CAS
+├── scripts/
+│   ├── production/              # Maintained entry points
+│   ├── diagnostics/             # Investigation tools, including hab_rdm/
+│   └── archived/                # Historical scripts
+├── batch/
+│   ├── production/              # Production Slurm launchers
+│   ├── diagnostics/             # Regression and diagnostic launchers
+│   └── archived/                # Historical launchers
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── regression/
 ├── docs/
-│   ├── phases/              # Phase reports
-│   └── notes/               # Meeting notes, design decisions
-├── notebooks/               # Exploratory analysis
-├── SKILL.md                 # This file
+│   ├── theory/
+│   ├── architecture/
+│   ├── development/
+│   └── archive/
+├── reports/
+├── hku_report/
+├── results/                     # Small, reproducible summaries only
+├── notebooks/
+├── SKILL.md
 ├── README.md
+├── CONTRIBUTING.md
 └── requirements.txt
 ```
 
@@ -116,10 +128,11 @@ krylov-dci/
 
 **Branch naming:**
 - Feature/refactor branches: `feat/<description>` (e.g., `feat/dense-sparse-split`)
+- Repository maintenance: `chore/<description>`
 - Phase branches: `phase/<N>-<description>` (e.g., `phase/1-determinants`)
 - Commit messages in English, descriptive
 - Push to GitHub after each meaningful chunk of work
-- **No force push to master**
+- **No force push to shared branches (`main`, feature baselines, or review branches)**
 
 ### 🔴 Branching Requirement for Backend Changes
 
@@ -371,7 +384,7 @@ For each value, plot Delta_E vs N_det_total. The optimal theta_sigma balances ac
 
 ## 9. Report Format
 
-Each phase report (`docs/phases/PhaseN_Title.md`) should follow:
+Each historical phase report (`docs/archive/phases/PhaseN_Title.md`) should follow:
 
 ```markdown
 # Phase N: [Title]
