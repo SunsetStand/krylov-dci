@@ -23,17 +23,20 @@ echo "Running pure-matrix state-averaged regression"
 "${PY}" tests/unit/test_state_averaged_wave_operator.py
 
 echo "Running H2/STO-3G state-averaged self-consistent smoke test"
+OUTPUT_DIR="results/sa_sc_dmsvd_test_${SLURM_JOB_ID}"
 "${PY}" scripts/production/run_state_averaged_dci.py \
     --atom 'H 0 0 0; H 0 0 0.74' \
     --basis sto-3g \
     --n-active 2 --n-alpha 1 --n-beta 1 --n-core 0 --n-occ 1 \
     --svd-eps 1e-10 \
     --sa-states 2 --state-weights 0.5,0.5 \
-    --p-blocks 1 \
+    --p-blocks 1,2 \
     --scheme A \
     --outer-density-tol 1e-8 --outer-energy-tol 1e-9 \
     --outer-max-iter 12 \
     --wave-damping 0.7 --wave-residual-tol 1e-10 \
     --wave-energy-tol 1e-11 --wave-max-iter 200 \
     --n-workers 2 \
-    --output-dir "results/sa_sc_dmsvd_test_${SLURM_JOB_ID}"
+    --output-dir "${OUTPUT_DIR}"
+
+"${PY}" -c "import json; p='${OUTPUT_DIR}/state_averaged_sc_dmsvd_results.json'; d=json.load(open(p)); err=max(abs(x) for x in d['errors_mH']); assert err < 1e-6, f'max CASCI error = {err} mH'; print(f'H2 end-to-end max CASCI error: {err:.3e} mH')"
