@@ -225,6 +225,13 @@ For CAS(14,10) with M=4M, C-order memmap causes SIGBUS/OOM due to strided writes
 
 ## 10. References
 
+The state-averaged residual-dressed extension is specified in
+`docs/theory/state_averaged_sc_dmsvd.md`.  Its key distinction from the
+state-specific formulation above is that all selected roots share both the
+weighted Schmidt basis and a single graph wave operator.  State-averaged left
+and right density ranks are retained independently, so each number block has
+dimension `r_A(n) * r_B(n)` rather than an assumed `r(n)^2`.
+
 1. Krylov, A.N. *Izvestiya AN SSSR* 1931, No. 4, 491-539.
 2. Löwdin, P.O. *J. Math. Phys.* 1962, 3, 969. (Partitioning technique)
 3. Li, J.; Yang, J. *JPCL* 2022, 13, 10042. (dCI method)
