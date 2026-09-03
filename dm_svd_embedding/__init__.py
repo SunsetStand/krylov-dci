@@ -14,6 +14,7 @@ from .occ_virt_partition import (
     setup_partition,
 )
 from .density_matrix import (
+    normalize_state_weights,
     svd_truncate_block,
     compute_schmidt_decomposition,
     compute_compression_metrics,

@@ -79,12 +79,17 @@ def partition_qspace_by_n(
         states = q_by_n[n_val]
         indices = np.array([s['flat_idx_q'] for s in states], dtype=np.int64)
         # Recover Schmidt rank from schmidt_data
-        r_n = schmidt_data.get(n_val, {}).get('r', 0)
+        data = schmidt_data.get(n_val, {})
+        r_n = data.get('r', 0)
+        r_A = data.get('r_A', r_n)
+        r_B = data.get('r_B', r_n)
         q_blocks[n_val] = {
             'basis': states,
             'dim': len(states),
             'indices': indices,
             'r': r_n,
+            'r_A': r_A,
+            'r_B': r_B,
             'n': n_val,
         }
 
