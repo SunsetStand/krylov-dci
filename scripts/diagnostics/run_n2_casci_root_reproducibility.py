@@ -333,6 +333,11 @@ def main():
         for comparison in report['root_comparisons']
         if comparison['right'] != 'shared_mf_inventory_8'
     )
+    inventory_subset_drift = any(
+        comparison['best_permutation'] != list(range(PRODUCTION_ROOTS))
+        for comparison in report['root_comparisons']
+        if comparison['right'] == 'shared_mf_inventory_8'
+    )
     orbital_drift = any(
         comparison['minimum_diagonal_overlap'] < 0.999999
         or comparison['maximum_off_diagonal_overlap'] > 1e-6
@@ -346,7 +351,7 @@ def main():
         classifications.append('UNCONVERGED_REFERENCE')
     if orbital_drift:
         classifications.append('ORBITAL_DRIFT')
-    if poor_match:
+    if poor_match or inventory_subset_drift:
         classifications.append('ROOT_SUBSET_DRIFT')
     if not classifications:
         classifications.append('REPRODUCIBLE')
