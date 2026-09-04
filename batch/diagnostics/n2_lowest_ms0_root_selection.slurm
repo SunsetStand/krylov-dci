@@ -5,9 +5,9 @@
 #SBATCH --error=slurm_outputs/n2_ms0_roots_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=2G
+#SBATCH --time=00:30:00
 
 set -euo pipefail
 
