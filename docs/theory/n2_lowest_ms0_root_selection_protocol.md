@@ -79,11 +79,14 @@ missing low roots are in fact single-excitation dominated.
 
 ### 4. Causal initial-guess interventions
 
-Run two additional three-root calculations on the same Hamiltonian:
+Run three additional three-root calculations on the same Hamiltonian:
 
 1. `inventory_seeded`: initialize from inventory roots 0, 1, and 2.  This is a
    reachability control, not a production prescription.
-2. `cis_seeded`: diagonalize the Hamiltonian in the RHF-plus-all-singles space
+2. `expanded_default_seeded`: request three eigenvalues but initialize from the
+   solver's eight-root default guess set.  This isolates initial-subspace size
+   from determinant character.
+3. `cis_seeded`: diagonalize the Hamiltonian in the RHF-plus-all-singles space
    and use its three lowest vectors as the full-CI Davidson guesses.
 
 Match every returned root to the eight-root inventory by maximum absolute CI
