@@ -1,8 +1,8 @@
 # Iterative CI, Schmidt bases and downfolding: novelty landscape
 
-Status: **partial**. The adversarial novelty audit is complete. The
-effective-Hamiltonian, embedding and selected-CI surveys are still running and
-their sections are placeholders. Do not treat the bibliography as complete.
+Status: **partial**. The adversarial novelty audit, the effective-Hamiltonian
+survey and the selected-CI survey are complete. The embedding survey is still
+running. Do not treat the bibliography as complete.
 
 Metadata marked `[unverified]` was taken from search-result metadata rather than
 a fetched journal page, and must be re-verified before appearing in a
@@ -29,10 +29,10 @@ inside a Schmidt-derived P/Q partition.
 
 | Component | Verdict |
 |---|---|
-| Single shared wave operator across multiple states | **KNOWN** -- this is the Bloch wave operator by definition; one operator maps the whole model space |
+| Single shared wave operator across multiple states | **KNOWN** -- this is the Bloch wave operator by definition, and the state-universal MRCC ansatz (Jeziorski and Monkhorst 1981). One Omega per state is the *later* and less standard variant, not the default |
 | Rectangular independent left and right Schmidt ranks per electron-number block | **POSSIBLY NOVEL** for the asymmetric left/right pairing; per-block ranks themselves are standard |
-| Residual dressing of a wave operator fitted by pseudoinverse | **LIKELY PRECEDENTED** in effect; the specific mechanism was not located |
-| Hermitian graph-subspace Ritz `X^dag H X c = E X^dag X c`, `X = [I; Omega]` | **KNOWN** -- the generalized-eigenvalue statement of the canonical Hermitian effective Hamiltonian |
+| Residual dressing of a wave operator fitted by pseudoinverse | **LIKELY PRECEDENTED**. Lee and Suzuki construct the shared omega from d target eigenvectors as `[Q-amplitudes] x [P-amplitudes]^-1`, which is structurally the pseudoinverse-over-states construction |
+| Hermitian graph-subspace Ritz `X^dag H X c = E X^dag X c`, `X = [I; Omega]` | **KNOWN**. Okamoto, Fujii and Suzuki write the des Cloizeaux family literally as `(X^dag X)^-a X^dag H X (X^dag X)^-a`. Kirtman 1968 is titled "Variational Form of Van Vleck Degenerate Perturbation Theory" |
 
 ## The principal risk: tensor product selected CI
 
@@ -130,6 +130,175 @@ Two genuine points survive from that line of the audit:
 Because Li and Yang's dCI grows its model space self-consistently from overlaps
 with the current approximate target root, a referee will reasonably ask for a
 head-to-head comparison. Their benchmark system is C2.
+
+## Wave-operator theory: both novelty questions answered no
+
+**Question (a): is the Hermitian generalized Ritz form a novel alternative to
+diagonalizing the Bloch effective Hamiltonian? No.** With `X = P + omega`, one has
+`X^dag X = P + omega^dag omega`, and the des Cloizeaux effective Hamiltonian
+`(P + omega^dag omega)^-1/2 (P + omega^dag) H (P + omega) (P + omega^dag omega)^-1/2`
+has by construction the spectrum of `X^dag H X c = E X^dag X c`. They are the same
+problem in orthogonalized versus non-orthogonal form.
+
+- Okamoto, R.; Fujii, S.; Suzuki, K. *Formal Relation among Various Hermitian and
+  non-Hermitian Effective Interactions.* **Int. J. Mod. Phys. E 2005**, 14, 21-28.
+  DOI `10.1142/S0218301305002734`. arXiv:nucl-th/0501081. Classifies all
+  energy-independent effective Hamiltonians; its Eq. (20) is the des Cloizeaux
+  family written as `(X^dag X)^-a X^dag H X (X^dag X)^-a`. `[the exponent rendered
+  as -1 in the HTML and is probably -1/2; re-verify against the published PDF]`
+- Kirtman, B. *Variational Form of Van Vleck Degenerate Perturbation Theory with
+  Particular Application to Electronic Structure Problems.* **J. Chem. Phys.
+  1968**, 49, 3890-3894. A variational determination of a Hermitian multi-state
+  effective Hamiltonian, predating the present formulation by decades.
+- Shavitt, I.; Redmon, L. T. *Quasidegenerate perturbation theories. A canonical
+  van Vleck formalism and its relationship to other approaches.* **J. Chem. Phys.
+  1980**, 73, 5711-5717. The canonical chemistry-side Hermitian versus
+  non-Hermitian unification.
+- Pokhilko, P.; Krylov, A. I. *Effective Hamiltonians derived from
+  equation-of-motion coupled-cluster wave functions.* **J. Chem. Phys. 2020**,
+  152, 094108. DOI `10.1063/1.5143318`. Modern electronic-structure instance:
+  several target states onto one shared model space, Bloch effective Hamiltonian
+  noted as non-Hermitian, then des Cloizeaux Hermitization by Löwdin `S^-1/2`.
+
+A referee will further observe that `X^dag H X c = E X^dag X c` is simply
+Rayleigh-Ritz in the non-orthogonal basis `{|i> + Omega|i>}`, so the upper-bound
+property follows from Hylleraas-Undheim-MacDonald and not from anything new.
+
+**Question (b): is a single shared wave operator across states novel? No.** It is
+the definition of the standard state-universal Bloch formalism. Bloch 1958;
+Lindgren, *J. Phys. B* 1974, 7, 2441; and Jeziorski, B.; Monkhorst, H. J.
+**Phys. Rev. A 1981**, 24, 1668-1681, DOI `10.1103/PhysRevA.24.1668`, whose
+state-universal ansatz produces all model-space roots from one wave operator.
+State-specific MRCC exists precisely because shared Omega was the default.
+
+**The most damaging single hit.** Suzuki, K.; Lee, S. Y. *Convergent Theory for
+Effective Interaction in Nuclei.* **Prog. Theor. Phys. 1980**, 64, 2091-2106.
+DOI `10.1143/PTP.64.2091`. Defines the single shared omega from d target
+eigenvectors as `<a_Q|omega|a_P> = sum_k <a_Q|Psi_k><Psi_k|a_P>^-1`, that is
+`Omega = [Q-amplitudes] x [P-amplitudes]^-1` -- structurally the same
+pseudoinverse-over-states construction as `delta Omega = [delta q_k] pinv([c_k])`,
+and it is already iterative.
+
+**What may still be defensible**, and it is narrow: using the Hermitian
+generalized Ritz problem as the *working equation inside* a self-consistent Omega
+iteration, rather than as a post-hoc Hermitization applied once at the end, which
+is what des Cloizeaux, Suzuki-Okamoto and Pokhilko-Krylov all do. No paper doing
+this was located. The equation is not new; only its placement in the loop.
+
+**Unclosed lead, and it matters.** Killingbeck, J. P.; Jolicard, G. *The Bloch
+wave operator: generalizations and applications: Part I. The time-independent
+case.* **J. Phys. A 2003**, 36 (20). DOI `10.1088/0305-4470/36/20/201`. A topical
+review presenting wave-operator theory in **partitioned-matrix language**, which is
+exactly the `X = [I; Omega]` picture. The full text could not be retrieved. This is
+the single most likely place for the residual-update rule to already exist and
+**must be read before any novelty claim about the Omega update**.
+
+Also close: Leclerc, A.; Jolicard, G. *Calculating eigenvalues and eigenvectors of
+parameter-dependent Hamiltonians using an adaptative wave operator method.*
+**J. Chem. Phys. 2020**, 152, 204107. DOI `10.1063/5.0008947`. An iterative
+wave-operator algorithm with an **adaptive active subspace** whose model space
+follows the eigenspaces as they change -- the closest published relative of
+rebuilding the model space each macro-iteration.
+
+## Root targeting: the residual result is a theorem, and overshoot alone is not a fix
+
+The Gate B finding that a residual norm cannot discriminate wrong-root selection
+is not an empirical curiosity. It follows from two standard results.
+
+1. **The Hermitian residual bound quantifies over "some eigenvalue".** For unit
+   `x`, `theta = x^dag H x`, `r = Hx - theta x`, there exists *an* eigenvalue
+   `lambda` with `|lambda - theta| <= ||r||`. It does not say which one. A wrong
+   root is a genuine eigenpair, so its residual is genuinely small. Parlett, B. N.
+   *The Symmetric Eigenvalue Problem*, SIAM Classics 20 (1998).
+2. **Cauchy interlacing gives only `theta_i >= lambda_i`.** Convergence certifies
+   that `theta_i` is an eigenvalue at or above `lambda_i` -- exactly consistent with
+   roots converged to `5e-7` sitting tens of millihartree too high.
+
+The PRIMME documentation states the practical consequence outright: the
+eigenvalues returned are accurate but not necessarily the smallest, some smaller
+ones may have been missed, and this is a limitation of all iterative solvers.
+Stathopoulos, A.; McCombs, J. R. **ACM Trans. Math. Softw. 2010**, 37 (2), Art. 21.
+DOI `10.1145/1731022.1731031`.
+
+**A correction to the Gate B write-up.** The symmetry miss is more severe than
+"converged to the wrong root". Because `H` is exactly block diagonal by irrep and
+the Davidson diagonal preconditioner is diagonal in the same labelling, the search
+space generated from a guess lying in irreps `{Gamma_a}` **stays inside those
+irreps to machine precision at every iteration**. The measured `1e-26` projection
+is roundoff leakage, not a small usable seed. The solver was not converging
+incorrectly; it was correctly solving a *different, block-restricted* eigenproblem.
+
+It follows that **overshoot alone is not a reliable fix for a symmetry miss.** It
+worked here only because requesting more roots made the default guess generator
+reach further down the diagonal and happen to pick up determinants of the missing
+irrep. That is a side effect, not a guarantee. Overshoot is a reliable fix only
+for a near-degenerate or cluster miss. The per-irrep solve is the guarantee, which
+is why the bundle builder already uses symmetry as primary and overshoot only as a
+cross-check. The protocol should say so explicitly.
+
+**Acceptance tests that should be added to the bundle.**
+
+- **Gap gate.** Require `theta_{n+1} - theta_n > C * tol` with `C` of order `1e3`.
+  If violated, the target boundary cuts a cluster and `n` must be extended.
+- **Symmetry census.** Report `<Psi_i|P_Gamma|Psi_i>` for every irrep and every
+  accepted root. An irrep with zero total weight across all `n + m` roots is a red
+  flag that the guess never spanned it. In the unblocked solve this is the only
+  direct detector of the failure mode.
+- **Randomized-restart reproducibility.** Re-solve from a second guess that is
+  dense in every irrep; the lowest `n` must agree to tolerance.
+- **Sylvester inertia count, the only deterministic guarantee.** An `LDL^T`
+  factorization of `H - sigma I` for `sigma` in the gap counts exactly how many
+  eigenvalues lie below `sigma`. Ericsson, T.; Ruhe, A. **Math. Comp. 1980**, 35,
+  1251-1268. At the present validation sizes this is tractable, especially
+  per-irrep where each block is far smaller, and should be run once to certify the
+  whole pipeline.
+
+**Degenerate manifolds must carry equal weight.** The requirement that all members
+of a degenerate subspace enter an ensemble, and with equal weight, is the GOK
+ensemble condition: Gross, E. K. U.; Oliveira, L. N.; Kohn, W. **Phys. Rev. A
+1988**, 37, 2809-2820, DOI `10.1103/PhysRevA.37.2809`. Unequal or partial weighting
+destroys invariance under the point group and produces symmetry-broken orbitals and
+densities. Burton, H. G. A. **J. Phys. Chem. A 2023**, 127, 4538-4552, DOI
+`10.1021/acs.jpca.3c00603`, documents the resulting unphysical solutions in
+state-specific CASSCF. **Consequence for this project: the state weights passed to
+the state-averaged solver must be equal within the degenerate block.**
+
+## Model-space update from iterated CI coefficients is not novel
+
+This is the defining feature of the selected-CI family, not a contribution.
+
+- CIPSI selects using `e_alpha = <Psi^(n)|H|alpha>^2 / (E^(n) - <alpha|H|alpha>)`
+  where `Psi^(n)` carries the **previous iteration's** CI coefficients. Huron, B.;
+  Malrieu, J. P.; Rancurel, P. **J. Chem. Phys. 1973**, 58, 5745-5759, DOI
+  `10.1063/1.1679199`. Modern implementation: Garniron, Y.; et al. *Quantum Package
+  2.0.* **J. Chem. Theory Comput. 2019**, 15, 3591-3609, DOI
+  `10.1021/acs.jctc.9b00176`.
+- ASCI ranks on current CI coefficient magnitudes. Tubman, N. M.; et al.
+  **J. Chem. Phys. 2016**, 145, 044112, DOI `10.1063/1.4955109`.
+- HCI and SHCI select on `|H_ai c_i| > eps_1`, again the current coefficients.
+  Holmes, A. A.; Tubman, N. M.; Umrigar, C. J. **J. Chem. Theory Comput. 2016**,
+  12, 3674-3680. Sharma, S.; et al. **J. Chem. Theory Comput. 2017**, 13, 1595-1604,
+  DOI `10.1021/acs.jctc.6b01028`.
+- **ACI is the most explicit**, and includes a state-averaged multi-root variant:
+  the determinant space is expanded *and coarse grained until self-consistency*.
+  Schriber, J. B.; Evangelista, F. A. **J. Chem. Phys. 2016**, 144, 161106.
+  Schriber, J. B.; Evangelista, F. A. **J. Chem. Theory Comput. 2017**, 13,
+  5354-5366, DOI `10.1021/acs.jctc.7b00725`.
+- The dressing half is also prior art, in both state-specific and multi-state form,
+  with a **low-rank factorization of the dressing matrix**: Garniron, Y.; Scemama,
+  A.; Giner, E.; Caffarel, M.; Loos, P.-F. **J. Chem. Phys. 2018**, 149, 064103,
+  DOI `10.1063/1.5044503`. Formal ancestry: Malrieu, J. P.; Durand, P.; Daudey,
+  J. P. **J. Phys. A 1985**, 18, 809-826, DOI `10.1088/0305-4470/18/5/014`; and
+  (SC)^2-CI, Daudey, J. P.; Heully, J. L.; Malrieu, J. P. **J. Chem. Phys. 1993**,
+  99, 1240.
+
+The narrower surviving formulation, per this survey: every method above selects
+model-space members by a **per-determinant importance score**. Selecting instead by
+a **global low-rank or entanglement criterion on the state-averaged coefficient
+tensor** is a different object. That framing must still be defended against TPSCI,
+which applies HOSVD to state-averaged cluster RDMs; the distinction is a global
+bipartition versus local cluster factorization, and it is a distinction that has to
+be argued numerically.
 
 ## Adjacent-field precedent
 
