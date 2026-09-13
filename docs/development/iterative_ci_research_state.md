@@ -24,7 +24,7 @@ error, initial-guess dependence, ablations and failure modes must all be shown.
 | Gate | Scope | Status |
 |---|---|---|
 | 0 | Checkout, branch, environment | Complete |
-| A | Literature and novelty | Not started; agents blocked by a session rate limit |
+| A | Literature and novelty | Complete, first pass. See `docs/literature/iterative_ci_schmidt_downfolding_review.md` |
 | B | Deterministic lowest-three-level root bundle | Complete |
 | C | Decouple production path from the exact CI seed | Not started |
 | D | Ablation and initial-guess sensitivity | Not started |
@@ -149,9 +149,16 @@ for CAS(10e,9o), where the electron-number blocks differ.
 
 ## Open questions
 
-1. **Novelty is unassessed.** Gate A agents were relaunched after an earlier
-   session rate limit. One partial lead needs chasing: an existing method appears
-   to be named "downfolded CI (dCI)", a naming and possibly a priority collision.
+1. **Novelty is weak and the framing must change.** Four independent surveys
+   agree the composite claim is likely precedented. State-averaged DMRG owns the
+   core loop including the exact averaging formula; TPSCI owns the selected-CI
+   version; the Hermitian generalized Ritz form is des Cloizeaux; a shared wave
+   operator is the standard Bloch formalism; and Lee and Suzuki 1980 already build
+   a shared omega from target states by an inverse over states. The surviving
+   candidates are the specific combination, rectangular independent left/right
+   ranks per block, and the omega update rule. The last is **not safe to claim
+   until Killingbeck and Jolicard, J. Phys. A 2003, 36 (20), has been read** --
+   the one source none of the agents could retrieve.
 2. **Does the target set survive the active-space change scientifically?**
    CAS(10e,9o) shifts absolute energies from every prior N2 result in the
    repository. Nothing downstream has been re-run against it yet.
@@ -177,9 +184,58 @@ for CAS(10e,9o), where the electron-number blocks differ.
 - That residual dressing is necessary rather than decorative. No bypass exists
   yet, so H4 has never been tested.
 
+## Corrections to earlier conclusions
+
+1. **Overshoot alone does not fix a symmetry miss.** Because H is exactly block
+   diagonal by irrep and the Davidson preconditioner is diagonal in the same
+   labelling, the search space stays inside the guess irreps to machine precision.
+   The solver was correctly solving a block-restricted problem. Overshoot worked
+   only because requesting more roots made the guess generator reach further down
+   the diagonal and happen to pick up the missing irrep. The per-irrep solve is the
+   guarantee; overshoot is a reliable fix only for a cluster miss. The bundle
+   already uses symmetry as primary and overshoot as cross-check, which is correct,
+   but the ordering is now justified rather than incidental.
+2. **The shared-omega tension needs a sharper statement.** Prior work in this
+   repository found that shared *Krylov bases centered at one energy* break excited
+   states. That is a statement about a truncated resolvent basis, not about the
+   wave operator formalism: a single shared omega is the standard Bloch construction
+   and produces all model-space roots by design. The open question is narrower --
+   whether the pseudoinverse fit that collapses per-state corrections into one
+   operator loses the per-state resolvent centering that was shown to matter. That
+   is what the Gate D per-state variant must test.
+3. **Degenerate members must carry equal weight.** The GOK ensemble condition
+   requires all members of a degenerate subspace to enter the ensemble with equal
+   weight; unequal or partial weighting breaks point-group invariance and produces
+   symmetry-broken orbitals and densities. The state weights passed to the
+   state-averaged solver must therefore be equal within the degenerate block. This
+   is a hard constraint on Gate C and D, not a preference.
+
+## Acceptance tests still to add to the bundle
+
+- **Gap gate**: require a clear separation between root n and root n+1.
+- **Symmetry census**: irrep weight per accepted root; an irrep with zero weight
+  across all returned roots means the guess never spanned it.
+- **Randomized-restart reproducibility** from a guess dense in every irrep.
+- **Sylvester inertia count**, an LDL^T factorization of H - sigma I counting
+  exactly how many eigenvalues lie below sigma. This is the only deterministic
+  guarantee. Per-irrep it is cheap, since each block is far smaller than the full
+  space, and it should be run once to certify the pipeline.
+
 ## Next single priority
 
 Gate C step 1: write `docs/theory/iterative_ci_feasibility_protocol.md`,
 pre-registering H1 through H5, the initialization family, the control groups,
 the metric set and the pass, fail and inconclusive thresholds, before any solver
 code is touched. Thresholds must be fixed in writing before results are seen.
+
+Two obligations from Gate A now belong in that protocol as primary hypotheses
+rather than ancillary controls, because the novelty case depends on them:
+
+- **H3 is now load bearing.** Freezing the Schmidt basis after the first iteration
+  and re-running is the test of whether the self-consistent map is decoration. If
+  the converged answer sits inside the error bar of the one-shot answer, there is
+  no method. This was independently identified by the novelty audit as the single
+  experiment that decides the paper.
+- **Competitors, not oracles.** Accuracy must eventually be reported against
+  state-averaged DMRG at matched retained dimension and against SA-TPSCI at matched
+  per-block basis size. FCI is the oracle; those are the competitors.
