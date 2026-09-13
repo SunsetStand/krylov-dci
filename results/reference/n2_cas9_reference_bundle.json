@@ -1,0 +1,162 @@
+{
+  "format_version": 1,
+  "environment": {
+    "pyscf": "2.14.0",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "python": "3.12.3",
+    "commit": "d8596d622533564b27a058f53453d2f120189b24"
+  },
+  "system": {
+    "atom": "N 0 0 0; N 0 0 1.098",
+    "basis": "cc-pVDZ",
+    "point_group": "D2h",
+    "point_group_detected": "D2h",
+    "n_active": 9,
+    "n_active_elec": [
+      5,
+      5
+    ],
+    "n_core": 2,
+    "determinant_dimension": 15876,
+    "determinant_shape": [
+      126,
+      126
+    ],
+    "active_orbital_irreps": [
+      "Ag",
+      "B1u",
+      "Ag",
+      "B2u",
+      "B3u",
+      "B2g",
+      "B3g",
+      "B1u",
+      "Ag"
+    ],
+    "rhf_energy": -108.95408660586693,
+    "ecore": -77.41742268592223
+  },
+  "target": {
+    "target_levels": 3,
+    "n_target_roots": 4,
+    "level_grouping": [
+      [
+        0
+      ],
+      [
+        1
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    "energies": [
+      -109.0401239715579,
+      -108.74086830938353,
+      -108.7218810453868,
+      -108.72188104538678
+    ],
+    "root_character": [
+      {
+        "index": 0,
+        "total_energy": -109.0401239715579,
+        "excitation_mH": 0.0,
+        "residual_norm": 2.2792093879070855e-07,
+        "spin_squared": -5.329070518200751e-15,
+        "multiplicity": 0.9999999999999893,
+        "irrep": "Ag",
+        "wavefunction_irrep": "Ag"
+      },
+      {
+        "index": 1,
+        "total_energy": -108.74086830938353,
+        "excitation_mH": 299.2556621743745,
+        "residual_norm": 1.9669629940419028e-07,
+        "spin_squared": 1.9999999999999925,
+        "multiplicity": 2.999999999999995,
+        "irrep": "B1u",
+        "wavefunction_irrep": "B1u"
+      },
+      {
+        "index": 2,
+        "total_energy": -108.7218810453868,
+        "excitation_mH": 318.2429261711093,
+        "residual_norm": 1.1292028196956747e-07,
+        "spin_squared": 1.9999999999999991,
+        "multiplicity": 2.9999999999999996,
+        "irrep": "B2g",
+        "wavefunction_irrep": "B2g"
+      },
+      {
+        "index": 3,
+        "total_energy": -108.72188104538678,
+        "excitation_mH": 318.2429261711235,
+        "residual_norm": 1.1292027854121495e-07,
+        "spin_squared": 1.9999999999999916,
+        "multiplicity": 2.9999999999999942,
+        "irrep": "B3g",
+        "wavefunction_irrep": "B3g"
+      }
+    ]
+  },
+  "provenance": {
+    "primary_procedure": "symmetry",
+    "cross_check_procedure": "overshoot",
+    "cross_check_energies": [
+      -109.04012397155789,
+      -108.74086830938334,
+      -108.72188104538672,
+      -108.72188104538668
+    ],
+    "cross_check_max_disagreement_Ha": 1.8474111129762605e-13,
+    "overshoot_margin": 2,
+    "inventory_energies": [
+      -109.04012397155782,
+      -108.7408683093835,
+      -108.7218810453868,
+      -108.72188104538675,
+      -108.69460745967945,
+      -108.69460745967942,
+      -108.67149793559338,
+      -108.67113611276017,
+      -108.67113611276014,
+      -108.65196371973244
+    ],
+    "inventory_levels": [
+      [
+        0
+      ],
+      [
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        6
+      ],
+      [
+        7,
+        8
+      ],
+      [
+        9
+      ]
+    ]
+  },
+  "thresholds": {
+    "energy_agreement_tol": 1e-08,
+    "degenerate_tol": 1e-09,
+    "nonconvergence_residual_tol": 0.0001,
+    "solve_conv_tol": 1e-12
+  },
+  "wall_time_seconds": 4.217010427999867,
+  "checksum": "ad5b19d6674d54411f704bd3ed4b65aab9741d5373037868fc8fb76e85133d9d"
+}
