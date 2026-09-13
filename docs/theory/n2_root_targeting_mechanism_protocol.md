@@ -157,10 +157,10 @@ rotation and are not reproducible.
 
 | Control | Value |
 |---|---|
-| FCI convergence tolerance | `1e-10` |
-| Maximum Davidson subspace | solver default, recorded |
-| Maximum Davidson cycles | solver default, recorded |
-| Residual acceptance threshold | `1e-8` |
+| Maximum Davidson subspace | `30`, recorded |
+| Maximum Davidson cycles | `400`, recorded |
+| FCI convergence tolerance for bundle-quality solves | `1e-12` |
+| Non-convergence residual threshold | `1e-4` |
 | Degenerate-level tolerance | `1e-9 Ha` |
 | Energy agreement threshold | `1e-8 Ha` |
 | Numerical library threads | `1` for OMP, MKL, OpenBLAS and NumExpr |
@@ -171,7 +171,8 @@ For every returned root of every calculation:
 
 - total energy, and excitation energy relative to the lowest root
 - explicit residual norm `||Hc - Ec||` computed independently of the solver's own
-  convergence flag, and the energy variance `<c|H^2|c> - <c|H|c>^2`
+  convergence flag, and the energy variance `<c|H^2|c> - <c|H|c>^2`, interpreted
+  according to the limitation recorded below
 - `S^2` and multiplicity
 - spatial irreducible representation of the wavefunction
 - CI weight decomposed by excitation rank from the RHF determinant, as a full vector
@@ -195,6 +196,26 @@ differ between library versions, so version capture is mandatory, not optional.
 
 The JSON report is written after every completed calculation so partial results
 survive a later failure.
+
+## What the residual norm can and cannot certify
+
+A small residual certifies that a returned pair is an eigenpair. It does **not**
+certify that it is one of the lowest eigenpairs. A solve that homes on roots tens of
+millihartree above the target returns residuals indistinguishable from a correct
+solve, because those roots are genuine eigenvectors that simply are not the lowest
+ones. Measured on CAS(10e,9o) at `conv_tol = 1e-12`:
+
+| Solve | Energy error of the four returned roots | Residual norms |
+|---|---|---|
+| `nroots = 4` | `0.0`, `+18.99`, `+27.27`, `+50.38 mH` | `5.9e-07` and below |
+| `nroots = 6`, lowest four | all `0.0` | `5.8e-07` and below |
+
+The wrong-root solve produced residuals as small as the correct one. The residual
+test is therefore retained only as a **non-convergence detector**, with a loose
+threshold of `1e-4`: genuinely unconverged vectors measure around `1e-3`, converged
+ones between `1e-7` and `1e-5`. The operative correctness test is margin stability,
+defined below. A solver convergence flag is likewise insufficient: every wrong-root
+solve recorded here reported `converged = True` for every root.
 
 ## Classification
 
@@ -244,13 +265,25 @@ system-dependent, so the builder must escalate and self-validate:
 given n_target and margin m:
   solve for n_target + m roots
   accept only if
-    (a) every returned residual norm  < 1e-8
+    (a) every returned residual norm < 1e-4
+        (non-convergence detector only; it cannot detect wrong-root
+         selection, so it is necessary but far from sufficient)
     (b) no degenerate level straddles the n_target boundary,
         tested with the degenerate-level tolerance
     (c) the lowest n_target energies are unchanged, to 1e-8 Ha,
-        when m is increased
+        when m is increased by one
   otherwise increase m and repeat
 ```
+
+Criterion (c) is the operative test. It is the only one of the three that
+discriminates a correct root set from a converged but wrong one.
+
+Independently, the symmetry-resolved procedure is preferred where an Abelian point
+group is available, because it guarantees coverage of every irreducible
+representation by construction rather than relying on a guess happening to span
+them, and because it keeps the members of a degenerate level together: each
+component is the lowest root of its own irreducible representation. The bundle
+builder runs both and requires them to agree to the energy agreement threshold.
 
 The bundle stores geometry, basis, frozen core, active-space definition, molecular
 orbital coefficients, active-space integrals, the target CI vectors, energies, `S^2`,
