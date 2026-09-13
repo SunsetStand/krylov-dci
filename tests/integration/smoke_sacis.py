@@ -15,9 +15,20 @@ Exit code 0 = pass.
 """
 import os, re, sys, subprocess
 
-ROOT = '/data/home/wangcx/krylov-dci'
-PY = '/data/home/wangcx/LiYF4_Er3+/env/bin/python'
-SCRIPT = os.path.join(ROOT, 'scripts_new', 'phaseA_cas10_v10_sacis.py')
+# Paths are environment-overridable so the test runs locally as well as on the
+# cluster.  The defaults resolve against this checkout and the running
+# interpreter rather than a hard-coded cluster location.
+ROOT = os.environ.get(
+    'KRYLOV_DCI_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+PY = os.environ.get('KRYLOV_DCI_PYTHON', sys.executable)
+# NOTE: the repository reorganization moved this driver into scripts/archived/,
+# which CONTRIBUTING.md marks as historical rather than a current API.  This
+# smoke test therefore needs a maintained replacement entry point; until then it
+# is pointed at the archived driver so that it can run at all.
+SCRIPT = os.environ.get(
+    'KRYLOV_DCI_SACIS_SCRIPT',
+    os.path.join(ROOT, 'scripts', 'archived', 'phaseA_cas10_v10_sacis.py'))
 
 def main():
     cmd = [PY, SCRIPT, '--P', '400', '--m-max', '1', '--tag', 'smoke']
