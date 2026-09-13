@@ -87,11 +87,71 @@ Built with PySCF 2.14.0, NumPy 2.5.3, SciPy 1.18.1.
 Artifact: `~/work/krylov-dci-run-artifacts/reference/n2_cas9/`.
 Committed summary: `results/reference/n2_cas9_reference_bundle.json`.
 
+## Prior art inside this repository
+
+The excited-state energy deviation has been met and solved before in this project.
+Four results from `hku_report/` and `reports/` bear directly on Gates C and D.
+
+1. **CIS seeding is the established fix for excited-state P-space quality.** The
+   `+636 mH` S1 plateau was caused by HFPT2 scoring assigning zero weight to single
+   excitations, since Brillouin makes `<HF|H|singles>` vanish, leaving the P space
+   blind to the single-excitation character of triplets. Seeding P with all
+   single-excitation determinants plus overlap and `<S^2>` tracking gave, at
+   `P = 2000`, `m = 1`: S1 `+636 -> +0.8 mH`, S2 `~+640 -> +0.8 mH`, S3
+   `~+50 -> +1.0 mH`. Source: `hku_report/Six_Week_Comprehensive_Report.md`.
+   Consequence: the CIS initializer in Gate C is not a guess, it is the documented
+   winner, and should be the first non-exact seed tried.
+
+2. **Sharing a resolvent or basis across states is known to break excited states.**
+   "The earlier 'excited states degrade with m' was an artifact of shared Krylov
+   bases." Per-state `E_0^(k)` Löwdin centering gives chemical accuracy for all
+   states. Source: `hku_report/Six_Week_Comprehensive_Report.md` key lesson 3, and
+   `hku_report/Phase17-18_Progress_Report.md`: "The Krylov basis MUST be centered at
+   the target state's energy."
+
+   **This is in tension with the current design.** `state_averaged_sc_dmsvd.md`
+   specifies ONE shared wave operator across all states. The residual dressing does
+   keep per-state denominators, `delta q_k = R_Q,k / (E_k - diag(H_QQ))`, but the
+   pseudoinverse fit `delta Omega = [delta q_k] pinv([c_k])` then collapses every
+   per-state correction into a single operator, which is exactly where the per-state
+   information is lost. Per-state Omega is therefore not merely a nice-to-have
+   ablation; prior evidence suggests it may be structurally required. It is approved
+   for implementation in Gate D and should be treated as a leading hypothesis rather
+   than a control.
+
+3. **Never select roots by index; track by overlap and `<S^2>`.** A Phase 18 result
+   of `|dE| <= 76 mH` for all roots was later shown to be coincidence: the script
+   used `ev[0]`, the lowest eigenvalue, for every root. Proper overlap tracking,
+   `m*_k = argmax_m |<c_m^eff | c_k^(P)>|`, revealed true errors above `600 mH`.
+   Source: `hku_report/Phase19-20_IterativeP_ExcitedStates.md` section 4.
+
+   The diagnostic offered there is directly reusable: "rerunning with any parameter
+   change destroys the good numbers -- a hallmark of coincidence, not convergence."
+   Gate D must therefore include a parameter-perturbation robustness test as an
+   explicit coincidence detector, not only a seed-perturbation test.
+
+4. **State averaging of the Schmidt basis is established as necessary.** A
+   ground-state-only Schmidt basis overestimates every triplet by `+323` to
+   `+372 mH` and collapses states 2 to 4 to near-degeneracy, because the GS
+   `rho_A^(n)` encodes closed-shell correlation dominated by doubles with
+   Brillouin-suppressed singles, while open-shell triplets have a different
+   entanglement structure. The state-averaged `rho_A^SA` and `rho_B^SA` keep all
+   errors below `1 mH`. Source: `reports/Phase1_DensityMatrix_SVD_Embedding.md`
+   section 3.6.1.
+
+**Validated benchmark to reproduce.** N2 CAS(10,10), P blocks `n = [8,9,10]`,
+`m = 1`, state-averaged mode, job 15372: S0 `+0.395`, S1 `-0.816`, S2 `-0.476`,
+S3 `-0.829`, S4 `-0.224 mH`, all overlaps above `0.997`. Expanding P to
+`n = [7,8,9,10]` changed the ground state by `0.004 mH`, so the P-block choice
+should not be widened. Note this benchmark predates the active-space correction and
+was computed in the defective CAS(10e,10o); the P-block choice must be re-derived
+for CAS(10e,9o), where the electron-number blocks differ.
+
 ## Open questions
 
-1. **Novelty is unassessed.** Gate A produced no report. One partial lead needs
-   chasing urgently: an existing method appears to be named "downfolded CI
-   (dCI)", which is a naming and possibly a priority collision.
+1. **Novelty is unassessed.** Gate A agents were relaunched after an earlier
+   session rate limit. One partial lead needs chasing: an existing method appears
+   to be named "downfolded CI (dCI)", a naming and possibly a priority collision.
 2. **Does the target set survive the active-space change scientifically?**
    CAS(10e,9o) shifts absolute energies from every prior N2 result in the
    repository. Nothing downstream has been re-run against it yet.
@@ -110,8 +170,10 @@ Committed summary: `results/reference/n2_cas9_reference_bundle.json`.
 - That the self-consistent Schmidt update improves on a frozen basis for a
   reason other than error cancellation. The H2O scan showed stability, not
   benefit.
-- That a shared Omega is preferable to a per-state Omega. Approved for
-  implementation as a controlled ablation in Gate D; currently untested.
+- That a shared Omega is preferable to a per-state Omega. Prior work in this
+  repository points the other way: shared Krylov bases were found to break excited
+  states, and per-state centering fixed them. Approved for implementation in Gate D
+  and now treated as a leading hypothesis rather than a control.
 - That residual dressing is necessary rather than decorative. No bypass exists
   yet, so H4 has never been tested.
 
