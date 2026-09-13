@@ -1,8 +1,9 @@
 # Iterative CI, Schmidt bases and downfolding: novelty landscape
 
-Status: **partial**. The adversarial novelty audit, the effective-Hamiltonian
-survey and the selected-CI survey are complete. The embedding survey is still
-running. Do not treat the bibliography as complete.
+Status: **complete for a first pass**. All four surveys have reported: the
+adversarial novelty audit, effective-Hamiltonian theory, embedding, and
+selected-CI/root-targeting. Four independent searches reached consistent
+conclusions, which raises confidence in the negative results.
 
 Metadata marked `[unverified]` was taken from search-result metadata rather than
 a fetched journal page, and must be re-verified before appearing in a
@@ -346,11 +347,132 @@ experiments already planned for Gate D.
    the one genuinely unlocated ingredient. Show a system where asymmetric rank
    allocation beats symmetric allocation at equal total cost, or drop the claim.
 
-## Sections pending
+## Embedding: what each family actually iterates
 
-- Effective Hamiltonian and wave-operator theory: Bloch, Bloch-Horowitz,
-  Feshbach, Löwdin, des Cloizeaux, QDPT, intermediate Hamiltonians, MRCC.
-- Embedding: DMET and its self-consistency condition, bootstrap embedding, SEET,
-  DMFT, DMRG, LASSCF/LASCI, comparison matrix.
-- Selected CI and root targeting: CIPSI, ASCI, SHCI, Davidson and
-  Jacobi-Davidson root homing, best practice for obtaining the lowest n roots.
+**DMET does not rebuild its bath from the correlated wavefunction, and this is
+the cleanest positive result for positioning.** Its bath is the Schmidt
+decomposition of a *single Slater determinant*; the self-consistency loop iterates
+a **one-body correlation potential `u`** added to the mean-field Hamiltonian until
+the mean-field and high-level one-particle density matrices agree on the fragment.
+The correlated impurity wavefunction feeds back only through that one-body
+potential. The bath is never re-derived from the correlated solution.
+
+- Knizia, G.; Chan, G. K.-L. **Phys. Rev. Lett. 2012**, 109, 186404. DOI
+  `10.1103/PhysRevLett.109.186404`.
+- Knizia, G.; Chan, G. K.-L. **J. Chem. Theory Comput. 2013**, 9, 1428-1432.
+- Wouters, S.; Jiménez-Hoyos, C. A.; Sun, Q.; Chan, G. K.-L. *A practical guide to
+  density matrix embedding theory in quantum chemistry.* **J. Chem. Theory Comput.
+  2016**, 12, 2706-2719. DOI `10.1021/acs.jctc.6b00316`. The explicit algorithmic
+  reference.
+- Negre, C.; Faulstich, F.; Kim, R.; Ayral, T.; Lin, L.; Cancès, E. *New
+  perspectives on Density-Matrix Embedding Theory.* arXiv:2503.09881 (2025).
+  Confirms that generalized DMET still alternates local many-body problems with
+  reconstruction of a global one-particle density matrix, and does **not** rebuild
+  the bath from the high-level wavefunction. `[unverified journal ref]`
+
+**Correlated baths exist in the DMET family, but all are one-shot and lower
+level.** None feeds the embedded solver's own output back into the bath.
+
+- Tsuchimochi, T.; Welborn, M.; Van Voorhis, T. **J. Chem. Phys. 2015**, 143,
+  024107. DOI `10.1063/1.4926650`. Bath from an antisymmetrized geminal power.
+- Nusspickel, M.; Booth, G. H. **Phys. Rev. X 2022**, 12, 011046. DOI
+  `10.1103/PhysRevX.12.011046`. Bath natural orbitals from an approximate MP2
+  density matrix.
+- Sekaran, S.; Bindech, O.; Fromager, E. **J. Chem. Phys. 2023**, 159, 034107. DOI
+  `10.1063/5.0157746`. Bath as a functional of a non-idempotent one-particle
+  density matrix.
+- Guan, Z.-B.; Jiang, H. arXiv:2607.08178 (2026). Bath from a state-averaged
+  CASSCF one-particle density matrix -- the multi-state analogue of `rho^SA`, but
+  from a one-shot lower-level reference. `[unverified]`
+- Hermes, M. R.; Gagliardi, L. *LASSCF.* **J. Chem. Theory Comput. 2019**, 15,
+  972-986. DOI `10.1021/acs.jctc.8b01009`. The DMET-family method that comes
+  closest: a multiconfigurational wavefunction as the bath, optimized
+  self-consistently through a modified DMET algorithm.
+
+**State-averaged DMRG owns the core loop, including the exact averaging formula.**
+
+- Ghosh, D.; Hachmann, J.; Yanai, T.; Chan, G. K.-L. *Orbital optimization in the
+  density matrix renormalization group.* **J. Chem. Phys. 2008**, 128, 144117.
+  arXiv:0712.2475. Constructs n orthogonal states in a common renormalized basis
+  and **averages their density matrices to build the common renormalized basis for
+  the next iteration** -- formally `rho^SA(n) = sum_k w_k C_k C_k^dag`, weights
+  included.
+- Schollwöck, U. **Rev. Mod. Phys. 2005**, 77, 259; **Ann. Phys. 2011**, 326, 96.
+  With abelian quantum numbers the coefficient matrix is block diagonal and block
+  dimensions differ per particle-number sector, so independent per-sector
+  dimensions are structurally normal in symmetry-adapted DMRG.
+
+**Also close, and not previously considered by this project:**
+
+- Parker, S. M.; Shiozaki, T. *Active space decomposition with multiple sites:
+  DMRG algorithm.* **J. Chem. Phys. 2014**, 141, 211102. DOI `10.1063/1.4902991`.
+  The RDM is diagonalized at each sweep step and the M largest eigenvectors
+  renormalize the block states, with renormalization applied only across the
+  inter-fragment cut -- an explicitly asymmetric use of left and right bases.
+- Jiménez-Hoyos, C. A.; Scuseria, G. E. *Cluster-based mean-field...* **Phys. Rev.
+  B 2015**, 92, 085101. Cluster states variationally re-optimized and iterated to
+  self-consistency.
+- Mayhall, N. J. *n-Body Tucker.* **J. Chem. Theory Comput. 2017**, 13, 4818-4828.
+  HOSVD of the wavefunction tensor defining local cluster bases; the root of the
+  TPSCI basis-rebuilding step.
+
+One nuance in this project's favour: Bachhar and Mayhall, arXiv:2508.13002 (2025),
+state that "we have currently omitted this HOSVD step to avoid mixing local
+states". The TPSCI basis rebuild is available but is not always driven to
+self-consistency in practice.
+
+## Synthesis: where the novelty actually is
+
+Four independent searches agree on the following, which is the honest position.
+
+**Not novel, and must be cited rather than claimed.**
+
+| Ingredient | Owner |
+|---|---|
+| Rebuilding a basis from the method's own correlated wavefunction's RDM and iterating | DMRG, since 1992 |
+| The state-averaged weighted RDM giving one shared basis | SA-DMRG (Ghosh et al. 2008) |
+| The same idea on a selected-CI wavefunction via SVD/HOSVD | TPSCI (Abraham and Mayhall 2020; Braunscheidel et al. 2023, 2024) |
+| Updating a model space from iterated CI coefficients | The whole selected-CI family, since CIPSI 1973 |
+| A single shared wave operator for several states | Bloch; state-universal MRCC (Jeziorski and Monkhorst 1981) |
+| `Omega` built from target states via an inverse over states | Lee and Suzuki 1980 |
+| The Hermitian generalized Ritz form | des Cloizeaux 1960; Kirtman 1968; Okamoto et al. 2005 |
+| Dressing a CI problem with outer-space residual effects | Malrieu's intermediate Hamiltonians; (SC)^2-CI; dressed sCI |
+
+**Not located by any of the four searches.**
+
+1. **The specific combination**: a Schmidt basis rebuilt from the method's own
+   correlated wavefunction, coupled to a **P/Q wave-operator downfolding** with a
+   **non-orthogonal generalized Ritz problem**, in one loop. The basis-rebuild half
+   and the effective-Hamiltonian half each have deep literatures; nothing joining
+   them was found.
+2. **Rectangular independent left and right ranks per electron-number block** as a
+   named, motivated, analyzed design choice. Structurally routine in
+   symmetry-adapted DMRG and explicit in ASD-DMRG, but never presented as a method
+   feature. Both the embedding survey and the novelty audit reached this
+   independently.
+3. **The `Omega` update rule** `delta Omega = [R_Q/(E - diag H_QQ)] pinv([c_k])`,
+   a Davidson-style preconditioner combined with a multi-state pseudoinverse fit.
+   Lee and Suzuki use the raw amplitude inverse; dressings use diagonal shifts.
+   **This claim is not safe until Killingbeck and Jolicard 2003 has been read.**
+
+**The strongest defensible framing**, given all of the above, is at the level of
+the downfolding and solver, not at the level of "correlated bath" or
+"self-consistent basis": a Schmidt/dmSVD selection rule inside an otherwise
+conventional iterated self-consistency loop, coupled to a residual-dressed shared
+wave operator solved variationally. Prior art must be cited for the loop itself.
+
+## Obligations before submission
+
+1. Read Killingbeck and Jolicard, **J. Phys. A 2003**, 36 (20), before claiming
+   anything about the `Omega` update rule.
+2. Benchmark against dressed selected CI on the same P space (Garniron et al.
+   2018). If the energies agree to within noise, there is no method.
+3. Freeze the Schmidt basis after the first iteration and re-run. If the
+   self-consistent answer is within the error bar of the one-shot answer, the
+   self-consistent map is decoration. This is the H3 control already planned.
+4. Matched-cost comparison against SA-DMRG at equal retained dimension and against
+   SA-TPSCI at equal per-block basis size. FCI is the oracle; these are the
+   competitors. C2 is the natural shared benchmark and is Li and Yang's.
+5. Show that asymmetric left/right rank allocation beats symmetric allocation at
+   equal total cost, or drop that claim.
+6. Re-verify every reference marked `[unverified]` against a publisher record.
