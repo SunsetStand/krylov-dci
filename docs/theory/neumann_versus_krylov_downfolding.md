@@ -129,6 +129,24 @@ the solver, but it is a rigorous bound rather than an intuition, and it offers a
 candidate explanation for the frozen residual stall recorded in
 `docs/theory/n2_casci_root_reproducibility_protocol.md`.
 
+## Two different SVDs, only one of which is being dropped
+
+This project applies a singular value decomposition at two unrelated places.
+Confusing them would be destructive, so they are named here explicitly.
+
+| | **dmSVD / Schmidt** | **Krylov basis compression** |
+|---|---|---|
+| Operates on | the CI coefficient matrix `C^(n)` | the weighted coupling `A H_QP` |
+| Partition | `A \| B`, the Schmidt bipartition | `P / Q`, the model/outer partition |
+| Produces | the Schmidt basis, hence `H_emb` | a compressed Krylov basis, hence `H_eff` |
+| Role | **the core of the method** | a truncation convenience |
+| Status | **retained, not negotiable** | **dropped, replaced by a plain QR** |
+
+The recommendation below removes only the second. The first is what defines the
+method: rebuilding the Schmidt basis from the state-averaged reduced densities of
+the current CI coefficients, with left and right ranks retained independently. It
+is unaffected by anything in this note.
+
 ## Answer and recommendation
 
 **In the weakly correlated regime the two are comparable**, with Krylov about
@@ -144,8 +162,8 @@ correlation is the entire purpose of a multireference downfolding method, Neuman
 cannot be the primary route.
 
 The useful middle path, which the measurement above already uses, is to keep the
-Galerkin step but drop the SVD compression: form `K = A H_QP`, orthonormalize by
-QR, and invert exactly inside it. That is Krylov `m = 0`. It costs the same
+Galerkin step but drop **the Krylov basis compression SVD**, not the dmSVD: form
+`K = A H_QP`, orthonormalize by QR, and invert exactly inside it. That is Krylov `m = 0`. It costs the same
 matvecs as Neumann `k = 1`, is twice as accurate at equilibrium, remains
 well behaved when the series diverges, and avoids the MGS-plus-SVD machinery that
 the project has documented as its main source of numerical fragility.
