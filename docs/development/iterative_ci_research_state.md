@@ -186,10 +186,10 @@ for CAS(10e,9o), where the electron-number blocks differ.
 
 ## Gate C progress
 
-**H5 is done and gated correctly.**  provides five
-non-exact seeds;  gained ; exact energies reach the
-pipeline only through , which can be switched off.
- arms tripwires on the CASCI and FCI
+**H5 is done and gated correctly.** `dm_svd_dci/initializers.py` provides five
+non-exact seeds; `setup_system` gained `solve_exact`; exact energies reach the
+pipeline only through `evaluate_reference_energies`, which can be switched off.
+`tests/regression/test_exact_ci_isolation.py` arms tripwires on the CASCI and FCI
 kernels, runs the whole pipeline from a CIS seed, and separately asserts the
 tripwire fires on an exact solve so it cannot pass vacuously. Default
 `seed='exact'` still reproduces CASCI to `6.7e-13 mH`.
