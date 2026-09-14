@@ -1,0 +1,517 @@
+{
+  "partitions": {
+    "equilibrium": {
+      "exact_casci_energy": -74.99681575299248,
+      "dimension": 100,
+      "partitions": {
+        "10": {
+          "n_P": 10,
+          "n_Q": 90,
+          "spectral_radius_BA": 0.36109673487874466,
+          "neumann_converges": true,
+          "exact_resolvent_energy": -74.99750559544374,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -75.00075512067872,
+              "error_vs_exact_resolvent_mH": -3.2495252349775683,
+              "error_vs_casci_mH": -3.939367686243145
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 10,
+              "energy": -74.9964665728447,
+              "error_vs_exact_resolvent_mH": 1.0390225990448698,
+              "error_vs_casci_mH": 0.3491801477792933
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 20,
+              "energy": -74.99778550630224,
+              "error_vs_exact_resolvent_mH": -0.2799108584952137,
+              "error_vs_casci_mH": -0.9697533097607902
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 30,
+              "energy": -74.99740528651284,
+              "error_vs_exact_resolvent_mH": 0.10030893089663095,
+              "error_vs_casci_mH": -0.5895335203689456
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 40,
+              "energy": -74.99754007981885,
+              "error_vs_exact_resolvent_mH": -0.03448437510655822,
+              "error_vs_casci_mH": -0.7243268263721347
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 10,
+              "basis_width": 10,
+              "energy": -74.99695200634538,
+              "error_vs_exact_resolvent_mH": 0.5535890983594527,
+              "error_vs_casci_mH": -0.13625335290612384
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 50,
+              "basis_width": 20,
+              "energy": -74.99749500983353,
+              "error_vs_exact_resolvent_mH": 0.01058561021238802,
+              "error_vs_casci_mH": -0.6792568410531885
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 110,
+              "basis_width": 30,
+              "energy": -74.99750550549922,
+              "error_vs_exact_resolvent_mH": 8.994452116439788e-05,
+              "error_vs_casci_mH": -0.6897525067444121
+            }
+          ]
+        },
+        "20": {
+          "n_P": 20,
+          "n_Q": 80,
+          "spectral_radius_BA": 0.36012727356005925,
+          "neumann_converges": true,
+          "exact_resolvent_energy": -74.9974522941859,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -75.00036937500396,
+              "error_vs_exact_resolvent_mH": -2.9170808180509766,
+              "error_vs_casci_mH": -3.553622011480684
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 20,
+              "energy": -74.99657024618682,
+              "error_vs_exact_resolvent_mH": 0.8820479990845342,
+              "error_vs_casci_mH": 0.24550680565482708
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 40,
+              "energy": -74.99767115357426,
+              "error_vs_exact_resolvent_mH": -0.2188593883545309,
+              "error_vs_casci_mH": -0.8554005817842381
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 60,
+              "energy": -74.99737920880655,
+              "error_vs_exact_resolvent_mH": 0.07308537935557524,
+              "error_vs_casci_mH": -0.5634558140741319
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 80,
+              "energy": -74.99747581653253,
+              "error_vs_exact_resolvent_mH": -0.023522346623394697,
+              "error_vs_casci_mH": -0.6600635400531019
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 20,
+              "basis_width": 20,
+              "energy": -74.99697664395242,
+              "error_vs_exact_resolvent_mH": 0.4756502334828383,
+              "error_vs_casci_mH": -0.16089095994686886
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 100,
+              "basis_width": 40,
+              "energy": -74.99744929875207,
+              "error_vs_exact_resolvent_mH": 0.002995433831642913,
+              "error_vs_casci_mH": -0.6335457595980643
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 220,
+              "basis_width": 60,
+              "energy": -74.99745226372698,
+              "error_vs_exact_resolvent_mH": 3.0458920718956506e-05,
+              "error_vs_casci_mH": -0.6365107345089882
+            }
+          ]
+        },
+        "40": {
+          "n_P": 40,
+          "n_Q": 60,
+          "spectral_radius_BA": 0.33161289502372626,
+          "neumann_converges": true,
+          "exact_resolvent_energy": -74.99731840309182,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -75.00030940240508,
+              "error_vs_exact_resolvent_mH": -2.9909993132548607,
+              "error_vs_casci_mH": -3.493649412604327
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 40,
+              "energy": -74.99633122228138,
+              "error_vs_exact_resolvent_mH": 0.987180810440691,
+              "error_vs_casci_mH": 0.4845307110912245
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 80,
+              "energy": -74.99755045091324,
+              "error_vs_exact_resolvent_mH": -0.23204782141306168,
+              "error_vs_casci_mH": -0.7346979207625282
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 120,
+              "energy": -74.99723518478372,
+              "error_vs_exact_resolvent_mH": 0.08321830810587016,
+              "error_vs_casci_mH": -0.4194317912435963
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 160,
+              "energy": -74.99734386403966,
+              "error_vs_exact_resolvent_mH": -0.025460947838951142,
+              "error_vs_casci_mH": -0.5281110471884176
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 40,
+              "basis_width": 40,
+              "energy": -74.99690819343803,
+              "error_vs_exact_resolvent_mH": 0.41020965379345853,
+              "error_vs_casci_mH": -0.09244044555600794
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 160,
+              "basis_width": 60,
+              "energy": -74.99731840309182,
+              "error_vs_exact_resolvent_mH": 0.0,
+              "error_vs_casci_mH": -0.5026500993494665
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 260,
+              "basis_width": 60,
+              "energy": -74.99731840309182,
+              "error_vs_exact_resolvent_mH": 0.0,
+              "error_vs_casci_mH": -0.5026500993494665
+            }
+          ]
+        }
+      }
+    },
+    "stretched_2x": {
+      "exact_casci_energy": -74.76693263428591,
+      "dimension": 100,
+      "partitions": {
+        "10": {
+          "n_P": 10,
+          "n_Q": 90,
+          "spectral_radius_BA": 2.5534619692205562,
+          "neumann_converges": false,
+          "exact_resolvent_energy": -75.24852650923727,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -74.93866433947476,
+              "error_vs_exact_resolvent_mH": 309.8621697625106,
+              "error_vs_casci_mH": -171.73170518884717
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 10,
+              "energy": -74.74815152774968,
+              "error_vs_exact_resolvent_mH": 500.37498148758175,
+              "error_vs_casci_mH": 18.781106536224
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 20,
+              "energy": -75.79080724189637,
+              "error_vs_exact_resolvent_mH": -542.2807326591084,
+              "error_vs_casci_mH": -1023.8746076104661
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 30,
+              "energy": -74.80589760857161,
+              "error_vs_exact_resolvent_mH": 442.6289006656532,
+              "error_vs_casci_mH": -38.96497428570456
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 40,
+              "energy": -78.71687953317155,
+              "error_vs_exact_resolvent_mH": -3468.3530239342845,
+              "error_vs_casci_mH": -3949.946898885642
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 10,
+              "basis_width": 10,
+              "energy": -74.84507256536587,
+              "error_vs_exact_resolvent_mH": 403.45394387139777,
+              "error_vs_casci_mH": -78.13993107995998
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 50,
+              "basis_width": 20,
+              "energy": -75.23217412154443,
+              "error_vs_exact_resolvent_mH": 16.35238769283376,
+              "error_vs_casci_mH": -465.241487258524
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 110,
+              "basis_width": 30,
+              "energy": -76.19781974528897,
+              "error_vs_exact_resolvent_mH": -949.2932360517017,
+              "error_vs_casci_mH": -1430.8871110030595
+            }
+          ]
+        },
+        "20": {
+          "n_P": 20,
+          "n_Q": 80,
+          "spectral_radius_BA": 1.9376925960443834,
+          "neumann_converges": false,
+          "exact_resolvent_energy": -75.32430013077928,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -74.93963947745803,
+              "error_vs_exact_resolvent_mH": 384.660653321248,
+              "error_vs_casci_mH": -172.70684317212215
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 20,
+              "energy": -74.73704107008729,
+              "error_vs_exact_resolvent_mH": 587.2590606919914,
+              "error_vs_casci_mH": 29.891564198621268
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 40,
+              "energy": -75.57386756612611,
+              "error_vs_exact_resolvent_mH": -249.56743534683312,
+              "error_vs_casci_mH": -806.9349318402033
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 60,
+              "energy": -74.86559024304415,
+              "error_vs_exact_resolvent_mH": 458.7098877351252,
+              "error_vs_casci_mH": -98.65760875824492
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 80,
+              "energy": -77.76255568986062,
+              "error_vs_exact_resolvent_mH": -2438.255559081341,
+              "error_vs_casci_mH": -2995.623055574711
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 20,
+              "basis_width": 20,
+              "energy": -75.16861637093874,
+              "error_vs_exact_resolvent_mH": 155.68375984054228,
+              "error_vs_casci_mH": -401.68373665282786
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 100,
+              "basis_width": 40,
+              "energy": -75.81572934760935,
+              "error_vs_exact_resolvent_mH": -491.42921683007046,
+              "error_vs_casci_mH": -1048.7967133234406
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 220,
+              "basis_width": 60,
+              "energy": -76.96740759576603,
+              "error_vs_exact_resolvent_mH": -1643.1074649867555,
+              "error_vs_casci_mH": -2200.474961480126
+            }
+          ]
+        },
+        "40": {
+          "n_P": 40,
+          "n_Q": 60,
+          "spectral_radius_BA": 1.5793404355835068,
+          "neumann_converges": false,
+          "exact_resolvent_energy": -74.98438492857709,
+          "records": [
+            {
+              "method": "neumann",
+              "order": 0,
+              "matvecs": 0,
+              "energy": -74.90997852246389,
+              "error_vs_exact_resolvent_mH": 74.40640611319793,
+              "error_vs_casci_mH": -143.04588817797992
+            },
+            {
+              "method": "neumann",
+              "order": 1,
+              "matvecs": 40,
+              "energy": -74.77696387598317,
+              "error_vs_exact_resolvent_mH": 207.42105259391508,
+              "error_vs_casci_mH": -10.031241697262772
+            },
+            {
+              "method": "neumann",
+              "order": 2,
+              "matvecs": 80,
+              "energy": -75.20806996273609,
+              "error_vs_exact_resolvent_mH": -223.6850341590042,
+              "error_vs_casci_mH": -441.13732845018205
+            },
+            {
+              "method": "neumann",
+              "order": 3,
+              "matvecs": 120,
+              "energy": -74.80904410244844,
+              "error_vs_exact_resolvent_mH": 175.34082612864665,
+              "error_vs_casci_mH": -42.111468162531196
+            },
+            {
+              "method": "neumann",
+              "order": 4,
+              "matvecs": 160,
+              "energy": -75.89896076011873,
+              "error_vs_exact_resolvent_mH": -914.5758315416401,
+              "error_vs_casci_mH": -1132.028125832818
+            },
+            {
+              "method": "krylov",
+              "order": 0,
+              "matvecs": 40,
+              "basis_width": 40,
+              "energy": -74.93603501127237,
+              "error_vs_exact_resolvent_mH": 48.34991730471927,
+              "error_vs_casci_mH": -169.10237698645858
+            },
+            {
+              "method": "krylov",
+              "order": 1,
+              "matvecs": 160,
+              "basis_width": 60,
+              "energy": -74.9843849285771,
+              "error_vs_exact_resolvent_mH": -1.4210854715202004e-11,
+              "error_vs_casci_mH": -217.45229429119206
+            },
+            {
+              "method": "krylov",
+              "order": 2,
+              "matvecs": 260,
+              "basis_width": 60,
+              "energy": -74.9843849285771,
+              "error_vs_exact_resolvent_mH": -1.4210854715202004e-11,
+              "error_vs_casci_mH": -217.45229429119206
+            }
+          ]
+        }
+      }
+    }
+  },
+  "n2_spectral_radius_scan": [
+    {
+      "scale": 0.8,
+      "distance_angstrom": 0.8784000000000001,
+      "reference_energy": -108.77128385046672,
+      "spectral_radius_BA": 0.7359017619220594,
+      "neumann_converges": true
+    },
+    {
+      "scale": 1.0,
+      "distance_angstrom": 1.098,
+      "reference_energy": -109.0401239715541,
+      "spectral_radius_BA": 0.8835817507370534,
+      "neumann_converges": true
+    },
+    {
+      "scale": 1.5,
+      "distance_angstrom": 1.6470000000000002,
+      "reference_energy": -108.8515178784283,
+      "spectral_radius_BA": 1.945287526202211,
+      "neumann_converges": false
+    },
+    {
+      "scale": 2.0,
+      "distance_angstrom": 2.196,
+      "reference_energy": -108.75405243680156,
+      "spectral_radius_BA": 3.4422724550115595,
+      "neumann_converges": false
+    },
+    {
+      "scale": 2.5,
+      "distance_angstrom": 2.745,
+      "reference_energy": -108.75212574706718,
+      "spectral_radius_BA": 3.820246331075439,
+      "neumann_converges": false
+    },
+    {
+      "scale": 3.0,
+      "distance_angstrom": 3.2940000000000005,
+      "reference_energy": -108.74926948920262,
+      "spectral_radius_BA": 3.8678337138928844,
+      "neumann_converges": false
+    }
+  ],
+  "wall_time_seconds": 3.416534063002473
+}
