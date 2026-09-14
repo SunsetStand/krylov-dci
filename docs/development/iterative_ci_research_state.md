@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `44bbf97` on branch `research/iterative-ci-feasibility`,
+Updated at commit `fa3ee73` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -230,6 +230,22 @@ truncation, and the Krylov basis compression SVD is dropped in favour of a plain
 QR. The dmSVD on CI coefficients in the A|B bipartition is untouched and remains
 the core of the method. Evidence: `docs/theory/neumann_versus_krylov_downfolding.md`.
 
+**Instrumentation complete.** The four quantities the protocol needs are now
+recorded per outer iteration: per-root residual norms, the full inner history
+including the Omega norm, the root-overlap matrix, and the Schmidt projector
+distance, which did not previously exist. Two ablation controls are in place,
+`rank_mode='symmetric'` for H6 and `apply_dressing=False` for H4, the latter
+verified to reduce the generalized Ritz problem to diagonalizing `H_PP`.
+
+**Two early readings, not yet conclusions.** On H2O at `svd_eps = 1e-3` with the
+protocol's partition, `rectangular` and `symmetric` give identical energies, so
+the rank asymmetry does not reach the P space at that threshold; and dressing on
+versus off differ by only `0.67 mH`. Both are single points from a smoke test,
+taken before the scan and before the matched-dimension rule is applied, so
+neither is evidence for or against H4 or H6 yet. They do suggest the scan must
+cover the threshold range where the N2 measurement showed the asymmetry is
+genuine, roughly `3e-2` to `3e-4`.
+
 **Rectangular ranks measured.** The asymmetry is real, caused by state averaging
 rather than by unequal block dimensions, and universal within its operating
 window. Detail: `docs/development/rectangular_schmidt_rank_measurement.md`.
@@ -282,11 +298,12 @@ threshold scan behind it.
 
 ## Next single priority
 
-Gate C step 2: add the missing instrumentation the protocol requires before any
-ablation can be scored -- per-root residual norms, the inner iteration history,
-the retained root-overlap matrix, and the Schmidt projector distance, which does
-not exist yet. Then add the `--no-residual-dressing` bypass for H4 and the
-matched-dimension symmetric-rank mode for H6.
+Gate C step 3: build the scan driver that runs the pre-registered cross of seed
+family, Schmidt basis treatment, dressing, wave operator and rank allocation,
+scoring each cell against the exact resolvent at the same `E_0` rather than
+against CASCI alone, and applying the matched-dimension rule for H6 by adjusting
+the symmetric run's threshold until its embedded dimension is within 2 percent
+of the rectangular one. H5 is already gated, so results become admissible.
 
 Two obligations from Gate A now belong in that protocol as primary hypotheses
 rather than ancillary controls, because the novelty case depends on them:
