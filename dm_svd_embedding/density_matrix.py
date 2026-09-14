@@ -128,6 +128,7 @@ def compute_schmidt_decomposition(
     eps: float = 1e-3,
     state_average: Optional[List[Dict[int, np.ndarray]]] = None,
     state_weights: Optional[np.ndarray] = None,
+    rank_mode: str = 'rectangular',
 ) -> Dict[int, Dict]:
     """Compute Schmidt decomposition for all electron-number blocks.
 
@@ -143,6 +144,12 @@ def compute_schmidt_decomposition(
                        U basis; then each state's C^(n) is compressed in that basis.
         state_weights: Optional non-negative weights for ``state_average``.
                        Equal weights are used when omitted.
+        rank_mode: ``'rectangular'`` keeps r_A(n) and r_B(n) independently,
+                   which is the method's default.  ``'symmetric'`` forces
+                   r_A = r_B = min(r_A, r_B) and exists only as the control
+                   for hypothesis H6; a fair comparison must match the total
+                   embedded dimension by adjusting ``eps``, not by comparing
+                   the two modes at the same threshold.
 
     Returns:
         Dict[n] → schmidt_data dict with keys:
@@ -154,6 +161,8 @@ def compute_schmidt_decomposition(
           'dim_A': int.
           'dim_B': int.
     """
+    if rank_mode not in ('rectangular', 'symmetric'):
+        raise ValueError(f"unknown rank_mode {rank_mode!r}")
     result = {}
     weights = None
     if state_average is not None:
@@ -208,6 +217,15 @@ def compute_schmidt_decomposition(
             # rectangular, with dimension r_A * r_B.
             sigma_A = sigma_est[keep]
             sigma_B = sigma_est_B[keep_B]
+            if rank_mode == 'symmetric':
+                # H6 control: discard the asymmetry deliberately.
+                r_sym = min(r, r_B)
+                U_trunc = U_SA[:, :r_sym]
+                V_trunc_B = V_SA[:, :r_sym]
+                sigma_A = sigma_est[:r_sym]
+                sigma_B = sigma_est_B[:r_sym]
+                r = r_sym
+                r_B = r_sym
             r_common = min(r, r_B)  # legacy paired-rank diagnostic only
 
             result[n_A] = {
@@ -226,6 +244,7 @@ def compute_schmidt_decomposition(
                 'rho_A_state_averaged': rho_SA,
                 'rho_B_state_averaged': rho_B_SA,
                 'state_weights': weights.copy(),
+                'rank_mode': rank_mode,
             }
         else:
             # Single-state: direct SVD

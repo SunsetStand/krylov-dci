@@ -243,6 +243,7 @@ def solve_state_averaged_wave_operator(
     max_iter: int = 100,
     min_denominator: float = 1e-6,
     pinv_rcond: float = 1e-12,
+    apply_dressing: bool = True,
     verbose: bool = True,
 ) -> Dict:
     """Solve several roots with one residual-dressed wave operator.
@@ -354,6 +355,12 @@ def solve_state_averaged_wave_operator(
             converged = True
             break
 
+        if not apply_dressing:
+            # H4 control: Omega is never updated, so the generalized Ritz
+            # problem reduces to diagonalizing H_PP in the model space.
+            previous_energies = ritz['energies'].copy()
+            break
+
         denominators = (
             ritz['energies'][np.newaxis, :] - diagonal[:, np.newaxis])
         denominators = _protect_denominators(denominators, min_denominator)
@@ -388,5 +395,6 @@ def solve_state_averaged_wave_operator(
         'history': history,
         'residuals': final_residuals,
         'state_weights': weights,
+        'apply_dressing': bool(apply_dressing),
         **assembled,
     }

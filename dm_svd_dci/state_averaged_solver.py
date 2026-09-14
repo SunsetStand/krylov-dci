@@ -184,7 +184,8 @@ def align_state_blocks(
         if abs(overlap) > 0.0:
             phases[i] = overlap.conjugate() / abs(overlap)
         aligned.append(_linear_combination([candidate[root]], np.array([phases[i]])))
-    return aligned, np.asarray(permutation, dtype=int), phases
+    return (aligned, np.asarray(permutation, dtype=int), phases,
+            np.asarray(overlaps))
 
 
 def mix_state_blocks(
@@ -267,6 +268,61 @@ def assemble_embedded_state_coefficients(
     return full
 
 
+def schmidt_projector_distance(
+    previous: Optional[Dict[int, Dict]],
+    current: Dict[int, Dict],
+) -> Optional[Dict]:
+    """Frobenius distance between consecutive Schmidt projectors, per block.
+
+    The retained left subspace of block ``n`` is represented by the projector
+    ``P_A(n) = U(n) U(n)^dagger``, which has a fixed ``dim_A x dim_A`` shape
+    regardless of the retained rank, so it stays comparable across outer
+    iterations even when the rank changes.  A block that is absent or has rank
+    zero contributes the zero projector, which is what makes an irreversible
+    block deletion visible as a finite jump rather than as a missing key.
+
+    Returns ``None`` on the first outer iteration, when there is nothing to
+    compare against.
+    """
+    if previous is None:
+        return None
+
+    per_block: Dict[int, Dict[str, float]] = {}
+    total_a_sq = 0.0
+    total_b_sq = 0.0
+    for label in sorted(set(previous) | set(current)):
+        old = previous.get(label)
+        new = current.get(label)
+        reference = new if new is not None else old
+        dim_a = int(reference['dim_A'])
+        dim_b = int(reference['dim_B'])
+
+        def projector(data: Optional[Dict], key: str, dim: int) -> np.ndarray:
+            if data is None:
+                return np.zeros((dim, dim))
+            basis = np.asarray(data[key])
+            if basis.size == 0 or basis.shape[1] == 0:
+                return np.zeros((dim, dim))
+            return basis @ basis.conj().T
+
+        delta_a = projector(new, 'U', dim_a) - projector(old, 'U', dim_a)
+        delta_b = projector(new, 'V', dim_b) - projector(old, 'V', dim_b)
+        distance_a = float(np.linalg.norm(delta_a))
+        distance_b = float(np.linalg.norm(delta_b))
+        total_a_sq += distance_a ** 2
+        total_b_sq += distance_b ** 2
+        per_block[int(label)] = {'A': distance_a, 'B': distance_b}
+
+    total_a = float(np.sqrt(total_a_sq))
+    total_b = float(np.sqrt(total_b_sq))
+    return {
+        'per_block': per_block,
+        'total_A': total_a,
+        'total_B': total_b,
+        'total': float(np.sqrt(total_a_sq + total_b_sq)),
+    }
+
+
 def solve_state_averaged_schmidt(
     initial_state_blocks: List[StateBlocks],
     build_problem: Callable[[Dict[int, Dict]], Dict],
@@ -277,6 +333,7 @@ def solve_state_averaged_schmidt(
     energy_tol: float = 1e-8,
     max_outer_iter: int = 20,
     wave_options: Optional[Dict] = None,
+    rank_mode: str = 'rectangular',
     verbose: bool = True,
 ) -> Dict:
     """Close the state-averaged Schmidt/wave-operator feedback loop.
@@ -296,6 +353,7 @@ def solve_state_averaged_schmidt(
     wave_options.pop('state_weights', None)
 
     previous_energies = None
+    previous_schmidt: Optional[Dict[int, Dict]] = None
     history: List[Dict] = []
     converged = False
     final_problem = None
@@ -312,7 +370,10 @@ def solve_state_averaged_schmidt(
     for outer_iteration in range(max_outer_iter):
         schmidt = compute_schmidt_decomposition(
             current_states[0], eps=svd_eps,
-            state_average=current_states, state_weights=weights)
+            state_average=current_states, state_weights=weights,
+            rank_mode=rank_mode)
+        projector_distance = schmidt_projector_distance(
+            previous_schmidt, schmidt)
         problem = build_problem(schmidt)
         required = {
             'H_PP', 'H_PQ', 'H_QQ_blocks', 'D_by_n',
@@ -339,8 +400,8 @@ def solve_state_averaged_schmidt(
         dressed_states = schmidt_product_coefficients_to_blocks(
             embedded_coefficients, schmidt)
         dressed_states = orthonormalize_state_blocks(dressed_states)
-        aligned_states, permutation, phases = align_state_blocks(
-            current_states, dressed_states)
+        aligned_states, permutation, phases, overlap_matrix = (
+            align_state_blocks(current_states, dressed_states))
         ordered_energies = wave['energies'][permutation]
 
         density_change = state_averaged_density_distance(
@@ -359,7 +420,14 @@ def solve_state_averaged_schmidt(
             'wave_converged': wave['converged'],
             'wave_iterations': wave['n_iter'],
             'wave_residual_rms': wave['residuals']['weighted_rms'],
+            'wave_residual_root_norms': np.asarray(
+                wave['residuals']['root_norms']).copy(),
+            'wave_residual_max': wave['residuals']['max_norm'],
+            'wave_history': wave['history'],
             'root_permutation': permutation.copy(),
+            'root_overlap_matrix': np.abs(overlap_matrix).copy(),
+            'schmidt_projector_distance': projector_distance,
+            'rank_mode': rank_mode,
             'schmidt_ranks': {
                 int(label): {
                     'r_A': int(data.get('r_A', data['r'])),
@@ -391,6 +459,7 @@ def solve_state_averaged_schmidt(
         current_states = mix_state_blocks(
             current_states, aligned_states, outer_mixing)
         previous_energies = ordered_energies.copy()
+        previous_schmidt = schmidt
 
     return {
         'energies': final_wave['energies'][final_permutation],

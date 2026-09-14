@@ -81,6 +81,8 @@ def run_state_averaged_dci(
     seed_perturbation_scale: float = 0.1,
     seed_random_seed: int = 0,
     seed_complete_blocks: bool = True,
+    rank_mode: str = 'rectangular',
+    apply_dressing: bool = True,
     compute_reference: bool = True,
     output_dir: Optional[str] = None,
     verbose: bool = True,
@@ -219,7 +221,9 @@ def run_state_averaged_dci(
             'energy_tol': wave_energy_tol,
             'max_iter': wave_max_iter,
             'min_denominator': min_denominator,
+            'apply_dressing': apply_dressing,
         },
+        rank_mode=rank_mode,
         verbose=verbose)
 
     final_problem = result['problem']
@@ -244,6 +248,12 @@ def run_state_averaged_dci(
         'final_wave_converged': result['wave_result']['converged'],
         'final_wave_iterations': result['wave_result']['n_iter'],
         'final_wave_residual_rms': result['wave_result']['residuals']['weighted_rms'],
+        'final_wave_residual_root_norms':
+            result['wave_result']['residuals']['root_norms'],
+        'final_wave_residual_max':
+            result['wave_result']['residuals']['max_norm'],
+        'final_wave_history': result['wave_result']['history'],
+        'apply_dressing': result['wave_result'].get('apply_dressing', True),
         'schmidt_metrics': {
             'r_total': metrics['r_total'],
             'r_A_total': metrics['r_A_total'],
@@ -283,6 +293,8 @@ def run_state_averaged_dci(
             'wave_damping': wave_damping,
             'seed': seed,
             'seed_complete_blocks': seed_complete_blocks,
+            'rank_mode': rank_mode,
+            'apply_dressing': apply_dressing,
             'compute_reference': compute_reference,
         },
     }
