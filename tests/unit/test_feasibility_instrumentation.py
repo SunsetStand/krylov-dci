@@ -140,12 +140,55 @@ def test_apply_dressing_control():
            'the dressed run does build a non-zero Omega')
 
 
+def test_omega_mode_control():
+    print('omega_mode control for H7', flush=True)
+    rng = np.random.default_rng(23)
+    p_dim, q_dim, n_states = 4, 5, 2
+    h_pp = rng.standard_normal((p_dim, p_dim))
+    h_pp = 0.5 * (h_pp + h_pp.T)
+    h_pq = 0.2 * rng.standard_normal((p_dim, q_dim))
+    h_qq = rng.standard_normal((q_dim, q_dim))
+    h_qq = 0.5 * (h_qq + h_qq.T) + np.diag(np.arange(q_dim) + 4.0)
+
+    kwargs = dict(H_PP=h_pp, H_PQ={0: h_pq}, H_QQ_blocks={(0, 0): h_qq},
+                  D_by_n={0: np.diag(h_qq)}, n_states=n_states,
+                  max_iter=60, verbose=False)
+    shared = solve_state_averaged_wave_operator(**kwargs)
+    per_state = solve_state_averaged_wave_operator(
+        omega_mode='per_state', **kwargs)
+
+    _check(np.asarray(shared['omega']).shape == (q_dim, p_dim),
+           f"shared Omega has shape {np.asarray(shared['omega']).shape}")
+    _check(np.asarray(per_state['omega']).shape == (n_states, q_dim, p_dim),
+           'per-state Omega carries one operator per state')
+    _check(per_state['omega_mode'] == 'per_state',
+           'omega_mode is recorded in the result')
+
+    # Both must solve the same physical problem: against the exact resolvent
+    # of the full P+Q matrix, each converged root should be an eigenvalue.
+    full = np.block([[h_pp, h_pq], [h_pq.T, h_qq]])
+    exact = np.linalg.eigvalsh(full)[:n_states]
+    for label, result in (('shared', shared), ('per_state', per_state)):
+        error = float(np.max(np.abs(
+            np.sort(np.asarray(result['energies'])) - exact)))
+        _check(error < 1e-8,
+               f'{label} converges to the exact roots, max error {error:.2e}')
+
+    try:
+        solve_state_averaged_wave_operator(omega_mode='bogus', **kwargs)
+    except ValueError:
+        _check(True, 'an unknown omega_mode is rejected')
+    else:
+        raise AssertionError('an unknown omega_mode was accepted')
+
+
 def main():
     print('Feasibility instrumentation unit checks', flush=True)
     test_projector_distance_basics()
     test_projector_distance_is_rank_invariant_in_shape()
     test_rank_mode_control()
     test_apply_dressing_control()
+    test_omega_mode_control()
     print('\nInstrumentation: PASS', flush=True)
     return 0
 
