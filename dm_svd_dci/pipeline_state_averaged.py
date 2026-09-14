@@ -80,6 +80,7 @@ def run_state_averaged_dci(
     seed_subspace_size: int = 64,
     seed_perturbation_scale: float = 0.1,
     seed_random_seed: int = 0,
+    seed_complete_blocks: bool = True,
     compute_reference: bool = True,
     output_dir: Optional[str] = None,
     verbose: bool = True,
@@ -114,11 +115,15 @@ def run_state_averaged_dci(
 
     # Initializer boundary.  Only seed='exact' reads exact CI, and it is a
     # control rather than a production path.
+    partition, _ = setup_partition(
+        n_active, sum(n_active_elec), n_occ, ms=ms)
     ci_roots, seed_provenance = build_initial_states(
         sys_data, sa_states, seed=seed,
         subspace_size=seed_subspace_size,
         perturbation_scale=seed_perturbation_scale,
-        random_seed=seed_random_seed, verbose=verbose)
+        random_seed=seed_random_seed,
+        partition=partition, complete_blocks=seed_complete_blocks,
+        verbose=verbose)
 
     # Evaluator boundary.  reference_energies is used for error reporting only
     # and is never consumed by the solver, the root selector or the Schmidt
@@ -127,8 +132,6 @@ def run_state_averaged_dci(
         evaluate_reference_energies(sys_data, sa_states)
         if compute_reference else None)
 
-    partition, _ = setup_partition(
-        n_active, sum(n_active_elec), n_occ, ms=ms)
     initial_state_blocks = [
         build_block_matrices(partition, root) for root in ci_roots]
 
@@ -279,6 +282,7 @@ def run_state_averaged_dci(
             'outer_mixing': outer_mixing,
             'wave_damping': wave_damping,
             'seed': seed,
+            'seed_complete_blocks': seed_complete_blocks,
             'compute_reference': compute_reference,
         },
     }

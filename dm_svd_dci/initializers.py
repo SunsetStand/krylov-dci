@@ -100,6 +100,27 @@ def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
     return vectors
 
 
+def _block_completion_addresses(partition: Dict, space: _ActiveSpace,
+                                addresses: Sequence[int]) -> List[int]:
+    """Determinants needed so that every electron-number block is represented.
+
+    A seed with no determinant in a block produces a zero state-averaged
+    density there, the block is truncated to rank zero, and the reconstructed
+    coefficients inherit the same empty support.  Deletion is irreversible, so
+    the outer loop is then trapped at a fixed point that omits the block.
+    Adding the lowest-diagonal determinant of each unrepresented block makes
+    the seed admissible without changing the solver.
+    """
+    covered = {int(a) for a in addresses}
+    extra: List[int] = []
+    for _, block in sorted(partition.items()):
+        members = [int(det) for (_, _, det) in block['coeff_map']]
+        if not members or any(member in covered for member in members):
+            continue
+        extra.append(min(members, key=lambda member: space.hdiag[member]))
+    return extra
+
+
 def _lowest_diagonal_addresses(space: _ActiveSpace, count: int) -> np.ndarray:
     return np.argsort(space.hdiag)[:max(count, 1)]
 
@@ -123,6 +144,8 @@ def build_initial_states(
         subspace_size: int = 64,
         perturbation_scale: float = 0.1,
         random_seed: int = 0,
+        partition: Optional[Dict] = None,
+        complete_blocks: bool = True,
         verbose: bool = True,
 ) -> Tuple[List[np.ndarray], Dict]:
     """Build ``n_states`` flat CI vectors in the CAS determinant ordering.
@@ -155,6 +178,7 @@ def build_initial_states(
             vectors = [np.asarray(cas.ci[k]).reshape(-1)
                        for k in range(n_states)]
         provenance['note'] = 'upper-bound control; not a production path'
+        provenance['block_completion_applied'] = False
         if verbose:
             print('  seed: exact CASCI (control, reads exact CI)', flush=True)
         return [v / np.linalg.norm(v) for v in vectors], provenance
@@ -178,7 +202,16 @@ def build_initial_states(
     else:                                                    # pragma: no cover
         raise InitializerError(f'unhandled seed {seed!r}')
 
-    provenance['subspace_dimension'] = int(len(addresses))
+    completion: List[int] = []
+    if complete_blocks and partition is not None:
+        completion = _block_completion_addresses(partition, space, addresses)
+        if completion:
+            addresses = np.concatenate(
+                [np.asarray(addresses, dtype=int),
+                 np.asarray(completion, dtype=int)])
+    provenance['block_completion_addresses'] = [int(a) for a in completion]
+    provenance['block_completion_applied'] = bool(completion)
+    provenance['subspace_dimension'] = int(len(set(int(a) for a in addresses)))
     vectors = _diagonalize_in_subspace(space, addresses, n_states)
 
     if seed == 'perturbed':
@@ -198,7 +231,10 @@ def build_initial_states(
         provenance['random_seed'] = int(random_seed)
 
     if verbose:
-        print(f'  seed: {seed}, subspace {len(addresses)} determinants, '
+        note = (f', +{len(completion)} block-completing determinants'
+                if completion else '')
+        print(f'  seed: {seed}, subspace '
+              f"{provenance['subspace_dimension']} determinants{note}, "
               f'{n_states} states (no exact CI read)', flush=True)
     return vectors, provenance
 

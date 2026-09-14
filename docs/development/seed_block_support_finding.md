@@ -60,29 +60,75 @@ problem; it has fixed points that are unreachable from certain seeds because the
 seed removes the dimensions needed to reach them. Reachability has to be stated
 in terms of block support, not just in terms of proximity.
 
-## What has been done
+## A correction: the block structure was never the problem
 
-Instrumentation only, per the protocol's immutable-scope rule that a numerical
-problem is first recorded as data. `dm_svd_dci/initializers.py` gains
-`seed_block_support`, and the pipeline records the per-block seed weight, the
-list of empty blocks and a warning, in `seed_provenance.block_support` of every
-result. No solver behaviour was changed.
+The first remedy considered was to take the block structure from the union of all
+seed states rather than from `current_states[0]`. **Measurement shows that does
+not apply.** The block keys are already complete and identical for every seed,
+because `build_block_matrices` allocates every block in the partition:
 
-## Candidate remedies, none yet implemented
+```text
+partition blocks : {0: (1,1), 1: (2,2), 2: (1,1)}
+seed = exact     : keys [0,1,2], per-state weight in n=0  1.27e-02 , 6.04e-32
+seed = cis       : keys [0,1,2], per-state weight in n=0  0.00e+00 , 0.00e+00
+```
 
-1. **Reject the seed.** Treat an empty block as a specification error and refuse
-   to run. Safe and honest, but it disqualifies the CIS seed outright.
-2. **Rank floor.** Retain a minimum rank per block regardless of weight, so a
-   block can never be deleted. Cheap, but it fabricates support that the seed
-   does not have and the added directions are arbitrary.
-3. **Union block support.** Take the block structure from the union of all seed
-   states, or from the determinant space itself, rather than from
-   `current_states[0]`. This preserves the shape of the problem independently of
-   the seed, and looks like the principled fix.
-4. **Enrich the seed.** Require the seed family to span every block, for instance
-   CIS plus the block-completing determinants of lowest diagonal energy. Keeps
-   the CIS character while removing the trap.
+Both seeds carry block `0`. It is present, correctly shaped, and empty. There is
+nothing to union. The failure is a **zero weight**, not a missing key, so the fix
+has to change either what the seed contains or what the solver does with a
+vanishing density.
 
-Remedy 3 addresses the cause and 4 addresses the trigger; they are not exclusive.
-A choice between them is a solver change and needs the full scan behind it, not
-this single data point.
+## What was implemented: seed completion
+
+`build_initial_states` gained `partition` and `complete_blocks`. When a seed's
+determinant subspace contains no member of some electron-number block, the
+lowest-diagonal determinant of that block is added to the subspace before
+diagonalizing. The seed keeps its character, gains admissibility, and the solver
+is untouched. This is a seeding option, which the protocol's immutable scope
+permits; changing the solver would not have been.
+
+Result on H2/STO-3G at `svd_eps = 1e-10`, where a correct run is exact:
+
+| Seed | `complete_blocks=False` | `complete_blocks=True` |
+|---|---|---|
+| `exact` | `6.7e-13 mH` | `6.7e-13 mH` |
+| `hf` | `6.7e-13 mH` | `6.7e-13 mH` |
+| `trunc` | `6.7e-13 mH` | `6.7e-13 mH` |
+| `selci` | `6.7e-13 mH` | `6.7e-13 mH` |
+| `cis` | **`20.5 mH`** | `6.7e-13 mH` |
+| `perturbed` | **`20.5 mH`** | `6.7e-13 mH` |
+
+**All six seed families now reach the same fixed point.** That is H1 satisfied on
+H2, with the standing caveat that H2 alone is not a sufficient test.
+
+`tests/regression/test_seed_block_support.py` pins both halves: that completion
+makes every seed exact, and that disabling completion still reproduces the trap
+at `20.5 mH` while reporting convergence. The failing case is pinned deliberately
+rather than deleted, because it is a property of the map.
+
+## What is still unresolved
+
+Seed completion guarantees non-zero support **at iteration zero only**. It does
+not make block deletion reversible. A block whose weight falls below `svd_eps`
+at any later outer iteration is still truncated to rank zero, and the same
+irreversibility applies from that point on. At the production threshold of
+`1e-3` this is a realistic possibility, not a corner case.
+
+So the map retains a structural property worth reporting in its own right:
+**the outer map can lose rank irreversibly, and it reports convergence when it
+does.** The remaining candidate remedies are unchanged in kind:
+
+1. **Rank floor.** Retain a minimum rank per block regardless of weight.
+   Fabricates arbitrary directions.
+2. **Density-matrix perturbation.** Add a decaying noise term before
+   diagonalizing, which is exactly what DMRG does to stop quantum-number sectors
+   from being discarded irreversibly (White, *Phys. Rev. B* **72**, 180403(R),
+   2005). Literature-backed, but adds a parameter.
+3. **Residual-informed block re-entry.** Use the Q-space residual, which already
+   says where the wavefunction wants weight, to decide whether a deleted block
+   should be re-admitted. The most natural fit for this method, since the
+   residual is already computed, and the closest analogue of selected-CI
+   re-selection. Also the largest change.
+
+None is implemented. The choice needs the full threshold scan behind it, not this
+single full-rank data point, and it is a solver change requiring approval.
