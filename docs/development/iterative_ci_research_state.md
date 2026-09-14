@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `08c2144` on branch `research/iterative-ci-feasibility`,
+Updated at commit `7caa6d7` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -258,6 +258,28 @@ weight is non-zero. Every seed family is empty-block free on both systems.
 the embedded dimension on H2O was `6` at every threshold from `1e-2` to `1e-4`,
 so a threshold scan would have discriminated nothing. With completion repaired it
 responds properly for `exact` (`6, 80, 124, 148`), `hf`, `trunc` and `selci`.
+
+**H1 is satisfied on the discriminating system.** The determinant-selection
+seeds were the wrong tool, imported from the Krylov-dCI line where the object
+chosen was a P space of determinants. The Lanczos seed selects nothing: it runs
+early-stopped block Lanczos in the full CAS space from the lowest-diagonal
+determinant of every block, so block support holds by construction and no
+completion machinery is needed.
+
+On H2O at `svd_eps = 1e-4`, weighted absolute error against CASCI:
+
+| seed | `D` | error |
+|---|---|---|
+| `exact` | 148 | `0.0000 mH` |
+| **`lanczos`** | **148** | **`0.0012 mH`** |
+| `selci` | 106 | `10.25 mH` |
+| `hf` | 122 | `10.99 mH` |
+| `cis` | 8 | `36.91 mH` |
+
+Convergence in the single parameter is systematic: `0.616, 0.024, 0.0012,
+0.0004, 0.0000 mH` at 1, 2, 3, 4 and 6 steps. Two steps already meets the
+`0.05 mH` agreement tolerance. **A seed that reads no exact CI and selects no
+determinants reaches the exact seed's fixed point.**
 
 **A distinction the project had conflated.** `cis` remains nearly flat
 (`5, 7, 8, 8`) even with no empty blocks. Completion made it admissible, not
