@@ -42,8 +42,17 @@ def setup_system(
     n_core: int = 2,
     nroots: int = 1,
     verbose: bool = True,
+    solve_exact: bool = True,
 ) -> Dict:
-    """Initialize PySCF molecule, RHF, CASCI, and backend."""
+    """Initialize PySCF molecule, RHF, CASCI, and backend.
+
+    With ``solve_exact=False`` the exact CASCI kernel is skipped and
+    ``fcivec``, ``ci_flat`` and ``E_fci`` are returned as ``None``.  The
+    active-space integrals are taken before the kernel would run, so nothing
+    else in the returned dictionary depends on it.  The state-averaged
+    production path uses this so that no exact CI coefficients are computed
+    at all.  See docs/theory/iterative_ci_feasibility_protocol.md, H5.
+    """
     from pyscf import gto, scf, mcscf
     from pyscf.fci import cistring
     from src_mf import QSpaceIndex, KDCIBackend
@@ -61,10 +70,15 @@ def setup_system(
     cas.frozen = n_core
     h1eff, ecore = cas.get_h1eff()
     h2eff = cas.get_h2eff()
-    cas.kernel()
-    fcivec = cas.ci
-    ci_flat = fcivec.reshape(-1)
-    E_fci = cas.e_tot
+    if solve_exact:
+        cas.kernel()
+        fcivec = cas.ci
+        ci_flat = fcivec.reshape(-1)
+        E_fci = cas.e_tot
+    else:
+        fcivec = None
+        ci_flat = None
+        E_fci = None
 
     na, nb = n_active_elec
     alpha_strs = cistring.gen_strings4orblist(range(n_act), na)
@@ -80,9 +94,13 @@ def setup_system(
     if verbose:
         print(f"  System:          {atom.strip()}, {basis}")
         print(f"  CAS({n_act},{n_elec_total}):      M={M_all:,} dets, n_core={n_core}")
-        print(f"  CASCI total E:   {E_fci:.12f} Ha")
-        print(f"  E_core (frozen): {ecore:.12f} Ha")
-        print(f"  Active E:        {E_fci - ecore:.12f} Ha")
+        if E_fci is None:
+            print("  CASCI total E:   not computed (solve_exact=False)")
+            print(f"  E_core (frozen): {ecore:.12f} Ha")
+        else:
+            print(f"  CASCI total E:   {E_fci:.12f} Ha")
+            print(f"  E_core (frozen): {ecore:.12f} Ha")
+            print(f"  Active E:        {E_fci - ecore:.12f} Ha")
         print(f"  Setup done:      {time.perf_counter() - t0:.0f}s", flush=True)
 
     return {

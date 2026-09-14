@@ -8,6 +8,11 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from dm_svd_dci.initializers import (
+    build_initial_states,
+    evaluate_reference_energies,
+    seed_block_support,
+)
 from dm_svd_dci.pipeline_v2 import setup_system
 from dm_svd_dci.qspace_partition import (
     extract_q_blocks_scheme_a,
@@ -71,6 +76,11 @@ def run_state_averaged_dci(
     min_denominator: float = 1e-6,
     n_workers: int = 1,
     scheme: str = 'A',
+    seed: str = 'exact',
+    seed_subspace_size: int = 64,
+    seed_perturbation_scale: float = 0.1,
+    seed_random_seed: int = 0,
+    compute_reference: bool = True,
     output_dir: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict:
@@ -95,16 +105,42 @@ def run_state_averaged_dci(
         print(f"  states={sa_states}, weights={np.array2string(weights, precision=5)}")
         print(f"  scheme={scheme}, P blocks={p_blocks}")
 
+    # solve_exact=False: the exact CASCI kernel in setup_system is dead weight
+    # for this path, because the integrals are taken before it would run.
     sys_data = setup_system(
         atom=atom, basis=basis,
         n_active=n_active, n_active_elec=n_active_elec,
-        n_core=n_core, nroots=1, verbose=verbose)
-    reference_energies, ci_roots = _multi_root_casci(sys_data, sa_states)
+        n_core=n_core, nroots=1, verbose=verbose, solve_exact=False)
+
+    # Initializer boundary.  Only seed='exact' reads exact CI, and it is a
+    # control rather than a production path.
+    ci_roots, seed_provenance = build_initial_states(
+        sys_data, sa_states, seed=seed,
+        subspace_size=seed_subspace_size,
+        perturbation_scale=seed_perturbation_scale,
+        random_seed=seed_random_seed, verbose=verbose)
+
+    # Evaluator boundary.  reference_energies is used for error reporting only
+    # and is never consumed by the solver, the root selector or the Schmidt
+    # builder.
+    reference_energies = (
+        evaluate_reference_energies(sys_data, sa_states)
+        if compute_reference else None)
 
     partition, _ = setup_partition(
         n_active, sum(n_active_elec), n_occ, ms=ms)
     initial_state_blocks = [
         build_block_matrices(partition, root) for root in ci_roots]
+
+    # A seed with no weight in an electron-number block causes that block to be
+    # deleted by the Schmidt decomposition, and the outer loop cannot recover
+    # it.  Record it rather than silently converging to a trapped fixed point.
+    seed_provenance['block_support'] = seed_block_support(initial_state_blocks)
+    if verbose and seed_provenance['block_support']['has_empty_block']:
+        print(f"  WARNING: seed has zero weight in blocks "
+              f"{seed_provenance['block_support']['empty_blocks']}; "
+              f"those blocks will be deleted and cannot be recovered",
+              flush=True)
 
     build_history = []
 
@@ -188,7 +224,8 @@ def run_state_averaged_dci(
     metrics = compute_compression_metrics(
         result['schmidt_data'], result['state_blocks'][0])
     energies = np.asarray(result['energies'])
-    errors_mh = (energies - reference_energies) * 1000.0
+    errors_mh = (None if reference_energies is None
+                 else (energies - reference_energies) * 1000.0)
     wall_time = time.perf_counter() - total_start
 
     output = {
@@ -196,6 +233,7 @@ def run_state_averaged_dci(
         'energies': energies,
         'reference_energies': reference_energies,
         'errors_mH': errors_mh,
+        'seed_provenance': seed_provenance,
         'state_weights': weights,
         'converged': result['converged'],
         'n_outer_iter': result['n_outer_iter'],
@@ -240,6 +278,8 @@ def run_state_averaged_dci(
             'scheme': scheme,
             'outer_mixing': outer_mixing,
             'wave_damping': wave_damping,
+            'seed': seed,
+            'compute_reference': compute_reference,
         },
     }
 
@@ -247,11 +287,15 @@ def run_state_averaged_dci(
         print("\n" + "=" * 72)
         print("STATE-AVERAGED SELF-CONSISTENT SUMMARY")
         print("=" * 72)
-        for root, (energy, reference, error) in enumerate(zip(
-                energies, reference_energies, errors_mh)):
-            print(
-                f"  S{root}: E={energy:.12f}  CASCI={reference:.12f}  "
-                f"dE={error:+.3f} mH")
+        if reference_energies is None:
+            for root, energy in enumerate(energies):
+                print(f"  S{root}: E={energy:.12f}  (no reference computed)")
+        else:
+            for root, (energy, reference, error) in enumerate(zip(
+                    energies, reference_energies, errors_mh)):
+                print(
+                    f"  S{root}: E={energy:.12f}  CASCI={reference:.12f}  "
+                    f"dE={error:+.3f} mH")
         print(
             f"  outer converged={result['converged']} "
             f"in {result['n_outer_iter']} iterations")
