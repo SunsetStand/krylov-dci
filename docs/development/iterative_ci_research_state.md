@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `7caa6d7` on branch `research/iterative-ci-feasibility`,
+Updated at commit `001a19a` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -26,7 +26,7 @@ error, initial-guess dependence, ablations and failure modes must all be shown.
 | 0 | Checkout, branch, environment | Complete |
 | A | Literature and novelty | Complete, first pass. See `docs/literature/iterative_ci_schmidt_downfolding_review.md` |
 | B | Deterministic lowest-three-level root bundle | Complete |
-| C | Decouple production path from the exact CI seed | H5 complete; H3 and H6 outstanding |
+| C | Decouple production path from the exact CI seed | Complete on H2O. H1, H2, H4 confirmed; H3 falsified; H7 indistinguishable; H6 not testable on this system |
 | D | Ablation and initial-guess sensitivity | Not started |
 | E | N2 state-averaged pilot | Blocked on B through D |
 
@@ -304,6 +304,34 @@ genuine, roughly `3e-2` to `3e-4`.
 rather than by unequal block dimensions, and universal within its operating
 window. Detail: `docs/development/rectangular_schmidt_rank_measurement.md`.
 
+## Gate C verdicts, H2O
+
+Full scan, pre-registered thresholds, about `25 s` and `120 MiB`. Detail:
+`docs/development/gate_c_feasibility_results.md`.
+
+**The finding that reframes the rest: the wave-operator error is exactly zero in
+every cell.** Splitting total error into a Schmidt part, `E_embedded -
+E_reference`, and a wave-operator part, `E_downfolded - E_embedded`, the second
+is `0.0000 mH` everywhere. At convergence the residual-dressed wave operator
+reproduces the exact diagonalization of `H_emb`. It is a **solver, not an
+approximation**, so the accuracy of the method is set entirely by the dmSVD
+truncation and any claim for the wave operator must be a **cost** claim.
+
+| Hypothesis | Verdict |
+|---|---|
+| H1, H2 reachability and stability | **CONFIRMED**. Lanczos reaches the exact-seeded fixed point monotonically in one parameter and is identical to it by six steps, at the same embedded dimension |
+| H3 self-consistency buys something | **FALSIFIED** at matched dimension. Never helps; worse by `0.24 mH` at the loosest threshold |
+| H4 residual dressing carries information | **CONFIRMED**. Undressed is 9.8 to 9700 times worse |
+| H6 rectangular ranks | **NOT TESTABLE on H2O**, whose blocks are too small to carry any rank asymmetry |
+| H7 shared versus per-state Omega | **INDISTINGUISHABLE**. A shared operator is sufficient |
+| H5 exact-CI isolation | **CONFIRMED** earlier, gated by tripwire test |
+
+H3 is the experiment the novelty audit independently identified as deciding
+whether there is a method, so its falsification is the most consequential result
+so far. Two caveats are recorded rather than smoothed: the dimension match
+failed at 13 percent against a 2 percent tolerance at one threshold, and H2O is
+one system. **H3 must be retested on N2 before anything is reported as general.**
+
 ## Corrections to earlier conclusions
 
 1. **Overshoot alone does not fix a symmetry miss.** Because H is exactly block
@@ -352,12 +380,11 @@ threshold scan behind it.
 
 ## Next single priority
 
-Gate C step 3: build the scan driver that runs the pre-registered cross of seed
-family, Schmidt basis treatment, dressing, wave operator and rank allocation,
-scoring each cell against the exact resolvent at the same `E_0` rather than
-against CASCI alone, and applying the matched-dimension rule for H6 by adjusting
-the symmetric run's threshold until its embedded dimension is within 2 percent
-of the rectangular one. H5 is already gated, so results become admissible.
+Run the same scan on N2 CAS(10e,9o) from the locked reference bundle. It is the
+only way to test H6 at all, since H2O cannot express rank asymmetry, and it is
+the retest H3 needs before its falsification can be reported as general. Measure
+the state-averaged pilot's resource envelope at the same time, since
+CAS(10e,9o) is four times smaller than the space the 96 GB figure came from.
 
 Two obligations from Gate A now belong in that protocol as primary hypotheses
 rather than ancillary controls, because the novelty case depends on them:
