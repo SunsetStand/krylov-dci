@@ -1,0 +1,3705 @@
+{
+  "protocol": "docs/theory/iterative_ci_feasibility_protocol.md",
+  "system": "h2o",
+  "system_definition": {
+    "atom": "O 0 0 0; H 0 0.757 0.586; H 0 -0.757 0.586",
+    "basis": "sto-3g",
+    "n_active": 5,
+    "n_active_elec": [
+      3,
+      3
+    ],
+    "n_core": 2,
+    "n_occ": 3,
+    "sa_states": 3,
+    "p_blocks": [
+      4,
+      5,
+      6
+    ]
+  },
+  "fixed_controls": {
+    "outer_mixing": 0.7,
+    "outer_density_tol": 1e-06,
+    "outer_energy_tol": 1e-07,
+    "outer_max_iter": 12,
+    "wave_damping": 0.7,
+    "wave_residual_tol": 1e-09,
+    "wave_energy_tol": 1e-10,
+    "wave_max_iter": 200,
+    "min_denominator": 1e-06
+  },
+  "thresholds": [
+    0.01,
+    0.001,
+    0.0001
+  ],
+  "protocol_thresholds": {
+    "tol_E_mH": 0.05,
+    "chemical_accuracy_mH": 1.6,
+    "matched_dimension_tolerance": 0.02
+  },
+  "groups": {
+    "h1_h2": {
+      "cells": [
+        {
+          "label": "lanczos_k2_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 2
+          },
+          "energies": [
+            -74.99471059780149,
+            -74.60739190861163,
+            -74.53673358966753
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99471059780151,
+            -74.60739190861175,
+            -74.53673358966756
+          ],
+          "weighted_total_error_mH": 1.2519951760433894,
+          "max_total_error_mH": 1.9686969185102043,
+          "weighted_schmidt_error_mH": 1.2519951759865457,
+          "weighted_wave_operator_error_mH": 5.684341886080801e-11,
+          "embedded_dimension": 75,
+          "p_dim": 59,
+          "q_dim": 16,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0010117018355299291,
+          "outer_converged": true,
+          "n_outer_iter": 10,
+          "inner_converged": true,
+          "n_inner_iter": 18,
+          "residual_weighted_rms": 9.590860971231263e-10,
+          "residual_root_norms": [
+            1.0286258535590736e-13,
+            1.6042018677938201e-09,
+            4.313638624997689e-10
+          ],
+          "schmidt_projector_distance": 1.240948796149402e-10,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.031167299217414658,
+          "damping_bound": 1.9395494809793359,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 2,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00135078104949733,
+                "3": 0.021039562372008377,
+                "4": 0.0815371282876918,
+                "5": 1.9151745022881166,
+                "6": 0.9808980260026857
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.9326640399995085,
+          "peak_rss_mib": 116.2890625,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k3_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 3
+          },
+          "energies": [
+            -74.99468987507524,
+            -74.60736553806379,
+            -74.53679564373017
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99468987507532,
+            -74.60736553806366,
+            -74.53679564373004
+          ],
+          "weighted_total_error_mH": 1.247008246527533,
+          "max_total_error_mH": 1.9894196447580725,
+          "weighted_schmidt_error_mH": 1.2470082465843764,
+          "weighted_wave_operator_error_mH": 1.1368683772161603e-10,
+          "embedded_dimension": 75,
+          "p_dim": 59,
+          "q_dim": 16,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0010067549724037505,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 18,
+          "residual_weighted_rms": 9.841831280905118e-10,
+          "residual_root_norms": [
+            1.1987489397068152e-13,
+            1.6551700146543044e-09,
+            4.077517591296859e-10
+          ],
+          "schmidt_projector_distance": 2.0853350859965037e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.031176911809560774,
+          "damping_bound": 1.9395314005724777,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 3,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.000648584839344238,
+                "3": 0.018745594263991458,
+                "4": 0.08764495190492484,
+                "5": 1.9128637811179492,
+                "6": 0.9800970878737907
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.2235589150004671,
+          "peak_rss_mib": 118.7890625,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k4_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 4
+          },
+          "energies": [
+            -74.99512503234584,
+            -74.60738182006074,
+            -74.53678235406808
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99512503234578,
+            -74.60738182006072,
+            -74.53678235406801
+          ],
+          "weighted_total_error_mH": 1.1009583780416201,
+          "max_total_error_mH": 1.5542623741566786,
+          "weighted_schmidt_error_mH": 1.1009583780889898,
+          "weighted_wave_operator_error_mH": 4.736951571734001e-11,
+          "embedded_dimension": 79,
+          "p_dim": 63,
+          "q_dim": 16,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0012297504409360402,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 18,
+          "residual_weighted_rms": 9.72261673511041e-10,
+          "residual_root_norms": [
+            4.441320367949565e-14,
+            1.6320591014129926e-09,
+            4.150438204068982e-10
+          ],
+          "schmidt_projector_distance": 2.2052057150089014e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.031062792301945724,
+          "damping_bound": 1.9397460706877123,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 4,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006756665174374314,
+                "3": 0.019041056417787305,
+                "4": 0.08743536226707596,
+                "5": 1.9131554626646028,
+                "6": 0.9796924521330967
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.2163871359989571,
+          "peak_rss_mib": 118.8828125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k6_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 6
+          },
+          "energies": [
+            -74.99512933614196,
+            -74.6073795811892,
+            -74.53678405301973
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.9951293361419,
+            -74.60737958118926,
+            -74.53678405301974
+          ],
+          "weighted_total_error_mH": 1.0997037526294662,
+          "max_total_error_mH": 1.549958578038968,
+          "weighted_schmidt_error_mH": 1.099703752624729,
+          "weighted_wave_operator_error_mH": 4.263256414560601e-11,
+          "embedded_dimension": 79,
+          "p_dim": 63,
+          "q_dim": 16,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0012320008777862094,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 18,
+          "residual_weighted_rms": 9.745510037026302e-10,
+          "residual_root_norms": [
+            9.314693165913569e-14,
+            1.636356851670541e-09,
+            4.142284656659121e-10
+          ],
+          "schmidt_projector_distance": 2.1007931897432937e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.031069207404199713,
+          "damping_bound": 1.9397340019833997,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 6,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006747389381391081,
+                "3": 0.01908773884745435,
+                "4": 0.0874002154738481,
+                "5": 1.913177287159296,
+                "6": 0.9796600195812625
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.22416216100100428,
+          "peak_rss_mib": 118.8828125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "exact_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "exact"
+          },
+          "energies": [
+            -74.99512959953711,
+            -74.60737948412326,
+            -74.53678410746896
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99512959953704,
+            -74.60737948412333,
+            -74.53678410746897
+          ],
+          "weighted_total_error_mH": 1.0996301598188059,
+          "max_total_error_mH": 1.5496951828879446,
+          "weighted_schmidt_error_mH": 1.099630159814069,
+          "weighted_wave_operator_error_mH": 5.210646728907401e-11,
+          "embedded_dimension": 79,
+          "p_dim": 63,
+          "q_dim": 16,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0012320537089018297,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 18,
+          "residual_weighted_rms": 9.766885017709598e-10,
+          "residual_root_norms": [
+            6.121098875376554e-14,
+            1.6394563601058816e-09,
+            4.170660955249122e-10
+          ],
+          "schmidt_projector_distance": 2.104659629110863e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.031137569207277595,
+          "damping_bound": 1.9396054025434926,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "exact",
+            "n_states": 3,
+            "reads_exact_ci": true,
+            "subspace_size": 64,
+            "note": "upper-bound control; not a production path",
+            "block_completion_applied": false,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006748333251970956,
+                "3": 0.019087493353156716,
+                "4": 0.08740052342651702,
+                "5": 1.9131773589268517,
+                "6": 0.9796597909682783
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.22421430300164502,
+          "peak_rss_mib": 118.9296875,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "hf_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "hf"
+          },
+          "energies": [
+            -74.99512411703,
+            -74.59237797742347,
+            -74.52086317712882
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99512411702987,
+            -74.59237797742351,
+            -74.52086317712892
+          ],
+          "weighted_total_error_mH": 11.408936675498655,
+          "max_total_error_mH": 16.82833700458275,
+          "weighted_schmidt_error_mH": 11.408936675493917,
+          "weighted_wave_operator_error_mH": 9.000207986294602e-11,
+          "embedded_dimension": 67,
+          "p_dim": 63,
+          "q_dim": 4,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0020374787242896453,
+          "outer_converged": true,
+          "n_outer_iter": 6,
+          "inner_converged": true,
+          "n_inner_iter": 16,
+          "residual_weighted_rms": 5.241339422818472e-10,
+          "residual_root_norms": [
+            8.053899501730105e-14,
+            5.92221068550437e-10,
+            6.880576776943784e-10
+          ],
+          "schmidt_projector_distance": 4.74954061429756e-13,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 3.528220662175036e-27,
+          "damping_bound": 2.0,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "hf",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              88
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 8.06222704750087e-06,
+                "3": 0.0012345618132764457,
+                "4": 0.09237206474472506,
+                "5": 1.9262619756362023,
+                "6": 0.9801233355787489
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.1629089739981282,
+          "peak_rss_mib": 118.9375,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "cis_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "cis"
+          },
+          "energies": [
+            -74.9629466565387,
+            -74.57643699834885,
+            -74.4923914308262
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.96294665653873,
+            -74.57643699834887,
+            -74.49239143082615
+          ],
+          "weighted_total_error_mH": 36.93899863167378,
+          "max_total_error_mH": 45.300083307196815,
+          "weighted_schmidt_error_mH": 36.93899863167852,
+          "weighted_wave_operator_error_mH": 3.315866100213801e-11,
+          "embedded_dimension": 7,
+          "p_dim": 6,
+          "q_dim": 1,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "4": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "5": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 8.469602550310507e-10,
+          "outer_converged": true,
+          "n_outer_iter": 5,
+          "inner_converged": true,
+          "n_inner_iter": 17,
+          "residual_weighted_rms": 3.9887147347879706e-10,
+          "residual_root_norms": [
+            2.1454210879112808e-14,
+            5.830401443038176e-10,
+            3.7062048882292035e-10
+          ],
+          "schmidt_projector_distance": 8.697885291835979e-16,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.0,
+          "damping_bound": 2.0,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "cis",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              78,
+              68,
+              61,
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 17,
+            "block_support": {
+              "block_weights": {
+                "2": 3.8726679777725126e-05,
+                "3": 0.0060115402636968214,
+                "4": 0.024201620204506488,
+                "5": 1.9697481128545484,
+                "6": 0.9999999999974705
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.06817126899841242,
+          "peak_rss_mib": 118.9453125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "selci_eps1e-02",
+          "settings": {
+            "svd_eps": 0.01,
+            "seed": "selci"
+          },
+          "energies": [
+            -74.9951282659329,
+            -74.59316257978486,
+            -74.5214975350175
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99512826593303,
+            -74.59316257978494,
+            -74.52149753501753
+          ],
+          "weighted_total_error_mH": 10.93456695783838,
+          "max_total_error_mH": 16.19397911589715,
+          "weighted_schmidt_error_mH": 10.934566957757852,
+          "weighted_wave_operator_error_mH": 8.052817671947803e-11,
+          "embedded_dimension": 64,
+          "p_dim": 63,
+          "q_dim": 1,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 0,
+              "r_B": 0
+            },
+            "3": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "4": {
+              "r_A": 9,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0019101038850482706,
+          "outer_converged": true,
+          "n_outer_iter": 7,
+          "inner_converged": true,
+          "n_inner_iter": 17,
+          "residual_weighted_rms": 4.758313478859726e-10,
+          "residual_root_norms": [
+            8.602208673597278e-14,
+            5.487023974559435e-10,
+            6.149569794052628e-10
+          ],
+          "schmidt_projector_distance": 4.823274779778586e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.0,
+          "damping_bound": 2.0,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "selci",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00022987803073859807,
+                "3": 0.0023240618125057733,
+                "4": 0.09206578561067144,
+                "5": 1.9252121331208993,
+                "6": 0.9801681414251853
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.1859290879983746,
+          "peak_rss_mib": 118.9453125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "lanczos_k2_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 2
+          },
+          "energies": [
+            -74.99664181771261,
+            -74.60819384837511,
+            -74.5376746621541
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99664181771261,
+            -74.60819384837518,
+            -74.53767466215413
+          ],
+          "weighted_total_error_mH": 0.027251122318716625,
+          "max_total_error_mH": 0.03747700738188087,
+          "weighted_schmidt_error_mH": 0.027251122285557962,
+          "weighted_wave_operator_error_mH": 3.3158661002138004e-11,
+          "embedded_dimension": 116,
+          "p_dim": 81,
+          "q_dim": 35,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 8,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.001729941484558737,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 20,
+          "residual_weighted_rms": 8.00288085972835e-10,
+          "residual_root_norms": [
+            2.572950471893123e-10,
+            1.2047534063138136e-09,
+            6.354144712841405e-10
+          ],
+          "schmidt_projector_distance": 7.116329732438027e-12,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.19456321474003613,
+          "damping_bound": 1.674252124392802,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 2,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00135078104949733,
+                "3": 0.021039562372008377,
+                "4": 0.0815371282876918,
+                "5": 1.9151745022881166,
+                "6": 0.9808980260026857
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.35090306799975224,
+          "peak_rss_mib": 118.953125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k3_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 3
+          },
+          "energies": [
+            -74.9966730624351,
+            -74.60821926053397,
+            -74.53768945489621
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667306243501,
+            -74.60821926053401,
+            -74.53768945489625
+          ],
+          "weighted_total_error_mH": 0.0034345811693962482,
+          "max_total_error_mH": 0.006232284903262553,
+          "weighted_schmidt_error_mH": 0.0034345811693962482,
+          "weighted_wave_operator_error_mH": 5.6843418860808015e-11,
+          "embedded_dimension": 124,
+          "p_dim": 81,
+          "q_dim": 43,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 10,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0017459974895260688,
+          "outer_converged": true,
+          "n_outer_iter": 7,
+          "inner_converged": true,
+          "n_inner_iter": 20,
+          "residual_weighted_rms": 7.85978584727004e-10,
+          "residual_root_norms": [
+            7.432103294101622e-11,
+            1.202790085875626e-09,
+            6.332925077168353e-10
+          ],
+          "schmidt_projector_distance": 1.041804879381811e-10,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.15582351636489927,
+          "damping_bound": 1.7303679771891662,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 3,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.000648584839344238,
+                "3": 0.018745594263991458,
+                "4": 0.08764495190492484,
+                "5": 1.9128637811179492,
+                "6": 0.9800970878737907
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.3205856249987846,
+          "peak_rss_mib": 119.453125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k4_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 4
+          },
+          "energies": [
+            -74.99667476541025,
+            -74.60821916318227,
+            -74.53769021505188
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.9966747654102,
+            -74.60821916318228,
+            -74.53769021505182
+          ],
+          "weighted_total_error_mH": 0.002645988127862135,
+          "max_total_error_mH": 0.004529309748591004,
+          "weighted_schmidt_error_mH": 0.002645988156283844,
+          "weighted_wave_operator_error_mH": 3.789561257387201e-11,
+          "embedded_dimension": 124,
+          "p_dim": 81,
+          "q_dim": 43,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 10,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0017480763175902045,
+          "outer_converged": true,
+          "n_outer_iter": 5,
+          "inner_converged": true,
+          "n_inner_iter": 36,
+          "residual_weighted_rms": 6.440372837966144e-10,
+          "residual_root_norms": [
+            1.1155052789940728e-09,
+            1.50896679559873e-13,
+            1.3611359412353573e-13
+          ],
+          "schmidt_projector_distance": 1.6837924533410631e-09,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.529409899312737,
+          "damping_bound": 1.3076939026605814,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 4,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006756665174374314,
+                "3": 0.019041056417787305,
+                "4": 0.08743536226707596,
+                "5": 1.9131554626646028,
+                "6": 0.9796924521330967
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.23138898699835408,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k6_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 6
+          },
+          "energies": [
+            -74.99667611321975,
+            -74.60821955132238,
+            -74.53768994973503
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667611321988,
+            -74.60821955132248,
+            -74.53768994973501
+          ],
+          "weighted_total_error_mH": 0.0021557772100777584,
+          "max_total_error_mH": 0.0031815002472512788,
+          "weighted_schmidt_error_mH": 0.0021557771390234848,
+          "weighted_wave_operator_error_mH": 8.052817671947801e-11,
+          "embedded_dimension": 124,
+          "p_dim": 81,
+          "q_dim": 43,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 10,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.001746669058196178,
+          "outer_converged": true,
+          "n_outer_iter": 3,
+          "inner_converged": true,
+          "n_inner_iter": 20,
+          "residual_weighted_rms": 7.83634480461224e-10,
+          "residual_root_norms": [
+            3.4622177878081264e-11,
+            1.200318840413004e-09,
+            6.326807908035121e-10
+          ],
+          "schmidt_projector_distance": 2.5409673720573068e-08,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.13602060851906042,
+          "damping_bound": 1.7605314419491391,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 6,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006747389381391081,
+                "3": 0.01908773884745435,
+                "4": 0.0874002154738481,
+                "5": 1.913177287159296,
+                "6": 0.9796600195812625
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.1411811209982261,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "exact_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "exact"
+          },
+          "energies": [
+            -74.99667612927706,
+            -74.6082195765995,
+            -74.53768992486194
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667612927715,
+            -74.60821957659937,
+            -74.53768992486182
+          ],
+          "weighted_total_error_mH": 0.002150290095907318,
+          "max_total_error_mH": 0.0031654429335503664,
+          "weighted_schmidt_error_mH": 0.0021502901480137853,
+          "weighted_wave_operator_error_mH": 1.0894988614988203e-10,
+          "embedded_dimension": 124,
+          "p_dim": 81,
+          "q_dim": 43,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 10,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0017467690030615651,
+          "outer_converged": true,
+          "n_outer_iter": 3,
+          "inner_converged": true,
+          "n_inner_iter": 20,
+          "residual_weighted_rms": 7.837574373698077e-10,
+          "residual_root_norms": [
+            3.4067219876180216e-11,
+            1.2005278293261657e-09,
+            6.327712994761826e-10
+          ],
+          "schmidt_projector_distance": 3.8925034446097714e-08,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.1356941643800412,
+          "damping_bound": 1.7610374894298861,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "exact",
+            "n_states": 3,
+            "reads_exact_ci": true,
+            "subspace_size": 64,
+            "note": "upper-bound control; not a production path",
+            "block_completion_applied": false,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006748333251970956,
+                "3": 0.019087493353156716,
+                "4": 0.08740052342651702,
+                "5": 1.9131773589268517,
+                "6": 0.9796597909682783
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.13997672599725774,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "hf_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "hf"
+          },
+          "energies": [
+            -74.99637292575675,
+            -74.59237797742354,
+            -74.52086317712886
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.9963729257568,
+            -74.59237797742351,
+            -74.52086317712887
+          ],
+          "weighted_total_error_mH": 10.992667099879819,
+          "max_total_error_mH": 16.828337004540117,
+          "weighted_schmidt_error_mH": 10.992667099865608,
+          "weighted_wave_operator_error_mH": 3.315866100213801e-11,
+          "embedded_dimension": 86,
+          "p_dim": 81,
+          "q_dim": 5,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0022922483639258124,
+          "outer_converged": true,
+          "n_outer_iter": 4,
+          "inner_converged": true,
+          "n_inner_iter": 16,
+          "residual_weighted_rms": 5.31140699559811e-10,
+          "residual_root_norms": [
+            1.4891217860020133e-10,
+            5.922220767310313e-10,
+            6.880621360630029e-10
+          ],
+          "schmidt_projector_distance": 3.826919879906682e-14,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 3.133061514981965e-14,
+          "damping_bound": 1.9999999999999374,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "hf",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              88
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 8.06222704750087e-06,
+                "3": 0.0012345618132764457,
+                "4": 0.09237206474472506,
+                "5": 1.9262619756362023,
+                "6": 0.9801233355787489
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.1463390780008922,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "cis_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "cis"
+          },
+          "energies": [
+            -74.9629466565387,
+            -74.57650277077093,
+            -74.49242332765456
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.96294665653873,
+            -74.5765027707709,
+            -74.49242332765458
+          ],
+          "weighted_total_error_mH": 36.90644221486157,
+          "max_total_error_mH": 45.268186478836014,
+          "weighted_schmidt_error_mH": 36.90644221485684,
+          "weighted_wave_operator_error_mH": 2.3684757858670004e-11,
+          "embedded_dimension": 8,
+          "p_dim": 6,
+          "q_dim": 2,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "4": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "5": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 7.579157138117259e-14,
+          "outer_converged": true,
+          "n_outer_iter": 2,
+          "inner_converged": true,
+          "n_inner_iter": 17,
+          "residual_weighted_rms": 6.247062968680615e-10,
+          "residual_root_norms": [
+            1.6259054617873377e-14,
+            9.074245154387949e-10,
+            5.893679839931342e-10
+          ],
+          "schmidt_projector_distance": 1.2196941696350136e-16,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.01784361429440703,
+          "damping_bound": 1.9649383971293535,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "cis",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              78,
+              68,
+              61,
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 17,
+            "block_support": {
+              "block_weights": {
+                "2": 3.8726679777725126e-05,
+                "3": 0.0060115402636968214,
+                "4": 0.024201620204506488,
+                "5": 1.9697481128545484,
+                "6": 0.9999999999974705
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.05055279999942286,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "selci_eps1e-03",
+          "settings": {
+            "svd_eps": 0.001,
+            "seed": "selci"
+          },
+          "energies": [
+            -74.99636322994868,
+            -74.59357947388413,
+            -74.52190787514552
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99636322994877,
+            -74.59357947388425,
+            -74.52190787514549
+          ],
+          "weighted_total_error_mH": 10.24716754348276,
+          "max_total_error_mH": 15.783638987883819,
+          "weighted_schmidt_error_mH": 10.247167543425917,
+          "weighted_wave_operator_error_mH": 7.579122514774403e-11,
+          "embedded_dimension": 85,
+          "p_dim": 81,
+          "q_dim": 4,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.00224214140547259,
+          "outer_converged": true,
+          "n_outer_iter": 3,
+          "inner_converged": true,
+          "n_inner_iter": 19,
+          "residual_weighted_rms": 7.004399800673444e-10,
+          "residual_root_norms": [
+            5.0543990566421345e-12,
+            8.85921415822117e-10,
+            8.28834238595473e-10
+          ],
+          "schmidt_projector_distance": 8.547907449451526e-14,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.07338476154047967,
+          "damping_bound": 1.8632647599074152,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "selci",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00022987803073859807,
+                "3": 0.0023240618125057733,
+                "4": 0.09206578561067144,
+                "5": 1.9252121331208993,
+                "6": 0.9801681414251853
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.12664080400281819,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "lanczos_k2_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 2
+          },
+          "energies": [
+            -74.99664821788237,
+            -74.6081951073789,
+            -74.537676848477
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99664821788234,
+            -74.60819510737882,
+            -74.53767684847685
+          ],
+          "weighted_total_error_mH": 0.023969290168679432,
+          "max_total_error_mH": 0.031076837629484544,
+          "weighted_schmidt_error_mH": 0.023969290258681514,
+          "weighted_wave_operator_error_mH": 9.000207986294602e-11,
+          "embedded_dimension": 148,
+          "p_dim": 97,
+          "q_dim": 51,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 12,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.001477526706754728,
+          "outer_converged": true,
+          "n_outer_iter": 8,
+          "inner_converged": true,
+          "n_inner_iter": 21,
+          "residual_weighted_rms": 5.306524774855971e-10,
+          "residual_root_norms": [
+            1.6196898366398294e-11,
+            8.510401872178017e-10,
+            3.467627658910398e-10
+          ],
+          "schmidt_projector_distance": 8.707572795920338e-13,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.13847238884788204,
+          "damping_bound": 1.7567400137160742,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 2,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00135078104949733,
+                "3": 0.021039562372008377,
+                "4": 0.0815371282876918,
+                "5": 1.9151745022881166,
+                "6": 0.9808980260026857
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.40242944799683755,
+          "peak_rss_mib": 119.67578125,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k3_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 3
+          },
+          "energies": [
+            -74.99667627084986,
+            -74.60822105870044,
+            -74.53769121807787
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667627084992,
+            -74.60822105870041,
+            -74.5376912180779
+          ],
+          "weighted_total_error_mH": 0.001177993539158706,
+          "max_total_error_mH": 0.0030238701356211095,
+          "weighted_schmidt_error_mH": 0.0011779935202108995,
+          "weighted_wave_operator_error_mH": 3.789561257387201e-11,
+          "embedded_dimension": 148,
+          "p_dim": 97,
+          "q_dim": 51,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 12,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0014809010800112506,
+          "outer_converged": true,
+          "n_outer_iter": 7,
+          "inner_converged": true,
+          "n_inner_iter": 21,
+          "residual_weighted_rms": 5.340167836425113e-10,
+          "residual_root_norms": [
+            1.830544439596926e-11,
+            8.624198885433354e-10,
+            3.337942812362808e-10
+          ],
+          "schmidt_projector_distance": 1.2712217524420911e-12,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.14351607827334162,
+          "damping_bound": 1.7489915865633574,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 3,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.000648584839344238,
+                "3": 0.018745594263991458,
+                "4": 0.08764495190492484,
+                "5": 1.9128637811179492,
+                "6": 0.9800970878737907
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.35761609099790803,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k4_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 4
+          },
+          "energies": [
+            -74.99667802651878,
+            -74.60822124460176,
+            -74.53769151222264
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667802651878,
+            -74.60822124460182,
+            -74.53769151222276
+          ],
+          "weighted_total_error_mH": 0.00043275520056340605,
+          "max_total_error_mH": 0.00126820121693072,
+          "weighted_schmidt_error_mH": 0.00043275513898303564,
+          "weighted_wave_operator_error_mH": 6.158037043254201e-11,
+          "embedded_dimension": 148,
+          "p_dim": 97,
+          "q_dim": 51,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 12,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0014816578417398284,
+          "outer_converged": true,
+          "n_outer_iter": 5,
+          "inner_converged": true,
+          "n_inner_iter": 21,
+          "residual_weighted_rms": 5.328571298814386e-10,
+          "residual_root_norms": [
+            2.146436439086038e-11,
+            8.600192878357244e-10,
+            3.3423983635749206e-10
+          ],
+          "schmidt_projector_distance": 7.677655742933578e-13,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.15476151619617368,
+          "damping_bound": 1.7319593456734448,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 4,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006756665174374314,
+                "3": 0.019041056417787305,
+                "4": 0.08743536226707596,
+                "5": 1.9131554626646028,
+                "6": 0.9796924521330967
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.2606953499998781,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "lanczos_k6_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "lanczos",
+            "seed_lanczos_steps": 6
+          },
+          "energies": [
+            -74.9966792781769,
+            -74.60822127270295,
+            -74.53769151412605
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667927817683,
+            -74.60822127270282,
+            -74.53769151412602
+          ],
+          "weighted_total_error_mH": 5.534294208094555e-06,
+          "max_total_error_mH": 1.654309755849681e-05,
+          "weighted_schmidt_error_mH": 5.5343699993197024e-06,
+          "weighted_wave_operator_error_mH": 7.579122514774402e-11,
+          "embedded_dimension": 148,
+          "p_dim": 97,
+          "q_dim": 51,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 12,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0014795917250090941,
+          "outer_converged": true,
+          "n_outer_iter": 3,
+          "inner_converged": true,
+          "n_inner_iter": 32,
+          "residual_weighted_rms": 9.429005172939214e-10,
+          "residual_root_norms": [
+            1.6331515875842469e-09,
+            1.7078009909250155e-13,
+            1.3908503174931803e-13
+          ],
+          "schmidt_projector_distance": 2.9314229113988894e-13,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.49186627634665725,
+          "damping_bound": 1.3406027280794102,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "lanczos",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "lanczos_steps": 6,
+            "selects_determinants": false,
+            "block_completion_applied": false,
+            "subspace_dimension": 100,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006747389381391081,
+                "3": 0.01908773884745435,
+                "4": 0.0874002154738481,
+                "5": 1.913177287159296,
+                "6": 0.9796600195812625
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.18507076999958372,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "lanczos"
+        },
+        {
+          "label": "exact_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "exact"
+          },
+          "energies": [
+            -74.99667929472,
+            -74.60822127275532,
+            -74.5376915141334
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99667929471997,
+            -74.6082212727554,
+            -74.53769151413341
+          ],
+          "weighted_total_error_mH": 2.3684757858670004e-11,
+          "max_total_error_mH": 7.105427357601002e-11,
+          "weighted_schmidt_error_mH": 1.8947806286936004e-11,
+          "weighted_wave_operator_error_mH": 4.263256414560601e-11,
+          "embedded_dimension": 148,
+          "p_dim": 97,
+          "q_dim": 51,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 3,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 12,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0014795105111710402,
+          "outer_converged": true,
+          "n_outer_iter": 2,
+          "inner_converged": true,
+          "n_inner_iter": 21,
+          "residual_weighted_rms": 5.331188827544402e-10,
+          "residual_root_norms": [
+            1.2466456187562677e-11,
+            8.608870046791373e-10,
+            3.337145218487417e-10
+          ],
+          "schmidt_projector_distance": 4.801183554776842e-13,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.136559649179336,
+          "damping_bound": 1.7596964677077174,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "exact",
+            "n_states": 3,
+            "reads_exact_ci": true,
+            "subspace_size": 64,
+            "note": "upper-bound control; not a production path",
+            "block_completion_applied": false,
+            "block_support": {
+              "block_weights": {
+                "2": 0.0006748333251970956,
+                "3": 0.019087493353156716,
+                "4": 0.08740052342651702,
+                "5": 1.9131773589268517,
+                "6": 0.9796597909682783
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.12733684100021492,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "hf_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "hf"
+          },
+          "energies": [
+            -74.99638706440867,
+            -74.59237797742345,
+            -74.52086317712892
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99638706440882,
+            -74.59237797742365,
+            -74.52086317712882
+          ],
+          "weighted_total_error_mH": 10.987954215915844,
+          "max_total_error_mH": 16.828337004483274,
+          "weighted_schmidt_error_mH": 10.987954215830579,
+          "weighted_wave_operator_error_mH": 1.5158245029548803e-10,
+          "embedded_dimension": 122,
+          "p_dim": 97,
+          "q_dim": 25,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.002040417898182009,
+          "outer_converged": true,
+          "n_outer_iter": 2,
+          "inner_converged": true,
+          "n_inner_iter": 16,
+          "residual_weighted_rms": 8.016229522878923e-10,
+          "residual_root_norms": [
+            1.0505444282034554e-09,
+            5.922266860776346e-10,
+            6.880567052012845e-10
+          ],
+          "schmidt_projector_distance": 5.923972551676146e-15,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.16875812940668955,
+          "damping_bound": 1.7112180439038174,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "hf",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              88
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 8.06222704750087e-06,
+                "3": 0.0012345618132764457,
+                "4": 0.09237206474472506,
+                "5": 1.9262619756362023,
+                "6": 0.9801233355787489
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.1104417860005924,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "cis_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "cis"
+          },
+          "energies": [
+            -74.9629466565387,
+            -74.57650277077093,
+            -74.49242332765456
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.96294665653873,
+            -74.5765027707709,
+            -74.49242332765458
+          ],
+          "weighted_total_error_mH": 36.90644221486157,
+          "max_total_error_mH": 45.268186478836014,
+          "weighted_schmidt_error_mH": 36.90644221485684,
+          "weighted_wave_operator_error_mH": 2.3684757858670004e-11,
+          "embedded_dimension": 8,
+          "p_dim": 6,
+          "q_dim": 2,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "4": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "5": {
+              "r_A": 2,
+              "r_B": 2
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 7.579157138117259e-14,
+          "outer_converged": true,
+          "n_outer_iter": 2,
+          "inner_converged": true,
+          "n_inner_iter": 17,
+          "residual_weighted_rms": 6.247062968680615e-10,
+          "residual_root_norms": [
+            1.6259054617873377e-14,
+            9.074245154387949e-10,
+            5.893679839931342e-10
+          ],
+          "schmidt_projector_distance": 1.2196941696350136e-16,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.01784361429440703,
+          "damping_bound": 1.9649383971293535,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "cis",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              78,
+              68,
+              61,
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 17,
+            "block_support": {
+              "block_weights": {
+                "2": 3.8726679777725126e-05,
+                "3": 0.0060115402636968214,
+                "4": 0.024201620204506488,
+                "5": 1.9697481128545484,
+                "6": 0.9999999999974705
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.050532253000710625,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "control"
+        },
+        {
+          "label": "selci_eps1e-04",
+          "settings": {
+            "svd_eps": 0.0001,
+            "seed": "selci"
+          },
+          "energies": [
+            -74.99636593190112,
+            -74.59357947388422,
+            -74.52190787514562
+          ],
+          "reference_energies": [
+            -74.99667929472,
+            -74.60822127275539,
+            -74.5376915141334
+          ],
+          "embedded_exact_energies": [
+            -74.99636593190093,
+            -74.59357947388418,
+            -74.52190787514553
+          ],
+          "weighted_total_error_mH": 10.246266892607991,
+          "max_total_error_mH": 15.783638987784343,
+          "weighted_schmidt_error_mH": 10.24626689271694,
+          "weighted_wave_operator_error_mH": 1.0894988614988202e-10,
+          "embedded_dimension": 106,
+          "p_dim": 97,
+          "q_dim": 9,
+          "schmidt_ranks": {
+            "2": {
+              "r_A": 1,
+              "r_B": 1
+            },
+            "3": {
+              "r_A": 4,
+              "r_B": 2
+            },
+            "4": {
+              "r_A": 12,
+              "r_B": 6
+            },
+            "5": {
+              "r_A": 6,
+              "r_B": 4
+            },
+            "6": {
+              "r_A": 1,
+              "r_B": 1
+            }
+          },
+          "discarded_weight": 0.0019350347688462815,
+          "outer_converged": true,
+          "n_outer_iter": 2,
+          "inner_converged": true,
+          "n_inner_iter": 19,
+          "residual_weighted_rms": 7.004427966361205e-10,
+          "residual_root_norms": [
+            7.130970385231349e-12,
+            8.859102136410227e-10,
+            8.288380883539146e-10
+          ],
+          "schmidt_projector_distance": 4.965065592312627e-14,
+          "root_permutations": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          "root_reorder": false,
+          "spectral_radius_BA": 0.07338467250284562,
+          "damping_bound": 1.863264914465879,
+          "damping_bound_satisfied": true,
+          "seed_provenance": {
+            "seed": "selci",
+            "n_states": 3,
+            "reads_exact_ci": false,
+            "subspace_size": 64,
+            "selects_determinants": true,
+            "block_completion_addresses": [
+              98
+            ],
+            "block_completion_applied": true,
+            "subspace_dimension": 65,
+            "block_support": {
+              "block_weights": {
+                "2": 0.00022987803073859807,
+                "3": 0.0023240618125057733,
+                "4": 0.09206578561067144,
+                "5": 1.9252121331208993,
+                "6": 0.9801681414251853
+              },
+              "empty_blocks": [],
+              "has_empty_block": false,
+              "tolerance": 1e-12
+            }
+          },
+          "wall_time_seconds": 0.11045873700277298,
+          "peak_rss_mib": 119.74609375,
+          "classification": "PASS",
+          "family": "control"
+        }
+      ]
+    },
+    "h3": {
+      "cells": [
+        {
+          "self_consistent": {
+            "label": "self_consistent_eps1e-02",
+            "settings": {
+              "svd_eps": 0.01
+            },
+            "energies": [
+              -74.99468987507524,
+              -74.60736553806379,
+              -74.53679564373017
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.99468987507532,
+              -74.60736553806366,
+              -74.53679564373004
+            ],
+            "weighted_total_error_mH": 1.247008246527533,
+            "max_total_error_mH": 1.9894196447580725,
+            "weighted_schmidt_error_mH": 1.2470082465843764,
+            "weighted_wave_operator_error_mH": 1.1368683772161603e-10,
+            "embedded_dimension": 75,
+            "p_dim": 59,
+            "q_dim": 16,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 0,
+                "r_B": 0
+              },
+              "3": {
+                "r_A": 4,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 9,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 2,
+                "r_B": 2
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0010067549724037505,
+            "outer_converged": true,
+            "n_outer_iter": 8,
+            "inner_converged": true,
+            "n_inner_iter": 18,
+            "residual_weighted_rms": 9.841831280905118e-10,
+            "residual_root_norms": [
+              1.1987489397068152e-13,
+              1.6551700146543044e-09,
+              4.077517591296859e-10
+            ],
+            "schmidt_projector_distance": 2.0853350859965037e-09,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.031176911809560774,
+            "damping_bound": 1.9395314005724777,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.2115203229986946,
+            "peak_rss_mib": 119.74609375,
+            "classification": "PASS"
+          },
+          "frozen": {
+            "label": "frozen_matched_to_eps1e-02_at_eps1.00e-02",
+            "settings": {
+              "svd_eps": 0.01,
+              "outer_max_iter": 1
+            },
+            "energies": [
+              -74.99468987507518,
+              -74.60737681586693,
+              -74.53751137513395
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.9946898750752,
+              -74.60737681586679,
+              -74.53751137513407
+            ],
+            "weighted_total_error_mH": 1.0046718442424662,
+            "max_total_error_mH": 1.989419644814916,
+            "weighted_schmidt_error_mH": 1.0046718442424662,
+            "weighted_wave_operator_error_mH": 9.473903143468002e-11,
+            "embedded_dimension": 76,
+            "p_dim": 59,
+            "q_dim": 17,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 1,
+                "r_B": 1
+              },
+              "3": {
+                "r_A": 4,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 9,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 2,
+                "r_B": 2
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0016599869269282967,
+            "outer_converged": false,
+            "n_outer_iter": 1,
+            "inner_converged": true,
+            "n_inner_iter": 20,
+            "residual_weighted_rms": 3.7189651533102787e-10,
+            "residual_root_norms": [
+              6.242557437463959e-14,
+              2.172171119199429e-10,
+              6.064138658855774e-10
+            ],
+            "schmidt_projector_distance": null,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.08150083808507694,
+            "damping_bound": 1.8492819696203218,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.05534692999935942,
+            "peak_rss_mib": 119.74609375,
+            "classification": "FROZEN_BASELINE",
+            "matched_dimension_relative_gap": 0.013333333333333334,
+            "matched_within_tolerance": true
+          },
+          "frozen_minus_self_consistent_mH": -0.2423364022850667,
+          "self_consistency_helps": false,
+          "indistinguishable": false,
+          "self_consistency_hurts": true
+        },
+        {
+          "self_consistent": {
+            "label": "self_consistent_eps1e-03",
+            "settings": {
+              "svd_eps": 0.001
+            },
+            "energies": [
+              -74.9966730624351,
+              -74.60821926053397,
+              -74.53768945489621
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.99667306243501,
+              -74.60821926053401,
+              -74.53768945489625
+            ],
+            "weighted_total_error_mH": 0.0034345811693962482,
+            "max_total_error_mH": 0.006232284903262553,
+            "weighted_schmidt_error_mH": 0.0034345811693962482,
+            "weighted_wave_operator_error_mH": 5.6843418860808015e-11,
+            "embedded_dimension": 124,
+            "p_dim": 81,
+            "q_dim": 43,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 3,
+                "r_B": 1
+              },
+              "3": {
+                "r_A": 10,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 12,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 4,
+                "r_B": 2
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0017459974895260688,
+            "outer_converged": true,
+            "n_outer_iter": 7,
+            "inner_converged": true,
+            "n_inner_iter": 20,
+            "residual_weighted_rms": 7.85978584727004e-10,
+            "residual_root_norms": [
+              7.432103294101622e-11,
+              1.202790085875626e-09,
+              6.332925077168353e-10
+            ],
+            "schmidt_projector_distance": 1.041804879381811e-10,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.15582351636489927,
+            "damping_bound": 1.7303679771891662,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.2836492759997782,
+            "peak_rss_mib": 119.74609375,
+            "classification": "PASS"
+          },
+          "frozen": {
+            "label": "frozen_matched_to_eps1e-03_at_eps3.98e-03",
+            "settings": {
+              "svd_eps": 0.003981071705534969,
+              "outer_max_iter": 1
+            },
+            "energies": [
+              -74.99663885628388,
+              -74.60821926254117,
+              -74.53768945205762
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.99663885628406,
+              -74.60821926254117,
+              -74.53768945205762
+            ],
+            "weighted_total_error_mH": 0.014836908704296548,
+            "max_total_error_mH": 0.04043843611611919,
+            "weighted_schmidt_error_mH": 0.014836908642716177,
+            "weighted_wave_operator_error_mH": 6.158037043254201e-11,
+            "embedded_dimension": 108,
+            "p_dim": 81,
+            "q_dim": 27,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 3,
+                "r_B": 1
+              },
+              "3": {
+                "r_A": 6,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 12,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 4,
+                "r_B": 2
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0016599869269282967,
+            "outer_converged": false,
+            "n_outer_iter": 1,
+            "inner_converged": true,
+            "n_inner_iter": 20,
+            "residual_weighted_rms": 7.985937910727443e-10,
+            "residual_root_norms": [
+              5.592115081419587e-12,
+              1.2321075696732915e-09,
+              6.285982774574756e-10
+            ],
+            "schmidt_projector_distance": null,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.13144732000716342,
+            "damping_bound": 1.7676474764970387,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.06878589500047383,
+            "peak_rss_mib": 119.74609375,
+            "classification": "FROZEN_BASELINE",
+            "matched_dimension_relative_gap": 0.12903225806451613,
+            "matched_within_tolerance": false
+          },
+          "frozen_minus_self_consistent_mH": 0.0114023275349003,
+          "self_consistency_helps": false,
+          "indistinguishable": true,
+          "self_consistency_hurts": false
+        },
+        {
+          "self_consistent": {
+            "label": "self_consistent_eps1e-04",
+            "settings": {
+              "svd_eps": 0.0001
+            },
+            "energies": [
+              -74.99667627084986,
+              -74.60822105870044,
+              -74.53769121807787
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.99667627084992,
+              -74.60822105870041,
+              -74.5376912180779
+            ],
+            "weighted_total_error_mH": 0.001177993539158706,
+            "max_total_error_mH": 0.0030238701356211095,
+            "weighted_schmidt_error_mH": 0.0011779935202108995,
+            "weighted_wave_operator_error_mH": 3.789561257387201e-11,
+            "embedded_dimension": 148,
+            "p_dim": 97,
+            "q_dim": 51,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 3,
+                "r_B": 1
+              },
+              "3": {
+                "r_A": 12,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 12,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 6,
+                "r_B": 4
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0014809010800112506,
+            "outer_converged": true,
+            "n_outer_iter": 7,
+            "inner_converged": true,
+            "n_inner_iter": 21,
+            "residual_weighted_rms": 5.340167836425113e-10,
+            "residual_root_norms": [
+              1.830544439596926e-11,
+              8.624198885433354e-10,
+              3.337942812362808e-10
+            ],
+            "schmidt_projector_distance": 1.2712217524420911e-12,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ],
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.14351607827334162,
+            "damping_bound": 1.7489915865633574,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.3398684919993684,
+            "peak_rss_mib": 119.74609375,
+            "classification": "PASS"
+          },
+          "frozen": {
+            "label": "frozen_matched_to_eps1e-04_at_eps3.98e-04",
+            "settings": {
+              "svd_eps": 0.0003981071705534969,
+              "outer_max_iter": 1
+            },
+            "energies": [
+              -74.9966762708499,
+              -74.60822105870037,
+              -74.53769121807781
+            ],
+            "reference_energies": [
+              -74.99667929472,
+              -74.60822127275539,
+              -74.5376915141334
+            ],
+            "embedded_exact_energies": [
+              -74.99667627084985,
+              -74.60822105870038,
+              -74.53769121807784
+            ],
+            "weighted_total_error_mH": 0.0011779935675804154,
+            "max_total_error_mH": 0.0030238700929885454,
+            "weighted_schmidt_error_mH": 0.001177993572317367,
+            "weighted_wave_operator_error_mH": 3.3158661002138004e-11,
+            "embedded_dimension": 148,
+            "p_dim": 97,
+            "q_dim": 51,
+            "schmidt_ranks": {
+              "2": {
+                "r_A": 3,
+                "r_B": 1
+              },
+              "3": {
+                "r_A": 12,
+                "r_B": 4
+              },
+              "4": {
+                "r_A": 12,
+                "r_B": 6
+              },
+              "5": {
+                "r_A": 6,
+                "r_B": 4
+              },
+              "6": {
+                "r_A": 1,
+                "r_B": 1
+              }
+            },
+            "discarded_weight": 0.0015518803405191386,
+            "outer_converged": false,
+            "n_outer_iter": 1,
+            "inner_converged": true,
+            "n_inner_iter": 21,
+            "residual_weighted_rms": 5.418743872345155e-10,
+            "residual_root_norms": [
+              1.545214662669339e-11,
+              8.778775313703124e-10,
+              3.316260329077597e-10
+            ],
+            "schmidt_projector_distance": null,
+            "root_permutations": [
+              [
+                0,
+                1,
+                2
+              ]
+            ],
+            "root_reorder": false,
+            "spectral_radius_BA": 0.13956567844723583,
+            "damping_bound": 1.7550546123196566,
+            "damping_bound_satisfied": true,
+            "seed_provenance": {
+              "seed": "lanczos",
+              "n_states": 3,
+              "reads_exact_ci": false,
+              "subspace_size": 64,
+              "lanczos_steps": 3,
+              "selects_determinants": false,
+              "block_completion_applied": false,
+              "subspace_dimension": 100,
+              "block_support": {
+                "block_weights": {
+                  "2": 0.000648584839344238,
+                  "3": 0.018745594263991458,
+                  "4": 0.08764495190492484,
+                  "5": 1.9128637811179492,
+                  "6": 0.9800970878737907
+                },
+                "empty_blocks": [],
+                "has_empty_block": false,
+                "tolerance": 1e-12
+              }
+            },
+            "wall_time_seconds": 0.0782724140008213,
+            "peak_rss_mib": 119.75390625,
+            "classification": "FROZEN_BASELINE",
+            "matched_dimension_relative_gap": 0.0,
+            "matched_within_tolerance": true
+          },
+          "frozen_minus_self_consistent_mH": 2.8421709430404007e-11,
+          "self_consistency_helps": false,
+          "indistinguishable": true,
+          "self_consistency_hurts": false
+        }
+      ]
+    }
+  }
+}

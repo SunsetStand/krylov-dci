@@ -86,6 +86,7 @@ def run_state_averaged_dci(
     apply_dressing: bool = True,
     omega_mode: str = 'shared',
     compute_reference: bool = True,
+    embedded_spectrum: bool = False,
     output_dir: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict:
@@ -231,6 +232,43 @@ def run_state_averaged_dci(
 
     final_problem = result['problem']
     final_part = final_problem['part_info']
+
+    # Exact diagonalization of the final embedded Hamiltonian.  This separates
+    # the two error sources that must not be allowed to cancel: the Schmidt
+    # truncation error, which is E_embedded - E_reference, and the
+    # wave-operator error, which is E_downfolded - E_embedded.  Scoring only
+    # against the reference cannot tell them apart.
+    embedded_energies = None
+    if embedded_spectrum:
+        from dm_svd_dci.wave_operator import assemble_qspace_hamiltonian
+        assembled = assemble_qspace_hamiltonian(
+            final_problem['H_PQ'], final_problem['H_QQ_blocks'],
+            final_problem['D_by_n'])
+        h_pp = np.asarray(final_problem['H_PP'])
+        h_pq = np.asarray(assembled['H_PQ'])
+        h_qq = np.asarray(assembled['H_QQ'])
+        if h_qq.shape[0] == 0:
+            full = h_pp
+        else:
+            full = np.block([[h_pp, h_pq], [h_pq.T.conj(), h_qq]])
+        full = 0.5 * (full + full.T.conj())
+        embedded_energies = np.linalg.eigvalsh(full)[:sa_states]
+
+        # Spectral radius of B A on the embedded Q space.  The residual
+        # dressing is a damped preconditioned iteration with matrix
+        # (1-w) I + w (A B), so convergence requires w < 2 / (rho + 1).
+        # Recording it turns a damping choice into a checkable condition.
+        if h_qq.shape[0] > 0:
+            diagonal = np.diag(h_qq)
+            reference = float(np.min(np.linalg.eigvalsh(h_pp)))
+            gap = reference - diagonal
+            gap[np.abs(gap) < 1e-12] = 1e-12
+            resolvent = 1.0 / gap
+            off_diagonal = h_qq - np.diag(diagonal)
+            spectral_radius = float(np.max(np.abs(np.linalg.eigvals(
+                off_diagonal * resolvent[np.newaxis, :]))))
+        else:
+            spectral_radius = 0.0
     metrics = compute_compression_metrics(
         result['schmidt_data'], result['state_blocks'][0])
     energies = np.asarray(result['energies'])
@@ -244,6 +282,20 @@ def run_state_averaged_dci(
         'reference_energies': reference_energies,
         'errors_mH': errors_mh,
         'seed_provenance': seed_provenance,
+        'embedded_exact_energies': embedded_energies,
+        'spectral_radius_BA': (
+            None if not embedded_spectrum else spectral_radius),
+        'damping_bound': (
+            None if not embedded_spectrum else 2.0 / (spectral_radius + 1.0)),
+        'damping_bound_satisfied': (
+            None if not embedded_spectrum
+            else bool(wave_damping < 2.0 / (spectral_radius + 1.0))),
+        'schmidt_truncation_errors_mH': (
+            None if (embedded_energies is None or reference_energies is None)
+            else (embedded_energies - reference_energies) * 1000.0),
+        'wave_operator_errors_mH': (
+            None if embedded_energies is None
+            else (energies - embedded_energies) * 1000.0),
         'state_weights': weights,
         'converged': result['converged'],
         'n_outer_iter': result['n_outer_iter'],
