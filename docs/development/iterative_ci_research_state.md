@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `fa3ee73` on branch `research/iterative-ci-feasibility`,
+Updated at commit `08c2144` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -236,6 +236,38 @@ including the Omega norm, the root-overlap matrix, and the Schmidt projector
 distance, which did not previously exist. Two ablation controls are in place,
 `rank_mode='symmetric'` for H6 and `apply_dressing=False` for H4, the latter
 verified to reduce the generalized Ritz problem to diagonalizing `H_PP`.
+
+**All five control axes now exist.** Seed family, frozen versus self-consistent,
+`apply_dressing`, `omega_mode` and `rank_mode`. The per-state wave operator
+solves each state in its own graph subspace, which gives up mutual
+orthonormality and index-based root ordering, both documented; root k is
+followed by overlap instead. Its dressing collapses to a rank-one minimum-norm
+update per state, removing the multi-state pseudoinverse that the literature
+identified as the Lee and Suzuki construction. Both modes converge to the exact
+eigenvalues of the full P+Q matrix to about `5e-15`.
+
+**A second seeding defect, found and fixed.** The H2 completion did not carry
+over: on H2O the CIS seed still left two blocks empty, because adding a
+determinant to the subspace is not the same as giving the seed weight in the
+block. The lowest-diagonal determinant of a block is often symmetry-decoupled,
+becomes its own eigenvector, and the low-lying roots keep zero amplitude on it.
+Completion now selects by coupling to the current seed and iterates until the
+weight is non-zero. Every seed family is empty-block free on both systems.
+
+**The scan design was nearly invalidated, and the fix is measured.** Before this,
+the embedded dimension on H2O was `6` at every threshold from `1e-2` to `1e-4`,
+so a threshold scan would have discriminated nothing. With completion repaired it
+responds properly for `exact` (`6, 80, 124, 148`), `hf`, `trunc` and `selci`.
+
+**A distinction the project had conflated.** `cis` remains nearly flat
+(`5, 7, 8, 8`) even with no empty blocks. Completion made it admissible, not
+representative. The record that a CIS seed fixed excited states concerns
+selecting a **P space of determinants**; here the seed builds a **Schmidt basis**
+from state-averaged densities, which depends on entanglement structure rather
+than determinant content. A wavefunction can carry the right determinants and the
+wrong entanglement structure. `cis` and `perturbed` will therefore show weak
+threshold dependence for a structural reason, which must be reported as a
+property of those seeds and not mistaken for insensitivity of the method.
 
 **Two early readings, not yet conclusions.** On H2O at `svd_eps = 1e-3` with the
 protocol's partition, `rectangular` and `symmetric` give identical energies, so
