@@ -93,7 +93,7 @@ def run_cell(system, label, **overrides):
                 'settings': {k: v for k, v in overrides.items()}}
 
     weights = np.asarray(result['state_weights'])
-    total = np.abs(np.asarray(result['errors_mH']))
+    total = np.abs(np.asarray(result['errors_sorted_mH']))
     schmidt = np.abs(np.asarray(result['schmidt_truncation_errors_mH']))
     wave = np.abs(np.asarray(result['wave_operator_errors_mH']))
     history = result['outer_history']

@@ -272,8 +272,19 @@ def run_state_averaged_dci(
     metrics = compute_compression_metrics(
         result['schmidt_data'], result['state_blocks'][0])
     energies = np.asarray(result['energies'])
+    # result['energies'] is in overlap-matched order, while the reference and
+    # the embedded spectrum are in ascending energy order.  Subtracting them
+    # directly compares different labelings and manufactures an error whenever
+    # the overlap match is not the energy order.  Both orderings are therefore
+    # reported: 'errors_mH' keeps the matched labeling, and the '_sorted'
+    # variants compare the spectra as sets, which is what the target
+    # definition of "the lowest n levels" actually asks.
+    energies_sorted = np.sort(energies)
     errors_mh = (None if reference_energies is None
                  else (energies - reference_energies) * 1000.0)
+    errors_sorted_mh = (
+        None if reference_energies is None
+        else (energies_sorted - np.sort(reference_energies)) * 1000.0)
     wall_time = time.perf_counter() - total_start
 
     output = {
@@ -281,6 +292,8 @@ def run_state_averaged_dci(
         'energies': energies,
         'reference_energies': reference_energies,
         'errors_mH': errors_mh,
+        'errors_sorted_mH': errors_sorted_mh,
+        'energies_sorted': energies_sorted,
         'seed_provenance': seed_provenance,
         'embedded_exact_energies': embedded_energies,
         'spectral_radius_BA': (
@@ -292,10 +305,11 @@ def run_state_averaged_dci(
             else bool(wave_damping < 2.0 / (spectral_radius + 1.0))),
         'schmidt_truncation_errors_mH': (
             None if (embedded_energies is None or reference_energies is None)
-            else (embedded_energies - reference_energies) * 1000.0),
+            else (np.sort(embedded_energies) - np.sort(reference_energies))
+            * 1000.0),
         'wave_operator_errors_mH': (
             None if embedded_energies is None
-            else (energies - embedded_energies) * 1000.0),
+            else (energies_sorted - np.sort(embedded_energies)) * 1000.0),
         'state_weights': weights,
         'converged': result['converged'],
         'n_outer_iter': result['n_outer_iter'],
