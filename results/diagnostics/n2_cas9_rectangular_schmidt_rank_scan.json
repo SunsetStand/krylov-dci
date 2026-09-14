@@ -1,0 +1,688 @@
+{
+  "bundle_checksum": "ad5b19d6674d54411f704bd3ed4b65aab9741d5373037868fc8fb76e85133d9d",
+  "system": {
+    "atom": "N 0 0 0; N 0 0 1.098",
+    "basis": "cc-pVDZ",
+    "point_group": "D2h",
+    "point_group_detected": "D2h",
+    "n_active": 9,
+    "n_active_elec": [
+      5,
+      5
+    ],
+    "n_core": 2,
+    "determinant_dimension": 15876,
+    "determinant_shape": [
+      126,
+      126
+    ],
+    "active_orbital_irreps": [
+      "Ag",
+      "B1u",
+      "Ag",
+      "B2u",
+      "B3u",
+      "B2g",
+      "B3g",
+      "B1u",
+      "Ag"
+    ],
+    "rhf_energy": -108.95408660586693,
+    "ecore": -77.41742268592223
+  },
+  "n_occ": 5,
+  "n_states": 4,
+  "block_norms": [
+    1.0,
+    1.0000000000000002,
+    0.9999999999999999,
+    1.0000000000000002
+  ],
+  "thresholds": [
+    0.03,
+    0.01,
+    0.003,
+    0.001,
+    0.0003,
+    0.0001,
+    3e-05
+  ],
+  "pure_state_control": [
+    {
+      "root": 0,
+      "n_blocks": 8,
+      "n_asymmetric": 0,
+      "max_abs_rank_difference": 0
+    },
+    {
+      "root": 1,
+      "n_blocks": 7,
+      "n_asymmetric": 0,
+      "max_abs_rank_difference": 0
+    },
+    {
+      "root": 2,
+      "n_blocks": 7,
+      "n_asymmetric": 0,
+      "max_abs_rank_difference": 0
+    },
+    {
+      "root": 3,
+      "n_blocks": 7,
+      "n_asymmetric": 0,
+      "max_abs_rank_difference": 0
+    }
+  ],
+  "state_averaged_scan": {
+    "3e-02": {
+      "blocks": [
+        {
+          "n": 6,
+          "r_A": 0,
+          "r_B": 1,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 7,
+          "r_A": 12,
+          "r_B": 4,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 8,
+          "r_A": 11,
+          "r_B": 6,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 9,
+          "r_A": 6,
+          "r_B": 4,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 5,
+      "n_genuine_asymmetric": 4,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 1,
+      "dimensions": {
+        "D_rectangular": 139,
+        "D_symmetric_min": 69,
+        "D_symmetric_max": 303
+      }
+    },
+    "1e-02": {
+      "blocks": [
+        {
+          "n": 6,
+          "r_A": 3,
+          "r_B": 1,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 7,
+          "r_A": 18,
+          "r_B": 8,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 8,
+          "r_A": 21,
+          "r_B": 18,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 9,
+          "r_A": 8,
+          "r_B": 6,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 5,
+      "n_genuine_asymmetric": 4,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 1,
+      "dimensions": {
+        "D_rectangular": 574,
+        "D_symmetric_min": 426,
+        "D_symmetric_max": 839
+      }
+    },
+    "3e-03": {
+      "blocks": [
+        {
+          "n": 6,
+          "r_A": 9,
+          "r_B": 12,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 7,
+          "r_A": 68,
+          "r_B": 40,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 8,
+          "r_A": 36,
+          "r_B": 28,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 9,
+          "r_A": 10,
+          "r_B": 8,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 5,
+      "n_genuine_asymmetric": 2,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 3,
+      "dimensions": {
+        "D_rectangular": 3917,
+        "D_symmetric_min": 2530,
+        "D_symmetric_max": 6165
+      }
+    },
+    "1e-03": {
+      "blocks": [
+        {
+          "n": 5,
+          "r_A": 16,
+          "r_B": 12,
+          "dim_A": 250,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 6,
+          "r_A": 55,
+          "r_B": 30,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 7,
+          "r_A": 92,
+          "r_B": 52,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 8,
+          "r_A": 42,
+          "r_B": 28,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 9,
+          "r_A": 10,
+          "r_B": 8,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 6,
+      "n_genuine_asymmetric": 3,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 3,
+      "dimensions": {
+        "D_rectangular": 7883,
+        "D_symmetric_min": 4597,
+        "D_symmetric_max": 13610
+      }
+    },
+    "3e-04": {
+      "blocks": [
+        {
+          "n": 4,
+          "r_A": 4,
+          "r_B": 2,
+          "dim_A": 200,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 5,
+          "r_A": 52,
+          "r_B": 30,
+          "dim_A": 250,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 6,
+          "r_A": 115,
+          "r_B": 68,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": true,
+          "genuine_and_asymmetric": true
+        },
+        {
+          "n": 7,
+          "r_A": 112,
+          "r_B": 56,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 8,
+          "r_A": 44,
+          "r_B": 28,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 9,
+          "r_A": 10,
+          "r_B": 8,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 7,
+      "n_genuine_asymmetric": 3,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 4,
+      "dimensions": {
+        "D_rectangular": 16973,
+        "D_symmetric_min": 9513,
+        "D_symmetric_max": 30526
+      }
+    },
+    "1e-04": {
+      "blocks": [
+        {
+          "n": 4,
+          "r_A": 18,
+          "r_B": 18,
+          "dim_A": 200,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": false,
+          "genuinely_truncated_both_sides": true,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 5,
+          "r_A": 108,
+          "r_B": 56,
+          "dim_A": 250,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 6,
+          "r_A": 160,
+          "r_B": 70,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 7,
+          "r_A": 120,
+          "r_B": 56,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 8,
+          "r_A": 45,
+          "r_B": 28,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 9,
+          "r_A": 10,
+          "r_B": 8,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 7,
+      "n_genuine_asymmetric": 0,
+      "n_genuine_symmetric": 1,
+      "n_saturated": 6,
+      "dimensions": {
+        "D_rectangular": 25633,
+        "D_symmetric_min": 12345,
+        "D_symmetric_max": 54114
+      }
+    },
+    "3e-05": {
+      "blocks": [
+        {
+          "n": 3,
+          "r_A": 8,
+          "r_B": 8,
+          "dim_A": 100,
+          "dim_B": 8,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 4,
+          "r_A": 56,
+          "r_B": 28,
+          "dim_A": 200,
+          "dim_B": 28,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 5,
+          "r_A": 162,
+          "r_B": 56,
+          "dim_A": 250,
+          "dim_B": 56,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 6,
+          "r_A": 180,
+          "r_B": 70,
+          "dim_A": 210,
+          "dim_B": 70,
+          "saturated_A": false,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 7,
+          "r_A": 120,
+          "r_B": 56,
+          "dim_A": 120,
+          "dim_B": 56,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 8,
+          "r_A": 45,
+          "r_B": 28,
+          "dim_A": 45,
+          "dim_B": 28,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 9,
+          "r_A": 10,
+          "r_B": 8,
+          "dim_A": 10,
+          "dim_B": 8,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": true,
+          "genuine_and_asymmetric": false
+        },
+        {
+          "n": 10,
+          "r_A": 1,
+          "r_B": 1,
+          "dim_A": 1,
+          "dim_B": 1,
+          "saturated_A": true,
+          "saturated_B": true,
+          "genuinely_truncated_both_sides": false,
+          "asymmetric": false,
+          "genuine_and_asymmetric": false
+        }
+      ],
+      "n_blocks": 8,
+      "n_genuine_asymmetric": 0,
+      "n_genuine_symmetric": 0,
+      "n_saturated": 8,
+      "dimensions": {
+        "D_rectangular": 31365,
+        "D_symmetric_min": 12869,
+        "D_symmetric_max": 78370
+      }
+    }
+  },
+  "pure_state_asymmetric_blocks_total": 0,
+  "conclusion": "asymmetry_caused_by_state_averaging",
+  "wall_time_seconds": 0.3807271560035588
+}
