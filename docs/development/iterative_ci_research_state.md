@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `6393f4c` on branch `research/iterative-ci-feasibility`,
+Updated at commit `286bc39` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -26,7 +26,7 @@ error, initial-guess dependence, ablations and failure modes must all be shown.
 | 0 | Checkout, branch, environment | Complete |
 | A | Literature and novelty | Complete, first pass. See `docs/literature/iterative_ci_schmidt_downfolding_review.md` |
 | B | Deterministic lowest-three-level root bundle | Complete |
-| C | Decouple production path from the exact CI seed | Not started |
+| C | Decouple production path from the exact CI seed | H5 complete; H3 and H6 outstanding |
 | D | Ablation and initial-guess sensitivity | Not started |
 | E | N2 state-averaged pilot | Blocked on B through D |
 
@@ -184,6 +184,43 @@ for CAS(10e,9o), where the electron-number blocks differ.
 - That residual dressing is necessary rather than decorative. No bypass exists
   yet, so H4 has never been tested.
 
+## Gate C progress
+
+**H5 is done and gated correctly.**  provides five
+non-exact seeds;  gained ; exact energies reach the
+pipeline only through , which can be switched off.
+ arms tripwires on the CASCI and FCI
+kernels, runs the whole pipeline from a CIS seed, and separately asserts the
+tripwire fires on an exact solve so it cannot pass vacuously. Default
+`seed='exact'` still reproduces CASCI to `6.7e-13 mH`.
+
+**First substantive feasibility result, and it is a partial falsification of H1.**
+At `svd_eps = 1e-10` on H2, where nothing should be truncated and every seed
+should give the exact answer, the `cis` and `perturbed` seeds are wrong by
+`20.5 mH` while `exact`, `hf`, `trunc` and `selci` are exact to
+`6.7e-13 mH`.
+
+A seed with zero weight in an electron-number block makes that block's
+state-averaged density vanish, so the block is deleted, and the reconstructed
+coefficients inherit the same empty support. The fixed point is self-trapping:
+the loop reports convergence at a density change of `1.2e-16` while being wrong.
+The CIS seed lacks the `n_A = 0` block because that block is a double excitation.
+
+This matters because the CIS seed is the one the project's own record identifies
+as the fix for excited states, so the recommended non-exact seed is the one that
+triggers the failure. Detail and four candidate remedies:
+`docs/development/seed_block_support_finding.md`. Instrumentation only so far;
+no solver change.
+
+**Downfolding route decided.** Krylov-Galerkin is retained over Neumann
+truncation, and the Krylov basis compression SVD is dropped in favour of a plain
+QR. The dmSVD on CI coefficients in the A|B bipartition is untouched and remains
+the core of the method. Evidence: `docs/theory/neumann_versus_krylov_downfolding.md`.
+
+**Rectangular ranks measured.** The asymmetry is real, caused by state averaging
+rather than by unequal block dimensions, and universal within its operating
+window. Detail: `docs/development/rectangular_schmidt_rank_measurement.md`.
+
 ## Corrections to earlier conclusions
 
 1. **Overshoot alone does not fix a symmetry miss.** Because H is exactly block
@@ -221,12 +258,20 @@ for CAS(10e,9o), where the electron-number blocks differ.
   guarantee. Per-irrep it is cheap, since each block is far smaller than the full
   space, and it should be run once to certify the pipeline.
 
+## New open question from Gate C
+
+Which remedy for the empty-block trap? Taking the block structure from the union
+of all seed states rather than from `current_states[0]` addresses the cause;
+enriching the seed to span every block addresses the trigger. Both are solver or
+seed changes and need the full scan behind them, not the single H2 data point.
+
 ## Next single priority
 
-Gate C step 1: write `docs/theory/iterative_ci_feasibility_protocol.md`,
-pre-registering H1 through H5, the initialization family, the control groups,
-the metric set and the pass, fail and inconclusive thresholds, before any solver
-code is touched. Thresholds must be fixed in writing before results are seen.
+Gate C step 2: add the missing instrumentation the protocol requires before any
+ablation can be scored -- per-root residual norms, the inner iteration history,
+the retained root-overlap matrix, and the Schmidt projector distance, which does
+not exist yet. Then add the `--no-residual-dressing` bypass for H4 and the
+matched-dimension symmetric-rank mode for H6.
 
 Two obligations from Gate A now belong in that protocol as primary hypotheses
 rather than ancillary controls, because the novelty case depends on them:
