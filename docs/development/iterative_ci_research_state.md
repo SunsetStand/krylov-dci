@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `286bc39` on branch `research/iterative-ci-feasibility`,
+Updated at commit `44bbf97` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -208,9 +208,22 @@ The CIS seed lacks the `n_A = 0` block because that block is a double excitation
 
 This matters because the CIS seed is the one the project's own record identifies
 as the fix for excited states, so the recommended non-exact seed is the one that
-triggers the failure. Detail and four candidate remedies:
-`docs/development/seed_block_support_finding.md`. Instrumentation only so far;
-no solver change.
+triggers the failure.
+
+**Resolved at iteration zero, by seed completion.** The planned remedy, taking
+the block structure from the union of all seed states, turned out not to apply:
+the block keys are already complete and identical for every seed, and the failure
+is a zero weight rather than a missing key. Instead `build_initial_states` now
+adds the lowest-diagonal determinant of any unrepresented block before
+diagonalizing. All six seed families then reach the same fixed point to
+`6.7e-13 mH`, which is H1 satisfied on H2. The solver was not changed.
+
+**Not resolved in general.** Completion guarantees non-zero support at iteration
+zero only. A block whose weight falls below `svd_eps` at a later outer iteration
+is still deleted permanently, which at the production threshold of `1e-3` is
+realistic. The outer map can lose rank irreversibly and reports convergence when
+it does. Detail and three candidate remedies, including DMRG-style density-matrix
+perturbation: `docs/development/seed_block_support_finding.md`.
 
 **Downfolding route decided.** Krylov-Galerkin is retained over Neumann
 truncation, and the Krylov basis compression SVD is dropped in favour of a plain
@@ -260,10 +273,12 @@ window. Detail: `docs/development/rectangular_schmidt_rank_measurement.md`.
 
 ## New open question from Gate C
 
-Which remedy for the empty-block trap? Taking the block structure from the union
-of all seed states rather than from `current_states[0]` addresses the cause;
-enriching the seed to span every block addresses the trigger. Both are solver or
-seed changes and need the full scan behind them, not the single H2 data point.
+How should irreversible rank loss be handled at a finite threshold? Seed
+completion fixes iteration zero but not later iterations. The candidates are a
+rank floor, DMRG-style density-matrix perturbation, and residual-informed block
+re-entry, the last being the closest fit since the Q-space residual already says
+where the wavefunction wants weight. This is a solver change and needs the
+threshold scan behind it.
 
 ## Next single priority
 
