@@ -26,6 +26,7 @@ from dm_svd_embedding.density_matrix import (
     normalize_state_weights,
 )
 from dm_svd_embedding.occ_virt_partition import (
+    blocks_to_ci_vector,
     build_block_matrices,
     setup_partition,
 )
@@ -85,6 +86,7 @@ def run_state_averaged_dci(
     rank_mode: str = 'rectangular',
     apply_dressing: bool = True,
     omega_mode: str = 'shared',
+    enrichment_strength: float = 0.0,
     compute_reference: bool = True,
     embedded_spectrum: bool = False,
     output_dir: Optional[str] = None,
@@ -149,6 +151,31 @@ def run_state_averaged_dci(
               f"{seed_provenance['block_support']['empty_blocks']}; "
               f"those blocks will be deleted and cannot be recovered",
               flush=True)
+
+    enrichment_callback = None
+    if enrichment_strength > 0.0:
+        from dm_svd_dci.initializers import _ActiveSpace
+        active_space = _ActiveSpace(sys_data)
+
+        def enrichment_callback(state_blocks, energies):
+            """Full-space residuals R_k = H C_k - E_k C_k, as block matrices.
+
+            Computed in the determinant basis rather than in the embedded
+            space, because the embedded residual already lies inside the
+            retained Schmidt span and could not add rank.
+            """
+            residual_blocks = []
+            norms = []
+            active_energies = np.asarray(energies) - float(sys_data['ecore'])
+            for index, blocks in enumerate(state_blocks):
+                vector = blocks_to_ci_vector(
+                    partition, blocks, active_space.dimension)
+                residual = (active_space.sigma(vector)
+                            - active_energies[index] * vector)
+                norms.append(float(np.linalg.norm(residual)))
+                residual_blocks.append(
+                    build_block_matrices(partition, residual))
+            return residual_blocks, norms
 
     build_history = []
 
@@ -228,6 +255,8 @@ def run_state_averaged_dci(
             'omega_mode': omega_mode,
         },
         rank_mode=rank_mode,
+        enrichment=enrichment_callback,
+        enrichment_strength=enrichment_strength,
         verbose=verbose)
 
     final_problem = result['problem']
@@ -367,6 +396,7 @@ def run_state_averaged_dci(
             'rank_mode': rank_mode,
             'apply_dressing': apply_dressing,
             'omega_mode': omega_mode,
+            'enrichment_strength': enrichment_strength,
             'compute_reference': compute_reference,
         },
     }

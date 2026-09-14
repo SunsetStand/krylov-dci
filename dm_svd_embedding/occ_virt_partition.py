@@ -221,6 +221,27 @@ def build_block_matrices(
     return matrices
 
 
+def blocks_to_ci_vector(
+    partition: Dict[int, Dict],
+    blocks: Dict[int, np.ndarray],
+    dimension: int,
+) -> np.ndarray:
+    """Inverse of :func:`build_block_matrices`.
+
+    Scatters the per-block coefficient matrices back into one flat CI vector in
+    the CAS determinant ordering.  Needed whenever a quantity defined on the
+    blocks has to be acted on by the full-space Hamiltonian.
+    """
+    vector = np.zeros(dimension)
+    for n_A, blk in partition.items():
+        block = blocks.get(n_A)
+        if block is None:
+            continue
+        for (i, j, det_idx) in blk['coeff_map']:
+            vector[det_idx] = block[i, j]
+    return vector
+
+
 # ---------- convenience: generate full CAS + partition in one go ----------
 
 def setup_partition(

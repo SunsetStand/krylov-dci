@@ -51,6 +51,10 @@ SYSTEMS = {
         atom='H 0 0 0; H 0 0 0.74', basis='sto-3g',
         n_active=2, n_active_elec=(1, 1), n_core=0, n_occ=1,
         sa_states=2, p_blocks=[1, 2]),
+    'n2': dict(
+        atom='N 0 0 0; N 0 0 1.098', basis='cc-pVDZ',
+        n_active=9, n_active_elec=(5, 5), n_core=2, n_occ=5,
+        sa_states=4, p_blocks=[8, 9, 10]),
 }
 
 CONTROLS = dict(
@@ -69,11 +73,19 @@ def parse_args():
                         default=list(THRESHOLDS))
     parser.add_argument('--groups', nargs='+',
                         default=['h1_h2', 'h3', 'h4', 'h6', 'h7'])
+    parser.add_argument('--enrichment', type=float, default=0.0,
+                        help='residual-driven Krylov enrichment strength')
+    parser.add_argument('--match-points', type=int, default=26,
+                        help='threshold grid size for dimension matching')
     return parser.parse_args()
 
 
 def peak_rss_mib():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+
+ENRICHMENT = {'value': 0.0}
+MATCH_POINTS = {'value': 26}
 
 
 def run_cell(system, label, **overrides):
@@ -83,6 +95,7 @@ def run_cell(system, label, **overrides):
     settings.update(CONTROLS)
     settings.update(overrides)
     settings.setdefault('seed', 'lanczos')
+    settings.setdefault('enrichment_strength', ENRICHMENT['value'])
     settings.update(embedded_spectrum=True, verbose=False)
 
     try:
@@ -125,6 +138,9 @@ def run_cell(system, label, **overrides):
         'residual_root_norms': result['final_wave_residual_root_norms'],
         'schmidt_projector_distance': (
             None if projector is None else projector['total']),
+        'dimension_trajectory': [
+            int(sum(v['r_A'] * v['r_B'] for v in item['schmidt_ranks'].values()))
+            for item in history],
         'root_permutations': permutations,
         'root_reorder': any(p != identity for p in permutations),
         'spectral_radius_BA': result['spectral_radius_BA'],
@@ -134,6 +150,11 @@ def run_cell(system, label, **overrides):
         'wall_time_seconds': float(time.perf_counter() - start),
         'peak_rss_mib': peak_rss_mib(),
     }
+    trajectory = cell['dimension_trajectory']
+    tail = trajectory[-4:]
+    cell['rank_oscillation'] = bool(
+        len(tail) == 4 and len(set(tail)) > 2
+        and max(tail) - min(tail) > 0.1 * max(max(tail), 1))
     cell['classification'] = classify(cell)
     return cell
 
@@ -148,6 +169,8 @@ def classify(cell):
         return 'INNER_NONCONVERGED'
     if not cell['outer_converged']:
         return 'OUTER_NONCONVERGED'
+    if cell.get('rank_oscillation'):
+        return 'RANK_OSCILLATION'
     if cell['root_reorder']:
         return 'ROOT_REORDER'
     return 'PASS'
@@ -162,7 +185,7 @@ def matched_dimension_threshold(system, target_dimension, **overrides):
     not produce the same embedded dimension at that threshold.  One arm would
     then be credited for accuracy it bought with extra dimensions.
     """
-    candidates = np.logspace(-1, -6, 26)
+    candidates = np.logspace(-1, -6, MATCH_POINTS['value'])
     best = None
     for threshold in candidates:
         cell = run_cell(system, f'match_eps_{threshold:.2e}',
@@ -180,6 +203,8 @@ def matched_dimension_threshold(system, target_dimension, **overrides):
 
 def main():
     args = parse_args()
+    ENRICHMENT['value'] = float(args.enrichment)
+    MATCH_POINTS['value'] = int(args.match_points)
     os.makedirs(args.output_dir, exist_ok=True)
     started = time.perf_counter()
     report = {
@@ -187,6 +212,7 @@ def main():
         'system': args.system,
         'system_definition': SYSTEMS[args.system],
         'fixed_controls': CONTROLS,
+        'enrichment_strength': float(args.enrichment),
         'thresholds': list(args.thresholds),
         'protocol_thresholds': {
             'tol_E_mH': TOL_E_MH,

@@ -334,6 +334,8 @@ def solve_state_averaged_schmidt(
     max_outer_iter: int = 20,
     wave_options: Optional[Dict] = None,
     rank_mode: str = 'rectangular',
+    enrichment: Optional[Callable] = None,
+    enrichment_strength: float = 0.0,
     verbose: bool = True,
 ) -> Dict:
     """Close the state-averaged Schmidt/wave-operator feedback loop.
@@ -354,6 +356,8 @@ def solve_state_averaged_schmidt(
 
     previous_energies = None
     previous_schmidt: Optional[Dict[int, Dict]] = None
+    enrichment_blocks: Optional[List[StateBlocks]] = None
+    enrichment_norms: Optional[List[float]] = None
     history: List[Dict] = []
     converged = False
     final_problem = None
@@ -368,9 +372,28 @@ def solve_state_averaged_schmidt(
         print(f"  svd_eps={svd_eps:.1e}, outer_mixing={outer_mixing:.3f}")
 
     for outer_iteration in range(max_outer_iter):
+        # Residual-driven Krylov enrichment.  The reconstructed coefficients
+        # C_new = U T V^dagger lie inside the span of the basis that produced
+        # them, so without enrichment the retained rank is monotonically
+        # non-increasing and the iteration can only lose directions.  The
+        # full-space residual R_k = H C_k - E_k C_k leaves that span by
+        # construction, and it vanishes at the exact solution, so the exact
+        # answer remains a fixed point.  Weights carry ||R_k||^2 rather than a
+        # normalized direction, so the enrichment fades as the residual does.
+        averaged_states = list(current_states)
+        averaged_weights = list(weights)
+        if enrichment_blocks is not None and enrichment_strength > 0.0:
+            for index, extra in enumerate(enrichment_blocks):
+                averaged_states.append(extra)
+                averaged_weights.append(
+                    enrichment_strength * float(weights[index]))
+        averaged_weights = np.asarray(averaged_weights, dtype=float)
+        if averaged_weights.sum() > 0.0:
+            averaged_weights = averaged_weights / averaged_weights.sum()
+
         schmidt = compute_schmidt_decomposition(
-            current_states[0], eps=svd_eps,
-            state_average=current_states, state_weights=weights,
+            averaged_states[0], eps=svd_eps,
+            state_average=averaged_states, state_weights=averaged_weights,
             rank_mode=rank_mode)
         projector_distance = schmidt_projector_distance(
             previous_schmidt, schmidt)
@@ -428,6 +451,9 @@ def solve_state_averaged_schmidt(
             'root_overlap_matrix': np.abs(overlap_matrix).copy(),
             'schmidt_projector_distance': projector_distance,
             'rank_mode': rank_mode,
+            'enrichment_strength': float(enrichment_strength),
+            'enrichment_residual_norms': (
+                None if enrichment_norms is None else list(enrichment_norms)),
             'schmidt_ranks': {
                 int(label): {
                     'r_A': int(data.get('r_A', data['r'])),
@@ -460,6 +486,9 @@ def solve_state_averaged_schmidt(
             current_states, aligned_states, outer_mixing)
         previous_energies = ordered_energies.copy()
         previous_schmidt = schmidt
+        if enrichment is not None and enrichment_strength > 0.0:
+            enrichment_blocks, enrichment_norms = enrichment(
+                current_states, ordered_energies)
 
     return {
         'energies': final_wave['energies'][final_permutation],
