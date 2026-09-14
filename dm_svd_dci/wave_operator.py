@@ -183,6 +183,102 @@ def graph_ritz(
     }
 
 
+def graph_ritz_per_state(
+    H_PP: np.ndarray,
+    H_PQ: np.ndarray,
+    H_QQ: np.ndarray,
+    omegas: np.ndarray,
+    n_states: int,
+    previous_coefficients: Optional[np.ndarray] = None,
+    metric_floor: float = 1e-12,
+) -> Dict:
+    """Rayleigh--Ritz solve with one wave operator per state.
+
+    Each state k is solved in its own graph subspace ``X_k = [I_P ; Omega_k]``,
+    so the downfolding is centred on that state rather than shared across all
+    of them.  This is the controlled counterpart of :func:`graph_ritz`, built
+    because the project's own record shows that a single resolvent centre
+    shared across states breaks excited states, while per-state centring fixes
+    them.
+
+    Two properties of the shared construction are deliberately given up here,
+    and callers must not assume them:
+
+    * the returned states live in **different** subspaces, so they are not
+      mutually orthonormal in the full P+Q metric;
+    * root k is no longer simply the k-th eigenvalue of one operator, so it is
+      tracked by overlap against the previous iterate rather than by index.
+
+    Returns the same keys as :func:`graph_ritz`, plus ``root_indices`` giving
+    which root of each state's own spectrum was selected.
+    """
+    H_PP = np.asarray(H_PP)
+    H_PQ = np.asarray(H_PQ)
+    H_QQ = np.asarray(H_QQ)
+    omegas = np.asarray(omegas)
+    p_dim = H_PP.shape[0]
+    q_dim = H_QQ.shape[0]
+
+    if omegas.shape != (n_states, q_dim, p_dim):
+        raise ValueError(
+            f"omegas must have shape {(n_states, q_dim, p_dim)}, "
+            f"got {omegas.shape}")
+    if n_states <= 0 or n_states > p_dim:
+        raise ValueError("n_states must satisfy 1 <= n_states <= p_dim")
+
+    energies = np.empty(n_states, dtype=float)
+    model_coefficients = np.empty((p_dim, n_states), dtype=omegas.dtype)
+    q_coefficients = np.empty((q_dim, n_states), dtype=omegas.dtype)
+    root_indices = np.empty(n_states, dtype=int)
+
+    for state in range(n_states):
+        omega = omegas[state]
+        metric = np.eye(p_dim, dtype=omega.dtype) + omega.T.conj() @ omega
+        projected = (
+            H_PP
+            + H_PQ @ omega
+            + omega.T.conj() @ H_PQ.T.conj()
+            + omega.T.conj() @ H_QQ @ omega
+        )
+        projected = 0.5 * (projected + projected.T.conj())
+
+        metric_evals, metric_vecs = eigh(metric)
+        if metric_evals[0] <= metric_floor:
+            raise np.linalg.LinAlgError(
+                f"per-state graph metric for root {state} is singular: "
+                f"min={metric_evals[0]:.3e}")
+        metric_inv_sqrt = (
+            metric_vecs * (1.0 / np.sqrt(metric_evals))[np.newaxis, :]
+        ) @ metric_vecs.T.conj()
+
+        orthogonal_h = metric_inv_sqrt @ projected @ metric_inv_sqrt
+        orthogonal_h = 0.5 * (orthogonal_h + orthogonal_h.T.conj())
+        local_energies, local_vectors = eigh(orthogonal_h)
+        candidates = metric_inv_sqrt @ local_vectors
+
+        if previous_coefficients is None:
+            chosen = state
+        else:
+            # Index-based selection is a documented trap for excited states, so
+            # the root is followed by overlap once a previous iterate exists.
+            reference = previous_coefficients[:, state]
+            overlaps = np.abs(candidates.T.conj() @ reference)
+            chosen = int(np.argmax(overlaps))
+
+        energies[state] = float(local_energies[chosen])
+        model_coefficients[:, state] = candidates[:, chosen]
+        q_coefficients[:, state] = omega @ candidates[:, chosen]
+        root_indices[state] = chosen
+
+    return {
+        'energies': energies,
+        'model_coefficients': model_coefficients,
+        'q_coefficients': q_coefficients,
+        'full_coefficients': np.vstack([model_coefficients, q_coefficients]),
+        'root_indices': root_indices,
+    }
+
+
 def compute_state_residuals(
     H_PP: np.ndarray,
     H_PQ: np.ndarray,
@@ -244,6 +340,7 @@ def solve_state_averaged_wave_operator(
     min_denominator: float = 1e-6,
     pinv_rcond: float = 1e-12,
     apply_dressing: bool = True,
+    omega_mode: str = 'shared',
     verbose: bool = True,
 ) -> Dict:
     """Solve several roots with one residual-dressed wave operator.
@@ -267,6 +364,8 @@ def solve_state_averaged_wave_operator(
 
     weights = normalize_state_weights(n_states, state_weights)
     assembled = assemble_qspace_hamiltonian(H_PQ, H_QQ_blocks, D_by_n)
+    if omega_mode not in ('shared', 'per_state'):
+        raise ValueError(f"unknown omega_mode {omega_mode!r}")
     H_PQ_full = assembled['H_PQ']
     H_QQ = assembled['H_QQ']
     diagonal = assembled['diagonal']
@@ -293,6 +392,7 @@ def solve_state_averaged_wave_operator(
                 'max_norm': 0.0,
             },
             'state_weights': weights,
+            'omega_mode': omega_mode,
             **assembled,
         }
 
@@ -301,13 +401,15 @@ def solve_state_averaged_wave_operator(
             f"H_PQ has P dimension {H_PQ_full.shape[0]}, expected {p_dim}")
 
     dtype = np.result_type(H_PP.dtype, H_PQ_full.dtype, H_QQ.dtype)
+    shared = omega_mode == 'shared'
+    expected = ((q_dim, p_dim) if shared else (n_states, q_dim, p_dim))
     if omega_init is None:
-        omega = np.zeros((q_dim, p_dim), dtype=dtype)
+        omega = np.zeros(expected, dtype=dtype)
     else:
         omega = np.asarray(omega_init, dtype=dtype).copy()
-        if omega.shape != (q_dim, p_dim):
+        if omega.shape != expected:
             raise ValueError(
-                f"omega_init has shape {omega.shape}, expected {(q_dim, p_dim)}")
+                f"omega_init has shape {omega.shape}, expected {expected}")
 
     history: List[Dict] = []
     previous_energies = None
@@ -320,8 +422,15 @@ def solve_state_averaged_wave_operator(
         print(f"    weights={np.array2string(weights, precision=4)}")
         print(f"    damping={damping:.3f}, residual_tol={residual_tol:.1e}")
 
+    previous_coefficients = None
     for iteration in range(max_iter):
-        ritz = graph_ritz(H_PP, H_PQ_full, H_QQ, omega, n_states)
+        if shared:
+            ritz = graph_ritz(H_PP, H_PQ_full, H_QQ, omega, n_states)
+        else:
+            ritz = graph_ritz_per_state(
+                H_PP, H_PQ_full, H_QQ, omega, n_states,
+                previous_coefficients=previous_coefficients)
+        previous_coefficients = ritz['model_coefficients'].copy()
         residuals = compute_state_residuals(
             H_PP, H_PQ_full, H_QQ,
             ritz['energies'], ritz['model_coefficients'],
@@ -365,17 +474,37 @@ def solve_state_averaged_wave_operator(
             ritz['energies'][np.newaxis, :] - diagonal[:, np.newaxis])
         denominators = _protect_denominators(denominators, min_denominator)
         state_corrections = residuals['residual_q'] / denominators
-        state_corrections *= update_scales[np.newaxis, :]
 
-        # Minimum-norm shared operator whose action on the target model span
-        # reproduces the preconditioned state corrections.
-        delta_omega = state_corrections @ np.linalg.pinv(
-            ritz['model_coefficients'], rcond=pinv_rcond)
-        omega += damping * delta_omega
+        if shared:
+            # The weights balance states competing for one operator.
+            state_corrections = state_corrections * update_scales[np.newaxis, :]
+            # Minimum-norm shared operator whose action on the target model
+            # span reproduces the preconditioned state corrections.
+            delta_omega = state_corrections @ np.linalg.pinv(
+                ritz['model_coefficients'], rcond=pinv_rcond)
+            omega += damping * delta_omega
+        else:
+            # With one operator per state there is no competition, so the
+            # weights do not apply and the pseudoinverse over states collapses
+            # to a rank-one minimum-norm update per state.
+            for state in range(n_states):
+                coefficients = ritz['model_coefficients'][:, state]
+                norm_squared = float(
+                    np.real(coefficients.conj() @ coefficients))
+                if norm_squared <= 0.0:
+                    continue
+                omega[state] += damping * np.outer(
+                    state_corrections[:, state],
+                    coefficients.conj()) / norm_squared
         previous_energies = ritz['energies'].copy()
 
     # Re-evaluate after the last update (or reuse the converged iterate).
-    final_ritz = graph_ritz(H_PP, H_PQ_full, H_QQ, omega, n_states)
+    if shared:
+        final_ritz = graph_ritz(H_PP, H_PQ_full, H_QQ, omega, n_states)
+    else:
+        final_ritz = graph_ritz_per_state(
+            H_PP, H_PQ_full, H_QQ, omega, n_states,
+            previous_coefficients=previous_coefficients)
     final_residuals = compute_state_residuals(
         H_PP, H_PQ_full, H_QQ,
         final_ritz['energies'], final_ritz['model_coefficients'],
@@ -396,5 +525,6 @@ def solve_state_averaged_wave_operator(
         'residuals': final_residuals,
         'state_weights': weights,
         'apply_dressing': bool(apply_dressing),
+        'omega_mode': omega_mode,
         **assembled,
     }

@@ -132,3 +132,51 @@ does.** The remaining candidate remedies are unchanged in kind:
 
 None is implemented. The choice needs the full threshold scan behind it, not this
 single full-rank data point, and it is a solver change requiring approval.
+
+## Follow-up on H2O: completion by lowest diagonal was insufficient
+
+The H2 fix did not carry over. On H2O/STO-3G CAS(6e,5o) with the protocol's
+partition, the CIS seed still left blocks `2` and `4` empty after completion.
+
+The reason is that adding a determinant to the seed subspace is **not** the same
+as giving the seed weight in that block. The lowest-diagonal determinant of a
+block is often symmetry-decoupled from the rest of the subspace, so it becomes
+its own eigenvector and the low-lying roots keep zero amplitude on it.
+
+Completion now selects by **coupling to the current seed**, which is the
+selected-CI criterion restricted to one block, and repeats until the block
+weight is actually non-zero or a pass budget is spent. That removes every empty
+block for every seed family on both systems.
+
+## A distinction that matters, and a limit that remains
+
+With empty blocks gone, the embedded dimension becomes threshold-responsive for
+most seeds, which is what the scan needs:
+
+| Seed | empty blocks | `D` at `eps = 1e-1, 1e-2, 1e-3, 1e-4` |
+|---|---|---|
+| `exact` | none | `6, 80, 124, 148` |
+| `hf` | none | `6, 67, 86, 122` |
+| `trunc` | none | `6, 64, 83, 99` |
+| `selci` | none | `6, 64, 85, 106` |
+| **`cis`** | none | **`5, 7, 8, 8`** |
+| **`perturbed`** | none | **`6, 28, 29, 29`** |
+
+The CIS seed is no longer empty anywhere, but its state-averaged density is
+still nearly rank-deficient, so its embedded dimension barely responds to the
+threshold. Completion made it admissible; it did not make it representative.
+
+**This is a finding, not a defect to hide.** It separates two things the project
+had conflated. The record that "a CIS seed fixed excited states" concerns
+selecting a **P space of determinants** in the Krylov-dCI line. Here the seed is
+used to build a **Schmidt basis** from state-averaged reduced densities, which
+is a different object: it depends on the entanglement structure of the seed
+rather than on which determinants it contains. A wavefunction can carry the
+right determinants and still carry the wrong entanglement structure, and CIS
+does exactly that.
+
+The consequence for the scan is concrete. `cis` and `perturbed` will show weak
+threshold dependence for a structural reason, and that must be reported as a
+property of those seeds rather than mistaken for insensitivity of the method.
+The irreversibility recorded above is unchanged: nothing here makes a deleted
+block recoverable at a finite threshold.

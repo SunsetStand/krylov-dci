@@ -83,6 +83,7 @@ def run_state_averaged_dci(
     seed_complete_blocks: bool = True,
     rank_mode: str = 'rectangular',
     apply_dressing: bool = True,
+    omega_mode: str = 'shared',
     compute_reference: bool = True,
     output_dir: Optional[str] = None,
     verbose: bool = True,
@@ -222,6 +223,7 @@ def run_state_averaged_dci(
             'max_iter': wave_max_iter,
             'min_denominator': min_denominator,
             'apply_dressing': apply_dressing,
+            'omega_mode': omega_mode,
         },
         rank_mode=rank_mode,
         verbose=verbose)
@@ -254,6 +256,7 @@ def run_state_averaged_dci(
             result['wave_result']['residuals']['max_norm'],
         'final_wave_history': result['wave_result']['history'],
         'apply_dressing': result['wave_result'].get('apply_dressing', True),
+        'omega_mode': result['wave_result'].get('omega_mode', 'shared'),
         'schmidt_metrics': {
             'r_total': metrics['r_total'],
             'r_A_total': metrics['r_A_total'],
@@ -295,6 +298,7 @@ def run_state_averaged_dci(
             'seed_complete_blocks': seed_complete_blocks,
             'rank_mode': rank_mode,
             'apply_dressing': apply_dressing,
+            'omega_mode': omega_mode,
             'compute_reference': compute_reference,
         },
     }

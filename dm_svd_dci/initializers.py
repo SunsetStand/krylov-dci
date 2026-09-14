@@ -100,25 +100,71 @@ def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
     return vectors
 
 
-def _block_completion_addresses(partition: Dict, space: _ActiveSpace,
-                                addresses: Sequence[int]) -> List[int]:
-    """Determinants needed so that every electron-number block is represented.
+def _block_members(partition: Dict) -> Dict[int, List[int]]:
+    return {int(label): [int(det) for (_, _, det) in block['coeff_map']]
+            for label, block in partition.items()}
 
-    A seed with no determinant in a block produces a zero state-averaged
-    density there, the block is truncated to rank zero, and the reconstructed
-    coefficients inherit the same empty support.  Deletion is irreversible, so
-    the outer loop is then trapped at a fixed point that omits the block.
-    Adding the lowest-diagonal determinant of each unrepresented block makes
-    the seed admissible without changing the solver.
+
+def _complete_block_support(space: _ActiveSpace, partition: Dict,
+                            addresses: Sequence[int], n_states: int,
+                            max_passes: int = 4,
+                            weight_floor: float = 1e-10
+                            ) -> Tuple[np.ndarray, List[int]]:
+    """Grow the seed subspace until every block carries real weight.
+
+    A seed with no weight in an electron-number block produces a zero
+    state-averaged density there, the block is truncated to rank zero, and the
+    reconstructed coefficients inherit the same empty support.  Deletion is
+    irreversible, so the outer loop is trapped at a fixed point that omits the
+    block.
+
+    Selecting the block's lowest-diagonal determinant is not sufficient: that
+    determinant is often symmetry-decoupled from the rest of the seed
+    subspace, so it becomes its own eigenvector and the low-lying roots keep
+    zero amplitude on it.  Determinants are therefore chosen by their coupling
+    to the current seed, which is the selected-CI criterion restricted to one
+    block, and the process is repeated until the block weight is actually
+    non-zero or the pass budget is spent.
     """
-    covered = {int(a) for a in addresses}
-    extra: List[int] = []
-    for _, block in sorted(partition.items()):
-        members = [int(det) for (_, _, det) in block['coeff_map']]
-        if not members or any(member in covered for member in members):
-            continue
-        extra.append(min(members, key=lambda member: space.hdiag[member]))
-    return extra
+    members = _block_members(partition)
+    addresses = np.asarray(sorted({int(a) for a in addresses}), dtype=int)
+    added: List[int] = []
+
+    for _ in range(max_passes):
+        vectors = _diagonalize_in_subspace(space, addresses, n_states)
+        combined = np.zeros(space.dimension)
+        for vector in vectors:
+            combined += np.abs(vector)
+        coupling = np.abs(space.sigma(combined))
+
+        deficient = []
+        for label, block_addresses in sorted(members.items()):
+            if not block_addresses:
+                continue
+            weight = sum(float(np.sum(vector[block_addresses] ** 2))
+                         for vector in vectors)
+            if weight <= weight_floor:
+                deficient.append((label, block_addresses))
+        if not deficient:
+            break
+
+        covered = set(int(a) for a in addresses)
+        new = []
+        for _, block_addresses in deficient:
+            candidates = [a for a in block_addresses if a not in covered]
+            if not candidates:
+                continue
+            # Largest coupling to the current seed, falling back to the lowest
+            # diagonal element when every coupling vanishes by symmetry.
+            best = max(candidates, key=lambda a: (coupling[a], -space.hdiag[a]))
+            new.append(int(best))
+        if not new:
+            break
+        added.extend(new)
+        addresses = np.asarray(
+            sorted(set(int(a) for a in addresses) | set(new)), dtype=int)
+
+    return addresses, added
 
 
 def _lowest_diagonal_addresses(space: _ActiveSpace, count: int) -> np.ndarray:
@@ -204,11 +250,8 @@ def build_initial_states(
 
     completion: List[int] = []
     if complete_blocks and partition is not None:
-        completion = _block_completion_addresses(partition, space, addresses)
-        if completion:
-            addresses = np.concatenate(
-                [np.asarray(addresses, dtype=int),
-                 np.asarray(completion, dtype=int)])
+        addresses, completion = _complete_block_support(
+            space, partition, addresses, n_states)
     provenance['block_completion_addresses'] = [int(a) for a in completion]
     provenance['block_completion_applied'] = bool(completion)
     provenance['subspace_dimension'] = int(len(set(int(a) for a in addresses)))
