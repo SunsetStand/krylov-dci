@@ -145,18 +145,49 @@ point-group invariance and is recorded as a specification error, not a result.
 
 No initializer may read exact CI coefficients.
 
-| ID | Seed |
-|---|---|
-| `exact` | exact CASCI roots; **upper-bound control only**, never a production path |
-| `hf` | Hartree-Fock determinant, plus the lowest-diagonal determinants needed to reach the target count |
-| `cis` | RHF plus all single excitations, diagonalized in that subspace |
-| `selci` | a cheap selected-CI wavefunction at a loose threshold |
-| `trunc` | truncated CI at fixed excitation rank |
-| `rand_0,1,2` | symmetry- and spin-preserving random perturbations of the `cis` seed at perturbation scale `0.1` |
+| ID | Seed | Selects determinants? |
+|---|---|---|
+| `lanczos` | **primary production seed.** Early-stopped block Lanczos in the full CAS space, `lanczos_steps` sigma applications, starting from the lowest-diagonal determinant of every electron-number block | **no** |
+| `exact` | exact CASCI roots; **upper-bound control only**, never a production path | n/a |
+| `hf` | Hartree-Fock plus the lowest-diagonal determinants needed to reach the target count | yes |
+| `cis` | RHF plus all single excitations, diagonalized in that subspace | yes |
+| `selci` | a cheap selected-CI wavefunction at a loose threshold | yes |
+| `trunc` | truncated CI at fixed excitation rank | yes |
+| `perturbed` | symmetry- and spin-preserving random perturbation of the `cis` seed at scale `0.1` | yes |
 
-`cis` is expected to be the strongest non-exact seed: the project's own record
-shows a CIS-informed P space took S1 from `+636 mH` to `+0.8 mH`. That is a prior
-expectation, stated here so that confirming it is not mistaken for a discovery.
+**A prior expectation that was falsified, recorded here so the correction is not
+lost.** The protocol originally expected `cis` to be the strongest non-exact
+seed, because the project's record shows a CIS-informed P space took S1 from
+`+636 mH` to `+0.8 mH`. That record concerns selecting a **P space of
+determinants**. Here the seed builds a **Schmidt basis** from state-averaged
+reduced densities, which depends on the entanglement structure of the seed rather
+than on which determinants it contains. A wavefunction can carry the right
+determinants and the wrong entanglement structure, and CIS does exactly that.
+
+Measured on H2O/STO-3G, weighted absolute error against CASCI at
+`svd_eps = 1e-4`:
+
+| Seed | `D` | weighted error |
+|---|---|---|
+| `exact` | 148 | `0.0000 mH` |
+| **`lanczos`, 3 steps** | **148** | **`0.0012 mH`** |
+| `selci` | 106 | `10.25 mH` |
+| `hf` | 122 | `10.99 mH` |
+| `cis` | 8 | `36.91 mH` |
+
+Every determinant-selection seed fails by an order of magnitude or more. The
+Lanczos seed matches the exact seed inside the agreement tolerance, and converges
+to it systematically with a single parameter:
+
+| `lanczos_steps` | 1 | 2 | 3 | 4 | 6 |
+|---|---|---|---|---|---|
+| difference from the exact seed | `0.616` | `0.024` | `0.0012` | `0.0004` | `0.0000 mH` |
+
+`lanczos_steps >= 2` is therefore the admissible range, and `3` is the default.
+
+The determinant-selection families are retained as **controls only**. They are
+the reason the block-support machinery exists; the Lanczos seed needs none of it,
+because every block is represented in its starting block by construction.
 
 ## Control groups
 

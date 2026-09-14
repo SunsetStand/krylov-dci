@@ -21,7 +21,9 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-SEED_FAMILIES = ('exact', 'hf', 'cis', 'trunc', 'selci', 'perturbed')
+SEED_FAMILIES = ('exact', 'lanczos', 'hf', 'cis', 'trunc', 'selci',
+                 'perturbed')
+PREFERRED_SEED = 'lanczos'
 NON_EXACT_SEEDS = tuple(name for name in SEED_FAMILIES if name != 'exact')
 
 
@@ -97,6 +99,86 @@ def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
         if norm == 0.0:
             raise InitializerError(f'seed root {root} has zero norm')
         vectors.append(vector / norm)
+    return vectors
+
+
+def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
+                  partition: Optional[Dict] = None) -> List[np.ndarray]:
+    """Early-stopped block Lanczos in the FULL CAS space.
+
+    This is the preferred non-exact seed, and it selects no determinants at
+    all.  Every determinant participates; their amplitudes are decided by the
+    Hamiltonian rather than by an importance score.
+
+    The determinant-selection seeds below (``cis``, ``trunc``, ``selci``) are
+    inherited from the Krylov-dCI line, where the object being chosen was a
+    **P space of determinants**.  Here the seed is used to build a **Schmidt
+    basis** from state-averaged reduced densities, which depends on the
+    entanglement structure of the seed rather than on which determinants it
+    contains.  A wavefunction can carry the right determinants and the wrong
+    entanglement structure, which is exactly what a CIS seed does, so those
+    families are retained only as controls.
+
+    The starting block is the lowest-diagonal determinant of every
+    electron-number block, plus the globally lowest determinants needed to
+    reach ``n_states``.  That choice is structural, not an importance ranking,
+    and it makes block completion unnecessary by construction: every block is
+    represented in the starting block, so the Krylov space carries weight
+    there from the first step.
+
+    Cost is ``steps`` sigma applications per starting vector, matrix-free, with
+    no convergence requirement.
+    """
+    start: List[int] = []
+    if partition is not None:
+        for _, block in sorted(partition.items()):
+            members = [int(det) for (_, _, det) in block['coeff_map']]
+            if members:
+                start.append(min(members, key=lambda m: space.hdiag[m]))
+    for address in np.argsort(space.hdiag)[:max(n_states, 1)]:
+        start.append(int(address))
+    start = sorted(set(start))
+
+    basis: List[np.ndarray] = []
+    for address in start:
+        vector = np.zeros(space.dimension)
+        vector[address] = 1.0
+        for existing in basis:
+            vector -= float(np.dot(existing, vector)) * existing
+        norm = float(np.linalg.norm(vector))
+        if norm > 1e-12:
+            basis.append(vector / norm)
+
+    frontier = list(basis)
+    for _ in range(max(steps, 0)):
+        new_frontier = []
+        for vector in frontier:
+            candidate = space.sigma(vector)
+            for existing in basis:
+                candidate -= float(np.dot(existing, candidate)) * existing
+            norm = float(np.linalg.norm(candidate))
+            if norm > 1e-10:
+                candidate /= norm
+                basis.append(candidate)
+                new_frontier.append(candidate)
+        if not new_frontier:
+            break
+        frontier = new_frontier
+
+    krylov = np.column_stack(basis)
+    projected = krylov.T @ np.column_stack(
+        [space.sigma(krylov[:, i]) for i in range(krylov.shape[1])])
+    projected = 0.5 * (projected + projected.T)
+    _, coefficients = np.linalg.eigh(projected)
+    if coefficients.shape[1] < n_states:
+        raise InitializerError(
+            f'Lanczos space of {coefficients.shape[1]} vectors cannot supply '
+            f'{n_states} states')
+
+    vectors = []
+    for root in range(n_states):
+        vector = krylov @ coefficients[:, root]
+        vectors.append(vector / np.linalg.norm(vector))
     return vectors
 
 
@@ -192,6 +274,7 @@ def build_initial_states(
         random_seed: int = 0,
         partition: Optional[Dict] = None,
         complete_blocks: bool = True,
+        lanczos_steps: int = 3,
         verbose: bool = True,
 ) -> Tuple[List[np.ndarray], Dict]:
     """Build ``n_states`` flat CI vectors in the CAS determinant ordering.
@@ -232,6 +315,19 @@ def build_initial_states(
     space = _ActiveSpace(sys_data)
     size = max(subspace_size, 4 * n_states)
 
+    if seed == 'lanczos':
+        vectors = _lanczos_seed(space, n_states, lanczos_steps, partition)
+        provenance.update({
+            'lanczos_steps': int(lanczos_steps),
+            'selects_determinants': False,
+            'block_completion_applied': False,
+            'subspace_dimension': int(space.dimension),
+        })
+        if verbose:
+            print(f'  seed: lanczos, {lanczos_steps} steps in the full CAS '
+                  f'space, no determinant selection', flush=True)
+        return vectors, provenance
+
     if seed == 'hf':
         addresses = _lowest_diagonal_addresses(space, size)
     elif seed == 'cis':
@@ -252,6 +348,7 @@ def build_initial_states(
     if complete_blocks and partition is not None:
         addresses, completion = _complete_block_support(
             space, partition, addresses, n_states)
+    provenance['selects_determinants'] = True
     provenance['block_completion_addresses'] = [int(a) for a in completion]
     provenance['block_completion_applied'] = bool(completion)
     provenance['subspace_dimension'] = int(len(set(int(a) for a in addresses)))

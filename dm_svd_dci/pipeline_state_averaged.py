@@ -81,6 +81,7 @@ def run_state_averaged_dci(
     seed_perturbation_scale: float = 0.1,
     seed_random_seed: int = 0,
     seed_complete_blocks: bool = True,
+    seed_lanczos_steps: int = 3,
     rank_mode: str = 'rectangular',
     apply_dressing: bool = True,
     omega_mode: str = 'shared',
@@ -126,7 +127,7 @@ def run_state_averaged_dci(
         perturbation_scale=seed_perturbation_scale,
         random_seed=seed_random_seed,
         partition=partition, complete_blocks=seed_complete_blocks,
-        verbose=verbose)
+        lanczos_steps=seed_lanczos_steps, verbose=verbose)
 
     # Evaluator boundary.  reference_energies is used for error reporting only
     # and is never consumed by the solver, the root selector or the Schmidt
@@ -296,6 +297,7 @@ def run_state_averaged_dci(
             'wave_damping': wave_damping,
             'seed': seed,
             'seed_complete_blocks': seed_complete_blocks,
+            'seed_lanczos_steps': seed_lanczos_steps,
             'rank_mode': rank_mode,
             'apply_dressing': apply_dressing,
             'omega_mode': omega_mode,
