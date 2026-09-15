@@ -21,7 +21,11 @@ from dm_svd_embedding.density_matrix import (
     compute_schmidt_decomposition,
     normalize_state_weights,
 )
-from dm_svd_dci.wave_operator import solve_state_averaged_wave_operator
+from dm_svd_dci.wave_operator import (
+    make_qspace_apply,
+    solve_state_averaged_wave_operator,
+    solve_state_averaged_wave_operator_lowrank,
+)
 
 
 StateBlocks = Dict[int, np.ndarray]
@@ -354,6 +358,9 @@ def solve_state_averaged_schmidt(
     # The outer driver owns these arguments.
     wave_options.pop('n_states', None)
     wave_options.pop('state_weights', None)
+    omega_solver = wave_options.pop('omega_solver', 'dense')
+    if omega_solver not in ('dense', 'lowrank'):
+        raise ValueError(f"unknown omega_solver {omega_solver!r}")
 
     previous_energies = None
     previous_schmidt: Optional[Dict[int, Dict]] = None
@@ -420,11 +427,24 @@ def solve_state_averaged_schmidt(
 
         local_wave_options = dict(wave_options)
         local_wave_options.setdefault('verbose', verbose)
-        wave = solve_state_averaged_wave_operator(
-            problem['H_PP'], problem['H_PQ'],
-            problem['H_QQ_blocks'], problem['D_by_n'],
-            n_states=n_states, state_weights=weights,
-            **local_wave_options)
+        if omega_solver == 'dense':
+            wave = solve_state_averaged_wave_operator(
+                problem['H_PP'], problem['H_PQ'],
+                problem['H_QQ_blocks'], problem['D_by_n'],
+                n_states=n_states, state_weights=weights,
+                **local_wave_options)
+        else:
+            # Matrix-free: the q by q Q-space Hamiltonian is never assembled.
+            # These options belong only to the dense path.
+            for unsupported in ('omega_mode', 'apply_dressing', 'omega_init'):
+                local_wave_options.pop(unsupported, None)
+            qspace = make_qspace_apply(
+                problem['H_PQ'], problem['H_QQ_blocks'], problem['D_by_n'])
+            wave = solve_state_averaged_wave_operator_lowrank(
+                problem['H_PP'], qspace['H_PQ'], qspace['apply'],
+                qspace['diagonal'], n_states=n_states, state_weights=weights,
+                q_slices=qspace['q_slices'], q_labels=qspace['q_labels'],
+                **local_wave_options)
 
         embedded_coefficients = assemble_embedded_state_coefficients(
             wave, problem['part_info'], problem['q_partition'])

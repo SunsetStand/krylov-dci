@@ -279,6 +279,70 @@ def graph_ritz_per_state(
     }
 
 
+def make_qspace_apply(
+    H_PQ: Dict[int, np.ndarray],
+    H_QQ_blocks: Dict[Tuple[int, int], np.ndarray],
+    D_by_n: Dict[int, np.ndarray],
+) -> Dict:
+    """Build an ``H_QQ`` apply callback without assembling the q by q matrix.
+
+    :func:`assemble_qspace_hamiltonian` allocates a dense ``q_dim x q_dim``
+    array.  This returns the same operator as a callable that contracts the
+    per-electron-number blocks directly, so the quadratic array is never
+    created.  Selection rules leave only the ``|dn| <= 2`` blocks non-zero,
+    which is what makes the block form cheaper than the assembled one.
+
+    Returns ``H_PQ`` concatenated in block order, the Q-space diagonal, the
+    total Q dimension, and ``apply``.
+    """
+    q_labels = sorted(H_PQ.keys())
+    slices = {}
+    offset = 0
+    for label in q_labels:
+        dim = np.asarray(H_PQ[label]).shape[1]
+        slices[label] = slice(offset, offset + dim)
+        offset += dim
+
+    if q_labels:
+        h_pq_full = np.concatenate(
+            [np.asarray(H_PQ[label]) for label in q_labels], axis=1)
+        diagonal = np.concatenate(
+            [np.asarray(D_by_n[label]) for label in q_labels])
+    else:
+        h_pq_full = np.zeros((0, 0))
+        diagonal = np.zeros(0)
+
+    # Resolve each block once, symmetrizing where both orientations exist, so
+    # the apply itself does no bookkeeping.
+    resolved = []
+    for left in q_labels:
+        for right in q_labels:
+            block = H_QQ_blocks.get((left, right))
+            transposed = H_QQ_blocks.get((right, left))
+            if block is None and transposed is None:
+                if left == right:
+                    resolved.append((slices[left], slices[left],
+                                     np.diag(np.asarray(D_by_n[left]))))
+                continue
+            if block is None:
+                block = np.asarray(transposed).T.conj()
+            elif transposed is not None and left != right:
+                block = 0.5 * (np.asarray(block)
+                               + np.asarray(transposed).T.conj())
+            resolved.append((slices[left], slices[right], np.asarray(block)))
+
+    def apply(vectors: np.ndarray) -> np.ndarray:
+        vectors = np.asarray(vectors)
+        result = np.zeros((offset, vectors.shape[1]), dtype=vectors.dtype)
+        for row, column, block in resolved:
+            result[row] += block @ vectors[column]
+        return result
+
+    return {'H_PQ': h_pq_full, 'diagonal': diagonal, 'q_dim': offset,
+            'apply': apply, 'n_blocks': len(resolved),
+            'q_slices': slices, 'q_labels': q_labels}
+
+
 def solve_state_averaged_wave_operator_lowrank(
     H_PP: np.ndarray,
     H_PQ: np.ndarray,
@@ -294,6 +358,8 @@ def solve_state_averaged_wave_operator_lowrank(
     pinv_rcond: float = 1e-12,
     max_rank: Optional[int] = None,
     rank_tol: float = 1e-13,
+    q_slices: Optional[Dict] = None,
+    q_labels: Optional[List] = None,
     verbose: bool = True,
 ) -> Dict:
     """Matrix-free wave-operator solve, with Omega kept in factored form.
@@ -479,6 +545,8 @@ def solve_state_averaged_wave_operator_lowrank(
                       'max_norm': float(np.max(root_norms))},
         'state_weights': weights, 'rank': int(basis.shape[1]),
         'hqq_applications': int(applications),
+        'q_slices': q_slices, 'q_labels': q_labels, 'q_dim': q_dim,
+        'H_PQ': H_PQ, 'diagonal': diagonal,
     }
 
 

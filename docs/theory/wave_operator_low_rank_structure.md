@@ -69,9 +69,42 @@ in the probe's generalized-eigenvalue solve, not a property of the method. The
 numbers above use the same symmetric metric inverse-square-root as
 `graph_ritz`.)*
 
-## Why this matters for this project specifically
+## Correction: this is NOT the recorded bottleneck
 
-The recorded bottleneck is exactly the object that becomes unnecessary.
+An earlier version of this note claimed that "the object that becomes
+unnecessary is exactly the recorded bottleneck". **That was wrong, and the
+measurement below refutes it.**
+
+Peak memory of the real pipeline on N2 CAS(10e,9o), `M = 15876` determinants,
+with the matrix-free solver in place:
+
+| `eps` | `D` | `Q` | peak | `q x q` | `M x D` | peak / `M x D` |
+|---|---|---|---|---|---|---|
+| `1e-2` | 720 | 241 | `363 MiB` | `0.44 MiB` | `87 MiB` | `4.17` |
+| `5e-3` | 1539 | 835 | `775 MiB` | `5.3 MiB` | `186 MiB` | `4.16` |
+| `3e-3` | 3242 | 2247 | `1665 MiB` | `38.5 MiB` | `393 MiB` | `4.24` |
+
+Peak memory is a constant multiple of `M x D` across three decades of `D`, while
+the `q x q` Hamiltonian accounts for between `0.1` and `2.3 percent` of it. The
+matrix-free wave operator removes a term that is not the bottleneck.
+
+The bottleneck is the determinant-space expansion in the embedded-Hamiltonian
+build, which is what `hku_report/Six_Week_Comprehensive_Report.md` actually said:
+"the CI expansion step for sigma-vector computation requires storing `M x D`
+matrices". Unblocking CAS(14,10) therefore requires streaming that build, for
+which the repository already has `dm_svd_dci/streaming_ops.py` and the Scheme B
+block extraction. It does not require this solver.
+
+## What this solver is still worth
+
+It is correct, it removes an `O(q^2)` object, and it is modestly faster: `9.5`
+against `11.2 s` at `eps = 1e-2` and `22.6` against `25.6 s` at `5e-3`, with
+energies agreeing to `7e-12 mH` and `3e-10 mH`. The `q x q` term is negligible
+at present sizes but grows quadratically, so it would become the binding
+constraint once the `M x D` build is streamed. The right sequence is therefore
+to stream the build first and keep this solver for afterwards.
+
+## The original argument, with the bottleneck claim removed
 
 - `hku_report/Six_Week_Comprehensive_Report.md` reports the embedded-Hamiltonian
   build at **87 to 93 percent** of total runtime, 449 s of 481 s in ground-state
