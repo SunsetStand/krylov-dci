@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `001a19a` on branch `research/iterative-ci-feasibility`,
+Updated at commit `18a7fa3` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -26,7 +26,7 @@ error, initial-guess dependence, ablations and failure modes must all be shown.
 | 0 | Checkout, branch, environment | Complete |
 | A | Literature and novelty | Complete, first pass. See `docs/literature/iterative_ci_schmidt_downfolding_review.md` |
 | B | Deterministic lowest-three-level root bundle | Complete |
-| C | Decouple production path from the exact CI seed | Complete on H2O. H1, H2, H4 confirmed; H3 falsified; H7 indistinguishable; H6 not testable on this system |
+| C | Decouple production path from the exact CI seed | Complete on H2O and N2. H1, H2, H4 confirmed; H3 falsified as originally formulated and confirmed after repair; H7 indistinguishable; H6 partially supported |
 | D | Ablation and initial-guess sensitivity | Not started |
 | E | N2 state-averaged pilot | Blocked on B through D |
 
@@ -332,6 +332,44 @@ so far. Two caveats are recorded rather than smoothed: the dimension match
 failed at 13 percent against a 2 percent tolerance at one threshold, and H2O is
 one system. **H3 must be retested on N2 before anything is reported as general.**
 
+## The central result: the outer map was a rank contraction, and it is repaired
+
+`docs/theory/outer_map_rank_contraction.md` proves that the reconstructed
+coefficients `C_new(n) = U(n) T(n) V(n)^dag` lie inside the span of the basis
+that produced them, so the retained rank is **monotonically non-increasing block
+by block, by construction**. Verified with no rank increase anywhere on either
+system. On N2 the basis collapsed `720 -> 216` while the ground state degraded by
+`2.44 mH`, and the loop reported convergence while doing it.
+
+That is why H3 was falsified: every basis the iteration could reach was a
+subspace of the frozen one.
+
+**Residual-driven Krylov enrichment repairs it.** The full-space residual
+`R_k = H C_k - E_k C_k` enters the state-averaged density with weight
+`lambda * w_k`. It is computed in the determinant basis, because the embedded
+residual already lies inside the retained span, and it is not normalized, so it
+fades as `||R_k||^2` and the exact solution stays a fixed point. The contraction
+breaks from `lambda = 0.2`; `lambda = 0.5` is usable, `1.0` oscillates.
+
+**H3 reverses at matched dimension on N2**, `396` against `398`, a `0.5 percent`
+gap: self-consistency with enrichment gives `15.1315 mH` against frozen at
+`17.8437 mH`, a **`2.71 mH` benefit, 54 times the tolerance**. The correct claim
+is therefore not "self-consistency works" but "self-consistency works only once
+the map is made rank-increasing; as originally formulated it provably cannot".
+
+**H6 is partially supported on N2**, the only system that expresses rank
+asymmetry. At directly matched dimension: `+0.0377 mH` at `D ~ 720`, below
+tolerance and indistinguishable; `+0.2217 mH` at `D ~ 1539`, a win. The advantage
+tracks the amount of asymmetry, which is the predicted trend, but two points do
+not establish it. Detail: `docs/development/gate_c_n2_results.md`.
+
+**A methodological warning.** An earlier version of the H6 comparison
+interpolated the symmetric error-versus-dimension curve rather than matching
+directly, and reported `+0.1434 mH` where direct matching gives `+0.0377 mH`.
+The curve is convex, so interpolation overestimates the symmetric error and
+biases toward rectangular. Interpolated matched-cost comparisons must not be
+used for this claim.
+
 ## Corrections to earlier conclusions
 
 1. **Overshoot alone does not fix a symmetry miss.** Because H is exactly block
@@ -380,11 +418,15 @@ threshold scan behind it.
 
 ## Next single priority
 
-Run the same scan on N2 CAS(10e,9o) from the locked reference bundle. It is the
-only way to test H6 at all, since H2O cannot express rank asymmetry, and it is
-the retest H3 needs before its falsification can be reported as general. Measure
-the state-averaged pilot's resource envelope at the same time, since
-CAS(10e,9o) is four times smaller than the space the 96 GB figure came from.
+Reach outer convergence with enrichment. None of the enriched runs met the outer
+tolerance within eight iterations, so the `2.71 mH` H3 benefit is a best-within-
+budget number rather than a converged fixed point, and the enrichment strength
+was chosen from a five-point scan on one system at one threshold. Until an
+enriched run converges, neither the H3 benefit nor the `lambda` default can be
+reported as settled.
+
+After that, a denser matched-dimension sweep for H6, which is supported at one
+of two tested dimensions and is the only surviving novelty candidate.
 
 Two obligations from Gate A now belong in that protocol as primary hypotheses
 rather than ancillary controls, because the novelty case depends on them:
