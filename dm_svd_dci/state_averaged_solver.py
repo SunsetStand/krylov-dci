@@ -261,6 +261,13 @@ def assemble_embedded_state_coefficients(
         dtype=np.result_type(p_coefficients.dtype, q_coefficients.dtype))
     full[part_info['p_indices'], :] = p_coefficients
 
+    if not wave_result.get('q_slices'):
+        # Streaming route: the Q space is flat and already in q_indices order.
+        if q_coefficients.shape[0] != len(part_info['q_indices']):
+            raise ValueError('flat Q coefficients do not match q_indices')
+        full[part_info['q_indices'], :] = q_coefficients
+        return full
+
     for label, q_slice in wave_result['q_slices'].items():
         if label not in q_partition['q_blocks']:
             raise ValueError(f"missing Q partition metadata for block {label}")
@@ -413,10 +420,11 @@ def solve_state_averaged_schmidt(
         projector_distance = schmidt_projector_distance(
             previous_schmidt, schmidt)
         problem = build_problem(schmidt)
-        required = {
-            'H_PP', 'H_PQ', 'H_QQ_blocks', 'D_by_n',
-            'part_info', 'q_partition',
-        }
+        streaming = 'hqq_apply' in problem
+        required = ({'H_PP', 'H_PQ_flat', 'hqq_apply', 'hqq_diagonal',
+                     'part_info', 'q_partition'} if streaming else
+                    {'H_PP', 'H_PQ', 'H_QQ_blocks', 'D_by_n',
+                     'part_info', 'q_partition'})
         missing = required - set(problem)
         if missing:
             raise KeyError(f"build_problem result is missing {sorted(missing)}")
@@ -427,7 +435,16 @@ def solve_state_averaged_schmidt(
 
         local_wave_options = dict(wave_options)
         local_wave_options.setdefault('verbose', verbose)
-        if omega_solver == 'dense':
+        if streaming:
+            # A streaming problem has no assembled Q-space Hamiltonian, so the
+            # dense solver cannot run on it.
+            for unsupported in ('omega_mode', 'apply_dressing', 'omega_init'):
+                local_wave_options.pop(unsupported, None)
+            wave = solve_state_averaged_wave_operator_lowrank(
+                problem['H_PP'], problem['H_PQ_flat'], problem['hqq_apply'],
+                problem['hqq_diagonal'], n_states=n_states,
+                state_weights=weights, **local_wave_options)
+        elif omega_solver == 'dense':
             wave = solve_state_averaged_wave_operator(
                 problem['H_PP'], problem['H_PQ'],
                 problem['H_QQ_blocks'], problem['D_by_n'],

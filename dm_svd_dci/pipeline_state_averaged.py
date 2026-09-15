@@ -77,6 +77,7 @@ def run_state_averaged_dci(
     min_denominator: float = 1e-6,
     n_workers: int = 1,
     scheme: str = 'A',
+    stream_batch_size: int = 32,
     seed: str = 'exact',
     seed_subspace_size: int = 64,
     seed_perturbation_scale: float = 0.1,
@@ -214,8 +215,59 @@ def run_state_averaged_dci(
                 'norm_total': float(np.linalg.norm(q_data['H_PP'])),
                 'asymmetry': 0.0,
             }
+        elif scheme == 'streaming':
+            # Never form the q by q Q-space Hamiltonian, and never expand the
+            # whole Schmidt product basis into determinant space at once.
+            # StreamBuilder batches the expansion and exposes H_QQ only as a
+            # matvec, which is exactly what the low-rank solver consumes.
+            from dm_svd_dci.streaming_ops import StreamBuilder
+
+            builder = StreamBuilder(
+                schmidt_data, partition, part_info, sys_data['backend'],
+                n_occ, n_active, batch_size=stream_batch_size,
+                n_workers=n_workers, verbose=verbose)
+            blocks = builder.build_all(prewarm_q=False)
+            ecore = float(sys_data['ecore'])
+            raw_batch = blocks['H_QQ_batch']
+            q_data = {
+                'H_PP': blocks['H_PP'] + ecore * np.eye(part_info['p_dim']),
+                'H_PQ_flat': blocks['H_PQ'],
+                # The raw matvec carries only the active-space Hamiltonian; the
+                # dense route inherits ecore from H_emb, so it is added here so
+                # that the resolvent denominators match between routes.
+                'hqq_apply': lambda vectors: raw_batch(vectors) + ecore * vectors,
+                'hqq_diagonal': blocks['H_QQ_diag'] + ecore,
+            }
+            hemb_norms = {
+                'norm_HA': 0.0, 'norm_HB': 0.0,
+                'norm_HAB': float(np.linalg.norm(q_data['H_PP'])),
+                'norm_total': float(np.linalg.norm(q_data['H_PP'])),
+                'asymmetry': 0.0,
+            }
         else:
             raise ValueError(f"unknown Hamiltonian construction scheme: {scheme}")
+
+        if scheme == 'streaming':
+            build_record = {
+                'seconds': time.perf_counter() - build_start,
+                'D_total': part_info['total_dim'],
+                'P_dim': part_info['p_dim'],
+                'Q_dim': part_info['q_dim'],
+                'Q_active_dim': int(part_info['q_dim']),
+            }
+            build_history.append(build_record)
+            return {
+                'H_PP': q_data['H_PP'],
+                'H_PQ_flat': q_data['H_PQ_flat'],
+                'hqq_apply': q_data['hqq_apply'],
+                'hqq_diagonal': q_data['hqq_diagonal'],
+                'H_PQ': {}, 'H_QQ_blocks': {}, 'D_by_n': {},
+                'part_info': part_info,
+                'q_partition': q_partition,
+                'q_data': q_data,
+                'hemb_norms': hemb_norms,
+                'build_record': build_record,
+            }
 
         build_record = {
             'seconds': time.perf_counter() - build_start,
@@ -446,6 +498,7 @@ def run_state_averaged_dci(
             'apply_dressing': apply_dressing,
             'omega_mode': omega_mode,
             'omega_solver': omega_solver,
+            'stream_batch_size': stream_batch_size,
             'enrichment_strength': enrichment_strength,
             'enrichment_decay': enrichment_decay,
             'compute_reference': compute_reference,
