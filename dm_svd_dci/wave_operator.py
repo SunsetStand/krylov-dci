@@ -279,6 +279,209 @@ def graph_ritz_per_state(
     }
 
 
+def solve_state_averaged_wave_operator_lowrank(
+    H_PP: np.ndarray,
+    H_PQ: np.ndarray,
+    hqq_apply,
+    diagonal: np.ndarray,
+    n_states: int,
+    state_weights: Optional[np.ndarray] = None,
+    damping: float = 0.5,
+    residual_tol: float = 1e-9,
+    energy_tol: float = 1e-10,
+    max_iter: int = 100,
+    min_denominator: float = 1e-6,
+    pinv_rcond: float = 1e-12,
+    max_rank: Optional[int] = None,
+    rank_tol: float = 1e-13,
+    verbose: bool = True,
+) -> Dict:
+    """Matrix-free wave-operator solve, with Omega kept in factored form.
+
+    Identical mathematics to :func:`solve_state_averaged_wave_operator`, but
+    ``H_QQ`` is never formed.  It enters only through ``hqq_apply(V)``, which
+    must return ``H_QQ @ V`` for ``V`` of shape ``(q_dim, m)``.
+
+    The enabling fact is that ``Omega`` is numerically rank ``n_states``
+    (``docs/theory/wave_operator_low_rank_structure.md``).  Keeping it as
+    ``Omega = W Omega_tilde`` with ``W`` orthonormal of width ``k`` means the
+    generalized Ritz problem needs only ``H_PQ W`` of size ``p x k`` and
+    ``W^dag H_QQ W`` of size ``k x k``.  ``H_QQ`` is applied to the ``k``
+    columns of ``W`` and nowhere else, so the cost per iteration is ``k``
+    applications rather than an ``O(q_dim^2)`` build.
+
+    The retained rank is controlled by ``rank_tol``, which drops factorization
+    directions whose singular value is negligible relative to the largest.
+    ``max_rank`` is an optional hard ceiling; leaving it unset is recommended,
+    because a count cap floors the residual and makes the solver report
+    non-convergence while its energies are already exact to machine precision.
+
+    Truncation is a cost saving, not a stability requirement.  An earlier
+    version of this solver appeared to need it, but that was a loss of
+    orthonormality in the factorization, not a property of the method: the
+    appended directions are now projected out of the basis twice, and the basis
+    is re-orthonormalized after each rotation with the same transformation
+    carried through the stored application and the coefficients.  With that in
+    place the untruncated run is also correct, and truncation simply costs
+    fewer applications of ``H_QQ`` for the same answer.
+    """
+    H_PP = np.asarray(H_PP)
+    H_PQ = np.asarray(H_PQ)
+    diagonal = np.asarray(diagonal).reshape(-1)
+    p_dim = H_PP.shape[0]
+    q_dim = diagonal.shape[0]
+    if H_PQ.shape != (p_dim, q_dim):
+        raise ValueError(
+            f"H_PQ has shape {H_PQ.shape}, expected {(p_dim, q_dim)}")
+    if not 0 < damping <= 1.0:
+        raise ValueError("damping must satisfy 0 < damping <= 1")
+    if max_iter <= 0:
+        raise ValueError("max_iter must be positive")
+    weights = normalize_state_weights(n_states, state_weights)
+    # No hard cap by default: the rank is controlled by rank_tol, which keeps
+    # only directions carrying real weight.  A count cap would make the solver
+    # report non-convergence while already being numerically exact in the
+    # energies, because the residual floors out before the energies move.
+    update_scales = np.sqrt(weights / np.max(weights))
+
+    # Omega = basis @ coefficients, with basis orthonormal (q_dim x k).
+    basis = np.zeros((q_dim, 0))
+    coefficients = np.zeros((0, p_dim))
+    hqq_basis = np.zeros((q_dim, 0))          # H_QQ applied to basis columns
+    applications = 0
+
+    history: List[Dict] = []
+    previous_energies = None
+    converged = False
+
+    if verbose:
+        print("\n  Matrix-free low-rank wave-operator solver")
+        print(f"    roots={n_states}, |P|={p_dim}, |Q|={q_dim}, "
+              f"max_rank={max_rank}")
+
+    for iteration in range(max_iter):
+        k = basis.shape[1]
+        hpq_basis = H_PQ @ basis                       # p x k
+        hqq_small = basis.T.conj() @ hqq_basis         # k x k
+        hqq_small = 0.5 * (hqq_small + hqq_small.T.conj())
+
+        metric = np.eye(p_dim) + coefficients.T.conj() @ coefficients
+        projected = H_PP.copy()
+        if k:
+            cross = hpq_basis @ coefficients
+            projected = (projected + cross + cross.T.conj()
+                         + coefficients.T.conj() @ hqq_small @ coefficients)
+        projected = 0.5 * (projected + projected.T.conj())
+
+        metric_evals, metric_vecs = eigh(metric)
+        metric_inv_sqrt = (
+            metric_vecs * (1.0 / np.sqrt(np.maximum(metric_evals, 1e-14)))
+        ) @ metric_vecs.T.conj()
+        orthogonal_h = metric_inv_sqrt @ projected @ metric_inv_sqrt
+        orthogonal_h = 0.5 * (orthogonal_h + orthogonal_h.T.conj())
+        energies, vectors = eigh(orthogonal_h)
+        energies = energies[:n_states]
+        model_coefficients = metric_inv_sqrt @ vectors[:, :n_states]
+
+        small_q = coefficients @ model_coefficients if k else np.zeros((0, n_states))
+        q_coefficients = basis @ small_q if k else np.zeros((q_dim, n_states))
+
+        residual_p = (H_PP @ model_coefficients + H_PQ @ q_coefficients
+                      - model_coefficients * energies[np.newaxis, :])
+        # H_QQ q = H_QQ basis (coefficients c), reusing the stored application.
+        hqq_q = hqq_basis @ small_q if k else np.zeros((q_dim, n_states))
+        residual_q = (H_PQ.T.conj() @ model_coefficients + hqq_q
+                      - q_coefficients * energies[np.newaxis, :])
+        root_norms = np.sqrt(np.sum(np.abs(residual_p) ** 2, axis=0)
+                             + np.sum(np.abs(residual_q) ** 2, axis=0))
+        weighted_rms = float(np.sqrt(np.dot(weights, root_norms ** 2)))
+
+        energy_change = (np.inf if previous_energies is None
+                         else float(np.max(np.abs(energies - previous_energies))))
+        history.append({
+            'iteration': iteration, 'energies': energies.copy(),
+            'energy_change': energy_change, 'residual_rms': weighted_rms,
+            'residual_max': float(np.max(root_norms)),
+            'rank': int(k), 'hqq_applications': int(applications),
+        })
+        if verbose:
+            text = "---" if not np.isfinite(energy_change) else f"{energy_change:.3e}"
+            print(f"    iter {iteration:3d}: E0={energies[0]:.12f} "
+                  f"max|dE|={text}  R_SA={weighted_rms:.3e}  rank={k}",
+                  flush=True)
+
+        if weighted_rms < residual_tol and energy_change < energy_tol:
+            converged = True
+            break
+
+        denominators = _protect_denominators(
+            energies[np.newaxis, :] - diagonal[:, np.newaxis], min_denominator)
+        corrections = (residual_q / denominators) * update_scales[np.newaxis, :]
+        delta_coefficients = np.linalg.pinv(
+            model_coefficients, rcond=pinv_rcond)          # s x p
+
+        # Append the new directions, re-orthonormalize, then truncate by SVD.
+        # Project the new directions out of the current basis twice.  One
+        # pass of Gram-Schmidt loses orthogonality; two is the standard remedy.
+        new = np.array(corrections, copy=True)
+        for _ in range(2):
+            if basis.shape[1]:
+                new = new - basis @ (basis.T.conj() @ new)
+        norms = np.linalg.norm(new, axis=0)
+        keep = norms > rank_tol * max(1.0, float(np.max(norms)))
+        if np.any(keep):
+            added, _ = np.linalg.qr(new[:, keep])
+            basis = np.hstack([basis, added]) if k else added
+            hqq_basis = (np.hstack([hqq_basis, hqq_apply(added)])
+                         if k else hqq_apply(added))
+            applications += added.shape[1]
+            coefficients = np.vstack(
+                [coefficients, np.zeros((added.shape[1], p_dim))])
+        coefficients = coefficients + damping * (
+            basis.T.conj() @ corrections) @ delta_coefficients
+
+        # Truncate the factorization by singular value, not by a count.  The
+        # rotation has orthonormal columns, so the rotated basis stays
+        # orthonormal and H_QQ(basis @ rotation) = (H_QQ basis) @ rotation,
+        # which means no extra applications are needed.
+        if basis.shape[1]:
+            left, sigma, right = np.linalg.svd(coefficients,
+                                               full_matrices=False)
+            largest = float(sigma[0]) if sigma.size else 0.0
+            kept = int(np.sum(sigma > rank_tol * max(largest, 1e-300)))
+            kept = max(kept, n_states)
+            if max_rank is not None:
+                kept = min(kept, max_rank)
+            if kept < basis.shape[1]:
+                rotation = left[:, :kept]
+                basis = basis @ rotation
+                hqq_basis = hqq_basis @ rotation
+                coefficients = (sigma[:kept, np.newaxis] * right[:kept, :])
+                # Rotations accumulate a small loss of orthonormality over many
+                # iterations.  Restore it and carry the same transformation
+                # through the stored application and the coefficients, so that
+                # Omega and H_QQ Omega stay exactly consistent.
+                basis, upper = np.linalg.qr(basis)
+                inverse = np.linalg.inv(upper)
+                hqq_basis = hqq_basis @ inverse
+                coefficients = upper @ coefficients
+        previous_energies = energies.copy()
+
+    omega = basis @ coefficients if basis.shape[1] else np.zeros((q_dim, p_dim))
+    return {
+        'energies': energies, 'model_coefficients': model_coefficients,
+        'q_coefficients': q_coefficients,
+        'full_coefficients': np.vstack([model_coefficients, q_coefficients]),
+        'omega': omega, 'omega_basis': basis, 'omega_coefficients': coefficients,
+        'converged': converged, 'n_iter': len(history), 'history': history,
+        'residuals': {'residual_p': residual_p, 'residual_q': residual_q,
+                      'root_norms': root_norms, 'weighted_rms': weighted_rms,
+                      'max_norm': float(np.max(root_norms))},
+        'state_weights': weights, 'rank': int(basis.shape[1]),
+        'hqq_applications': int(applications),
+    }
+
+
 def compute_state_residuals(
     H_PP: np.ndarray,
     H_PQ: np.ndarray,
