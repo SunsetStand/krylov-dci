@@ -87,6 +87,7 @@ def run_state_averaged_dci(
     apply_dressing: bool = True,
     omega_mode: str = 'shared',
     enrichment_strength: float = 0.0,
+    enrichment_decay: float = 1.0,
     compute_reference: bool = True,
     embedded_spectrum: bool = False,
     output_dir: Optional[str] = None,
@@ -257,6 +258,7 @@ def run_state_averaged_dci(
         rank_mode=rank_mode,
         enrichment=enrichment_callback,
         enrichment_strength=enrichment_strength,
+        enrichment_decay=enrichment_decay,
         verbose=verbose)
 
     final_problem = result['problem']
@@ -397,6 +399,7 @@ def run_state_averaged_dci(
             'apply_dressing': apply_dressing,
             'omega_mode': omega_mode,
             'enrichment_strength': enrichment_strength,
+            'enrichment_decay': enrichment_decay,
             'compute_reference': compute_reference,
         },
     }

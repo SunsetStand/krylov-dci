@@ -51,9 +51,49 @@ works" but "self-consistency works only once the map is made rank-increasing;
 as originally formulated it cannot work, for a reason that is provable rather
 than empirical".
 
-One caveat that must not be dropped: the self-consistent run did **not** meet
-the outer convergence tolerance within eight iterations. The number above is the
-best within that budget, not a converged fixed point.
+### Reaching a converged fixed point
+
+The constant-strength runs above never converged, and the diagnosis is specific:
+the projector distance stayed at `5.7` to `6.2` at **every** iteration, so the
+Schmidt basis was rotating completely each time and never settling, while the
+density change plateaued near `4e-3` against a `1e-6` tolerance.
+
+The cause was a wrong assumption in the design. The enrichment was expected to
+fade because `||R_k||` would vanish, but **it does not**: a state in a truncated
+space can never be an exact eigenvector of the full Hamiltonian, so `||R_k||`
+plateaued at about `0.13` and the enrichment acted as a permanent rotating
+perturbation. The map was in a limit cycle.
+
+The strength is therefore **annealed**, `lambda_t = lambda_0 * decay^t`, which is
+what DMRG does with its noise term. This converges:
+
+| `decay` | final `D` | error | converged | outer iterations | final `d_rho` | final projector distance |
+|---|---|---|---|---|---|---|
+| 1.0 | 412 | `15.2087` | **no** | 16 | `3.6e-03` | `5.70` |
+| 0.7 | 155 | `17.7453` | no | 16 | `5.7e-06` | `1.3e-03` |
+| 0.5 | 178 | `17.5816` | **yes**, 13 | 13 | `3.5e-07` | `7.9e-05` |
+| 0.3 | 203 | `17.2539` | **yes**, 13 | 13 | `3.2e-07` | `1.1e-11` |
+
+At `decay = 0.3` the projector distance falls to `1.1e-11`, so the basis is
+completely settled.
+
+Annealing to zero lets the contraction resume, which prunes the basis from about
+`400` down to `180` to `200` and gives back part of the absolute accuracy. **But
+at matched dimension the converged runs still win decisively:**
+
+| `decay` | self-consistent, converged | frozen at matched `D` | gap | advantage |
+|---|---|---|---|---|
+| 0.5 | `D=178`, `17.5816 mH` | `D=177`, `20.3947 mH` | `0.6 percent` | **`+2.8131 mH`** |
+| 0.3 | `D=203`, `17.2539 mH` | `D=201`, `19.7860 mH` | `1.0 percent` | **`+2.5322 mH`** |
+
+Both dimension matches are inside the `2 percent` tolerance and both advantages
+are about 50 times the agreement tolerance. **H3 is confirmed with a genuinely
+converged fixed point**, not only as a best-within-budget number.
+
+The trade-off is explicit and should be reported as such: constant enrichment
+gives a better absolute error at a larger basis but no fixed point, while
+annealed enrichment gives a converged fixed point at a smaller basis and a
+larger margin over frozen at equal cost.
 
 ## H6: partially supported, and the effect tracks the asymmetry
 
@@ -108,7 +148,8 @@ Settled:
 
 Not settled:
 
-- outer convergence with enrichment, which was not reached in eight iterations;
-- the enrichment strength, chosen as `0.5` from a five-point scan on one system
-  at one threshold;
+- the enrichment strength and decay, chosen as `0.5` and `0.3` from small scans
+  on one system at one threshold;
+- whether the constant-strength regime has a fixed point at all, or only a limit
+  cycle;
 - H6, which is supported at one matched dimension and not at the other.

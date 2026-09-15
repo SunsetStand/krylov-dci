@@ -1,0 +1,16 @@
+{
+  "decay": 0.3,
+  "sc": {
+    "D": 203,
+    "err": 17.253853288949017,
+    "converged": true
+  },
+  "frozen": {
+    "D": 201,
+    "err": 19.786043529059327,
+    "eps": 0.014713635881046409
+  },
+  "gap": 0.009852216748768473,
+  "frozen_minus_sc_mH": 2.5321902401103102,
+  "verdict": "SELF-CONSISTENCY HELPS"
+}
