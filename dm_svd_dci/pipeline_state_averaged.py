@@ -310,7 +310,28 @@ def run_state_averaged_dci(
         # would mean the operator can be stored and applied in compressed form,
         # which is the only claim left to the wave-operator half of the method
         # once its accuracy contribution is known to be zero.
-        omega = np.asarray(result['wave_result'].get('omega'))
+        # Why Omega compresses and H_QP does not.  Three spectra on the same
+        # embedded problem: the raw coupling, the resolvent-weighted coupling
+        # that the Krylov route SVDs, and the same thing restricted to the
+        # target states, which is what the wave operator actually needs.
+        wave = result['wave_result']
+        h_qp = h_pq.T.conj()
+        reference = float(np.min(np.linalg.eigvalsh(h_pp)))
+        if h_qq.shape[0] > 0:
+            gap = reference - np.diag(h_qq)
+            gap[np.abs(gap) < 1e-12] = 1e-12
+            weighted = (1.0 / gap)[:, np.newaxis] * h_qp
+            coefficients = np.asarray(wave['model_coefficients'])
+            coupling_singular = np.linalg.svd(h_qp, compute_uv=False)
+            krylov_singular = np.linalg.svd(weighted, compute_uv=False)
+            projected_singular = np.linalg.svd(
+                weighted @ coefficients, compute_uv=False)
+        else:
+            coupling_singular = np.zeros(0)
+            krylov_singular = np.zeros(0)
+            projected_singular = np.zeros(0)
+
+        omega = np.asarray(wave.get('omega'))
         if omega.size and omega.ndim == 2:
             omega_singular = np.linalg.svd(omega, compute_uv=False)
         elif omega.size and omega.ndim == 3:
@@ -349,6 +370,12 @@ def run_state_averaged_dci(
             None if not embedded_spectrum else spectral_radius),
         'omega_singular_values': (
             None if not embedded_spectrum else omega_singular),
+        'coupling_singular_values': (
+            None if not embedded_spectrum else coupling_singular),
+        'krylov_singular_values': (
+            None if not embedded_spectrum else krylov_singular),
+        'projected_coupling_singular_values': (
+            None if not embedded_spectrum else projected_singular),
         'damping_bound': (
             None if not embedded_spectrum else 2.0 / (spectral_radius + 1.0)),
         'damping_bound_satisfied': (
