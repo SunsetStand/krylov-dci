@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `18a7fa3` on branch `research/iterative-ci-feasibility`,
+Updated at commit `133b968` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -351,11 +351,32 @@ residual already lies inside the retained span, and it is not normalized, so it
 fades as `||R_k||^2` and the exact solution stays a fixed point. The contraction
 breaks from `lambda = 0.2`; `lambda = 0.5` is usable, `1.0` oscillates.
 
-**H3 reverses at matched dimension on N2**, `396` against `398`, a `0.5 percent`
-gap: self-consistency with enrichment gives `15.1315 mH` against frozen at
-`17.8437 mH`, a **`2.71 mH` benefit, 54 times the tolerance**. The correct claim
-is therefore not "self-consistency works" but "self-consistency works only once
-the map is made rank-increasing; as originally formulated it provably cannot".
+**The enrichment had to be annealed to converge.** Constant strength never
+converged: the projector distance stayed between `5.7` and `6.2` at every
+iteration, so the basis rotated completely each time. The design assumption was
+wrong -- `||R_k||` does **not** vanish, because a state in a truncated space can
+never be an exact eigenvector of the full Hamiltonian, so it plateaued near
+`0.13` and acted as a permanent rotating perturbation. The map was in a limit
+cycle. With `lambda_t = lambda_0 * decay^t`, which is what DMRG does with its
+noise term, the loop converges in 13 outer iterations and at `decay = 0.3` the
+projector distance falls to `1.1e-11`.
+
+**H3 reverses at matched dimension on N2, with a converged fixed point:**
+
+| | self-consistent, converged | frozen at matched `D` | advantage |
+|---|---|---|---|
+| `decay = 0.5` | `D=178`, `17.5816 mH` | `D=177`, `20.3947 mH` | **`+2.8131 mH`** |
+| `decay = 0.3` | `D=203`, `17.2539 mH` | `D=201`, `19.7860 mH` | **`+2.5322 mH`** |
+
+Both gaps inside the `2 percent` tolerance, both advantages about 50 times
+`tol_E`. The correct claim is therefore not "self-consistency works" but
+"self-consistency works only once the map is made rank-increasing; as originally
+formulated it provably cannot".
+
+The trade-off is explicit: constant enrichment gives a better absolute error at
+a larger basis but no fixed point, `15.2087 mH` at `D=412`; annealed enrichment
+gives a converged fixed point at a smaller basis and a larger margin over frozen
+at equal cost.
 
 **H6 is partially supported on N2**, the only system that expresses rank
 asymmetry. At directly matched dimension: `+0.0377 mH` at `D ~ 720`, below
@@ -418,15 +439,15 @@ threshold scan behind it.
 
 ## Next single priority
 
-Reach outer convergence with enrichment. None of the enriched runs met the outer
-tolerance within eight iterations, so the `2.71 mH` H3 benefit is a best-within-
-budget number rather than a converged fixed point, and the enrichment strength
-was chosen from a five-point scan on one system at one threshold. Until an
-enriched run converges, neither the H3 benefit nor the `lambda` default can be
-reported as settled.
+A denser matched-dimension sweep for H6. It is the only surviving novelty
+candidate and is currently supported at one of two tested dimensions,
+`+0.2217 mH` at `D ~ 1539` against `+0.0377 mH` at `D ~ 720`, with the advantage
+tracking the amount of asymmetry. Two points do not establish a trend, and the
+comparison must use direct dimension matching rather than interpolation.
 
-After that, a denser matched-dimension sweep for H6, which is supported at one
-of two tested dimensions and is the only surviving novelty candidate.
+Then calibrate `lambda_0` and `decay`, which were chosen from small scans on one
+system at one threshold, and determine whether the constant-strength regime has
+a fixed point at all or only a limit cycle.
 
 Two obligations from Gate A now belong in that protocol as primary hypotheses
 rather than ancillary controls, because the novelty case depends on them:
