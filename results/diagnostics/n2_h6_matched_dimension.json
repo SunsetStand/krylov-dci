@@ -1,0 +1,30 @@
+{
+  "tol_E_mH": 0.05,
+  "matched_dimension_tolerance": 0.02,
+  "comparisons": [
+    {
+      "eps_rect": 0.01,
+      "D_rect": 720,
+      "err_rect": 15.48975090641136,
+      "eps_sym": 0.009834363454180376,
+      "D_sym": 715,
+      "err_sym": 15.52748543465654,
+      "gap": 0.006944444444444444,
+      "advantage_mH": 0.03773452824518131,
+      "verdict": "INDISTINGUISHABLE",
+      "match_within_tolerance": true
+    },
+    {
+      "eps_rect": 0.005,
+      "D_rect": 1539,
+      "err_rect": 12.171556508420167,
+      "eps_sym": 0.00453741763593187,
+      "D_sym": 1559,
+      "err_sym": 12.3932540719629,
+      "gap": 0.01299545159194282,
+      "advantage_mH": 0.22169756354273318,
+      "verdict": "RECTANGULAR WINS",
+      "match_within_tolerance": true
+    }
+  ]
+}
