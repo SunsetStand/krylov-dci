@@ -1,6 +1,6 @@
 # Iterative-CI feasibility: research state
 
-Updated at commit `133b968` on branch `research/iterative-ci-feasibility`,
+Updated at commit `b2301d5` on branch `research/iterative-ci-feasibility`,
 based on `origin/feat/residual-dressed-sc-dmsvd` at `e218187`.
 
 ## The question
@@ -391,6 +391,40 @@ The curve is convex, so interpolation overestimates the symmetric error and
 biases toward rectangular. Interpolated matched-cost comparisons must not be
 used for this claim.
 
+## The wave operator is low rank, and what that did and did not buy
+
+`Omega` is numerically rank `n_states`: three of 51 singular values carry
+`99.99 percent` of its Frobenius norm on H2O, four of 241 on N2, with a two to
+three order drop right after `n_states`. The reason is the construction, since
+`[delta q_k] pinv([c_k])` has row space equal to the span of the `s` model
+coefficients.
+
+A matrix-free solver was built on that fact
+(`solve_state_averaged_wave_operator_lowrank`). `H_QQ` is never formed; it enters
+only through an apply callback, and `Omega` is kept factored as `W Omega_tilde`.
+Against the dense solver it agrees to `1e-14` on synthetic problems and to
+`7e-12 mH` end to end on N2, with **identical iteration counts**, and its `H_QQ`
+applications are essentially independent of the Q dimension, growing `1.10x`
+while `Q` grows `6.7x`.
+
+**But it does not unblock the recorded bottleneck, and an earlier claim that it
+did was wrong.** Peak memory on N2 is a constant `4.2` times `M x D` across
+three decades of `D`, while the `q x q` Hamiltonian is `0.1` to `2.3 percent` of
+peak. The bottleneck is the determinant-space expansion in the
+embedded-Hamiltonian build, exactly as the Six-Week report stated. Unblocking
+CAS(14,10) needs that build streamed, for which `streaming_ops.py` and Scheme B
+already exist. The `q^2` term grows quadratically and would become binding once
+the build is streamed, so the right order is to stream the build first and keep
+this solver for afterwards.
+
+Two further corrections made during the work, both recorded rather than quietly
+fixed: a count-based rank cap floors the residual and makes the solver report
+non-convergence while its energies are already exact, so truncation is by
+singular value; and an apparent breakdown without truncation was my own loss of
+orthonormality, not evidence that truncation is needed for stability. With the
+basis properly maintained, orthonormality improved from `1.9e-07` to `8.9e-16`
+and the untruncated run became correct too.
+
 ## Corrections to earlier conclusions
 
 1. **Overshoot alone does not fix a symmetry miss.** Because H is exactly block
@@ -439,7 +473,13 @@ threshold scan behind it.
 
 ## Next single priority
 
-A denser matched-dimension sweep for H6. It is the only surviving novelty
+Stream the embedded-Hamiltonian build, which is the actual memory bottleneck at
+`4.2 x M x D`, using the existing `streaming_ops.py` and Scheme B. That is what
+CAS(14,10) needs, and growing-CAS already reaches `0.000 mH` on 7 of 7
+CAS(10,10) configurations, so a streamed build is the step between a validated
+method and a scalable one.
+
+Then a denser matched-dimension sweep for H6. It is the only surviving novelty
 candidate and is currently supported at one of two tested dimensions,
 `+0.2217 mH` at `D ~ 1539` against `+0.0377 mH` at `D ~ 720`, with the advantage
 tracking the amount of asymmetry. Two points do not establish a trend, and the
