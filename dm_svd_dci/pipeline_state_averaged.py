@@ -300,6 +300,22 @@ def run_state_averaged_dci(
                 off_diagonal * resolvent[np.newaxis, :]))))
         else:
             spectral_radius = 0.0
+
+        # Singular spectrum of the wave operator itself.  Omega maps P into Q,
+        # so Omega Omega^dag is a response density on the Q space: its dominant
+        # singular directions are the Q directions the model space couples to
+        # most strongly, aggregated over all target states.  A low-rank Omega
+        # would mean the operator can be stored and applied in compressed form,
+        # which is the only claim left to the wave-operator half of the method
+        # once its accuracy contribution is known to be zero.
+        omega = np.asarray(result['wave_result'].get('omega'))
+        if omega.size and omega.ndim == 2:
+            omega_singular = np.linalg.svd(omega, compute_uv=False)
+        elif omega.size and omega.ndim == 3:
+            omega_singular = np.linalg.svd(
+                omega.reshape(-1, omega.shape[-1]), compute_uv=False)
+        else:
+            omega_singular = np.zeros(0)
     metrics = compute_compression_metrics(
         result['schmidt_data'], result['state_blocks'][0])
     energies = np.asarray(result['energies'])
@@ -329,6 +345,8 @@ def run_state_averaged_dci(
         'embedded_exact_energies': embedded_energies,
         'spectral_radius_BA': (
             None if not embedded_spectrum else spectral_radius),
+        'omega_singular_values': (
+            None if not embedded_spectrum else omega_singular),
         'damping_bound': (
             None if not embedded_spectrum else 2.0 / (spectral_radius + 1.0)),
         'damping_bound_satisfied': (
