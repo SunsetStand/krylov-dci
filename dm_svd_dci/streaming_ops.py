@@ -647,87 +647,81 @@ class StreamBuilder:
         return self.apply_hqq_batch(v.reshape(-1, 1)).reshape(-1)
 
     def apply_hqq_batch(self, B: np.ndarray) -> np.ndarray:
-        """Compute H_QQ @ B using Q-index batching with parallel sigma.
+        """Compute ``H_QQ @ B`` matrix-free.
 
-        Key idea: batch over Q-indices instead of Krylov vectors.
-        For each Q-batch (size q_batch_size), expand all Q states once,
-        compute their sigma vectors in parallel, then project onto
-        ALL Krylov vectors simultaneously via BLAS3.
+        With ``H_QQ[i, j] = <CI_i| H |CI_j>`` the product is
 
-        Without Q-cache, this replaces O(r·Q) CI expansions with O(Q)
-        expansions. Sigma calls remain at Q total (not r·Q).
+            result[i, k] = sum_j <CI_i| H |CI_j> B[j, k]
+                         = <CI_i| H |psi_k>,   psi_k = sum_j B[j, k] CI_j
 
-        If Q-cache is pre-warmed (prewarm_q_cache), the per-batch
-        expansion step is skipped and cached flat vectors are used.
+        and the sum over ``j`` runs over the **whole** Q space.  An earlier
+        implementation batched over Q and restricted that sum to each batch,
+        which silently dropped every cross-batch coupling and left only the
+        block-diagonal part of ``H_QQ``.  It was exact whenever the batch size
+        reached ``|Q|`` and wrong otherwise, and because diagonal elements
+        always fall inside their own batch the diagonal stayed correct while
+        the off-diagonal action did not.
+
+        The correct form also costs far less.  It contracts first and applies
+        the Hamiltonian afterwards, so it needs ``r`` sigma evaluations rather
+        than one per Q index.  Batching is retained for the two expansion
+        passes, which is where the memory is.
 
         Args:
-            B: (|Q|, r) matrix — r vectors in Q-space.
+            B: ``(|Q|, r)`` matrix of r vectors in Q space.
 
         Returns:
-            HQQ_B: (|Q|, r) = H_QQ @ B
+            ``(|Q|, r)`` equal to ``H_QQ @ B``.
         """
         q_dim, r = B.shape
         if q_dim == 0 or r == 0:
             return np.zeros((q_dim, r))
 
         use_cache = len(self._q_ci_flat_cache) > 0
-        B_Q = min(self.q_batch_size, q_dim)
-        result = np.zeros((q_dim, r))
+        batch = min(self.q_batch_size, q_dim)
 
         if self.verbose:
             t0 = time.perf_counter()
-            print(f"  [H_QQ batch] |Q|={q_dim}, r={r}, q_batch={B_Q}, "
+            print(f"  [H_QQ batch] |Q|={q_dim}, r={r}, q_batch={batch}, "
                   f"cache={'warm' if use_cache else 'cold'}", flush=True)
 
-        for q_start in range(0, q_dim, B_Q):
-            q_end = min(q_start + B_Q, q_dim)
-            B_Q_actual = q_end - q_start
-            B_sub = B[q_start:q_end, :]  # (B_Q_actual, r)
-
-            # ── Step 1: obtain CI flat vectors for this Q-batch ──
+        def ci_columns(q_start: int, q_end: int) -> np.ndarray:
+            width = q_end - q_start
+            columns = np.empty((self.M, width))
             if use_cache:
-                C_batch = np.empty((self.M, B_Q_actual))
-                for idx_local in range(B_Q_actual):
-                    q_idx = q_start + idx_local
-                    C_batch[:, idx_local] = self._get_q_ci_flat(q_idx)
+                for local in range(width):
+                    columns[:, local] = self._get_q_ci_flat(q_start + local)
             else:
-                ci_mats_q = self.expand_batch(self.q_basis[q_start:q_end])
-                C_batch = np.empty((self.M, B_Q_actual))
-                for idx_local, ci in enumerate(ci_mats_q):
-                    C_batch[:, idx_local] = ci.reshape(-1)
+                for local, ci in enumerate(
+                        self.expand_batch(self.q_basis[q_start:q_end])):
+                    columns[:, local] = ci.reshape(-1)
+            return columns
 
-            # ── Step 2: compute sigma vectors for ALL Q states in batch ──
-            ci_mats_sigma = []
-            for idx_local in range(B_Q_actual):
-                ci_mats_sigma.append(
-                    C_batch[:, idx_local].reshape(
-                        self.n_alpha_strs, self.n_beta_strs))
-            sigmas = self.sigma_batch(ci_mats_sigma)
-            S_batch = np.empty((self.M, B_Q_actual))
-            for idx_local, s in enumerate(sigmas):
-                S_batch[:, idx_local] = s.reshape(-1)
-            del ci_mats_sigma, sigmas
+        # Pass 1: contract the Q-space vectors into r determinant-space states.
+        psi = np.zeros((self.M, r))
+        for q_start in range(0, q_dim, batch):
+            q_end = min(q_start + batch, q_dim)
+            psi += ci_columns(q_start, q_end) @ B[q_start:q_end, :]
 
-            # ── Step 3: project each Krylov column against S_batch ──
-            # result[Q_batch, k] = C_batch^T @ (S_batch @ B_sub[:, k])
-            # Do column-by-column to keep memory low.
-            for k in range(r):
-                b_sub_k = B_sub[:, k]
-                if np.all(np.abs(b_sub_k) < 1e-14):
-                    continue
-                sigma_combined = S_batch @ b_sub_k  # (M,)
-                result[q_start:q_end, k] = C_batch.T @ sigma_combined
+        # Apply the Hamiltonian once per column, not once per Q index.
+        sigmas = self.sigma_batch([
+            psi[:, k].reshape(self.n_alpha_strs, self.n_beta_strs)
+            for k in range(r)])
+        h_psi = np.empty((self.M, r))
+        for k, sigma in enumerate(sigmas):
+            h_psi[:, k] = sigma.reshape(-1)
+        del psi, sigmas
 
-            del C_batch, S_batch
+        # Pass 2: project back onto every Q basis vector.
+        result = np.zeros((q_dim, r))
+        for q_start in range(0, q_dim, batch):
+            q_end = min(q_start + batch, q_dim)
+            result[q_start:q_end, :] = ci_columns(q_start, q_end).T @ h_psi
 
-            if self.verbose and (q_end - B_Q) % max(1, q_dim // 10) == 0:
-                elapsed = time.perf_counter() - t0
-                print(f"    Q[{q_start}:{q_end}] / {q_dim} "
-                      f"({elapsed:.0f}s)", flush=True)
-            elif self.verbose and q_end >= q_dim:
-                elapsed = time.perf_counter() - t0
-                print(f"    Q[{0}:{q_dim}] done ({elapsed:.0f}s)", flush=True)
-
+        if self.verbose:
+            print(f"    Q[0:{q_dim}] done "
+                  f"({time.perf_counter() - t0:.0f}s, {r} sigma calls)",
+                  flush=True)
         return result
 
     def get_hqq_diag(self) -> np.ndarray:
