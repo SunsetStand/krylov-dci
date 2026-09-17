@@ -172,41 +172,48 @@ def compute_schmidt_decomposition(
         C = C_blocks[n_A]
 
         if state_average is not None:
-            # Multi-state: state-averaged density matrix
-            rho_SA = np.zeros((C.shape[0], C.shape[0]))
+            # The state-averaged bases are obtained by SVD of the weighted
+            # coefficient blocks, not by eigendecomposition of the densities.
+            # The two are mathematically equivalent, because
+            #     M = [sqrt(w_1) C_1 | ... | sqrt(w_s) C_s]   gives  M M^dag = rho_A^SA
+            #     N = [sqrt(w_1) C_1 ; ... ; sqrt(w_s) C_s]   gives  N^dag N = rho_B^SA
+            # so U is the left singular vectors of M and V the right singular
+            # vectors of N.  The SVD is preferred because forming the density
+            # squares the condition number and, worse, yields dim_A eigenvalues
+            # when the true rank is bounded by min(dim_A, s dim_B); the square
+            # root then turns numerical noise into plausible small singular
+            # values and the truncation can retain ranks that cannot exist.
+            # Measured on N2 with four states the two agree exactly at every
+            # threshold from 1e-2 to 1e-6, while at 1e-8 the eigendecomposition
+            # reported ranks of 35 and 113 in blocks whose true maxima are 32
+            # and 112.  See docs/theory/density_eigendecomposition_versus_ci_svd.md
+            contributions = []
             for weight, C_k in zip(weights, state_average):
                 Ck = C_k.get(n_A)
                 if Ck is not None and Ck.shape == C.shape:
-                    rho_SA += weight * (Ck @ Ck.T)
+                    contributions.append(
+                        np.sqrt(weight) * np.asarray(Ck, dtype=float))
 
-            # Diagonalize ρ_A^SA to get common U basis
-            eigvals, U_SA = np.linalg.eigh(rho_SA)
-            # Sort descending
-            idx = np.argsort(-eigvals)
-            eigvals = eigvals[idx]
-            U_SA = U_SA[:, idx]
+            if contributions:
+                M = np.hstack(contributions)
+                N = np.vstack(contributions)
+                U_SA, sigma_est, _ = np.linalg.svd(M, full_matrices=False)
+                _, sigma_est_B, Vh = np.linalg.svd(N, full_matrices=False)
+                V_SA = Vh.T.conj()
+                rho_SA = M @ M.T.conj()
+                rho_B_SA = N.T.conj() @ N
+            else:
+                U_SA = np.zeros((C.shape[0], 0))
+                V_SA = np.zeros((C.shape[1], 0))
+                sigma_est = np.zeros(0)
+                sigma_est_B = np.zeros(0)
+                rho_SA = np.zeros((C.shape[0], C.shape[0]))
+                rho_B_SA = np.zeros((C.shape[1], C.shape[1]))
 
-            # Truncate based on eigenvalues (which are σ²)
-            sigma_sq = np.maximum(eigvals, 0.0)
-            sigma_est = np.sqrt(sigma_sq)
             keep = singular_value_threshold(sigma_est, eps)
             r = int(np.sum(keep))
             U_trunc = U_SA[:, keep]
 
-            # Also diagonalize ρ_B^SA to get common V basis (symmetric to ρ_A^SA)
-            rho_B_SA = np.zeros((C.shape[1], C.shape[1]))
-            for weight, C_k in zip(weights, state_average):
-                Ck = C_k.get(n_A)
-                if Ck is not None and Ck.shape == C.shape:
-                    rho_B_SA += weight * (Ck.T @ Ck)
-
-            eigvals_B, V_SA = np.linalg.eigh(rho_B_SA)
-            idx_B = np.argsort(-eigvals_B)
-            eigvals_B = eigvals_B[idx_B]
-            V_SA = V_SA[:, idx_B]
-
-            sigma_sq_B = np.maximum(eigvals_B, 0.0)
-            sigma_est_B = np.sqrt(sigma_sq_B)
             keep_B = singular_value_threshold(sigma_est_B, eps)
             r_B = int(np.sum(keep_B))
             V_trunc_B = V_SA[:, keep_B]
