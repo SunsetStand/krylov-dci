@@ -18,14 +18,17 @@ The legacy Krylov/Scheme B line is deprecated and is excluded.
 
 ## One-paragraph summary
 
-The method is now internally sound and unusually well characterized: it runs
-from seeds that read no exact CI, it reaches the exact-seeded fixed point, its
-error budget is cleanly separated, and the one structural defect that made it
-provably unable to work has been found, proved, and repaired. What it does not
-have is any demonstrated advantage over any competitor, and its accuracy at
-every dimension tested is roughly an order of magnitude short of chemical
-accuracy. That gap, not any missing feature, is what stands between the current
-state and a publishable performance claim.
+The method is internally sound and unusually well characterized: it runs from
+seeds that read no exact CI, it reaches the exact-seeded fixed point, its error
+budget is cleanly separated, and the one structural defect that made it provably
+unable to work has been found, proved, and repaired. **It reaches chemical
+accuracy on a single state**, measured at `1.209 mH` for `D = 810` and
+`0.283 mH` for `D = 2466`, self-consistently and from a non-exact seed. What it
+does not yet have is that accuracy for several states sharing one basis, where
+the error at comparable dimension is about twelve times larger, nor any
+comparison against a competitor. The multi-state gap, not accuracy as such, is
+what stands between the current state and a publishable performance claim, and
+the record already contains a candidate fix for it.
 
 ## The assets, stated precisely
 
@@ -76,42 +79,79 @@ These are worth listing because they are what any paper would be built on.
 
 ## The shortcomings, ranked by how much they threaten publication
 
-### S1. Accuracy is the binding constraint, and the curve is shallow
+### S1. Accuracy is reached for one state; the binding constraint is the shared multi-state basis
 
-All recorded four-state weighted absolute errors on N2 CAS(10e,9o), against the
-exact bundle, with their provenance:
+**This section replaces an earlier version that reached the opposite conclusion.
+That version was wrong, and the reason it was wrong is recorded in S1b.**
 
-| `D` | error / mH | configuration |
-|---|---|---|
-| 178 | `17.5816` | annealed `decay=0.5`, converged |
-| 177 | `20.3947` | frozen, matched to the above |
-| 203 | `17.2539` | annealed `decay=0.3`, converged |
-| 396 | `15.1315` | constant `lambda=0.5` |
-| 398 | `17.8437` | frozen, matched to the above |
-| 715 | `15.4898` | rectangular ranks |
-| 720 | `15.5275` | symmetric ranks |
-| 1559 | `12.1716` | rectangular ranks |
-| 1539 | `12.3933` | symmetric ranks |
+N2 CAS(10e,9o), Lanczos seed, self-consistent, `enrichment_strength = 0`,
+converged in every row, measured 2026-09-17. Ground state alone:
 
-These are separate runs at different thresholds and settings, not one curve, and
-they must not be read as one. The observation that survives that caveat is
-blunt: **across `D` from about 180 to 1560, that is from roughly 1 to 10 percent
-of the 15876-determinant space, the error moves only from about 17.6 to 12.2 mH,
-and no recorded configuration comes within 7 times of chemical accuracy
-(1.6 mH).**
+| `svd_eps` | `D` | error | wall | peak RSS |
+|---|---|---|---|---|
+| 1e-2 | 342 | `3.009 mH` | 24 s | 287 MiB |
+| 5e-3 | 810 | **`1.209 mH`** | 89 s | 525 MiB |
+| 3e-3 | 942 | **`0.771 mH`** | 108 s | 595 MiB |
+| 1e-3 | 2466 | **`0.283 mH`** | 309 s | 1659 MiB |
 
-Because of asset 2, every one of those millihartrees is dmSVD truncation error.
-So the method's accuracy is entirely a statement about how fast the Schmidt
-spectrum of this A|B bipartition decays, and on N2 with a five-orbital A space
-it decays slowly.
+Chemical accuracy (`1.6 mH`) is crossed at `eps = 5e-3` and `D = 810`, and the
+error keeps falling to `0.283 mH`. This is from a seed that reads no exact CI,
+in the corrected active space, with the outer loop converged.
 
-The self-consistency advantage is real and well outside tolerance
-(`+2.71 mH` at matched `D ~ 397`, 54 times `tol_E`; `+2.53` to `+2.81 mH` for
-the annealed runs) but it is small next to the 12-18 mH absolute error. A
-referee will read that as a correction to a poor starting approximation rather
-than as evidence of a competitive method.
+Four states covering the three lowest levels, sharing one basis, same settings:
 
-**This is the single fact most likely to stop a performance paper.**
+| `svd_eps` | `D` | weighted error | worst single state |
+|---|---|---|---|
+| 1e-2 | 216 | `18.203 mH` | `38.591 mH` |
+| 5e-3 | 978 | `12.710 mH` | `32.234 mH` |
+| 3e-3 | 2517 | `9.473 mH` | `29.321 mH` |
+| 2e-3 | 2841 | `7.653 mH` | `22.533 mH` |
+
+At comparable embedded dimension the gap is about twelve fold: `0.771 mH` for one
+state at `D = 942` against `9.473 mH` for four states at `D = 2517`, where the
+four-state run has the larger basis.
+
+**So the constraint is not the accuracy of the method. It is the cost of one
+basis that must serve four states simultaneously, two of which are the exactly
+degenerate `3Pi_g` components.** The record contains the converse measurement and
+the two agree: a ground-state-only basis overestimates every triplet by `+323`
+to `+372 mH`, so a shared basis is necessary, and it is expensive.
+
+The record also contains a candidate fix, and it is not a new construction:
+
+| Job | Space | `eps` | `D` | grid ceiling | Error | Downfolding |
+|---|---|---|---|---|---|---|
+| 15371, gs | CAS(10,10) | 1e-3 | 4,668 | 184,756 | `+0.144 mH` | per-state Löwdin `m=1` |
+| 15372, sa 5 states | CAS(10,10) | 1e-3 | 15,198 | 184,756 | all within `±1 mH` | per-state Löwdin `m=1` |
+| Gate C, sa 4 states | CAS(10e,9o) | 2e-3 | 2,841 | 43,186 | `7.653 mH` | shared residual-dressed Omega |
+
+Chemical accuracy on five states has already been achieved in this project,
+using **per-state** Löwdin centering rather than a single shared wave operator.
+This repository's own record states the mechanism: the earlier observation that
+excited states degrade with `m` "was an artifact of shared Krylov bases", and
+"the Krylov basis MUST be centered at the target state's energy". Hypothesis H7,
+shared versus per-state Omega, has been tested only on H2O, which returned
+`INDISTINGUISHABLE` on the system least able to express the effect.
+
+**Running H7 properly on N2 at `eps = 1e-3` is therefore the single highest-value
+experiment available**, and it is cheap. See
+`docs/theory/hpq_svd_qspace_compression_analysis.md` for the structural reason
+the same choice appears as whether to precondition the Q-space compression by
+`1/(E_k - diag H_QQ)`: the bare coupling span is energy independent and hence
+shared, while that preconditioning makes it per-state.
+
+### S1b. Why the earlier assessment got this backwards
+
+Recorded because the failure mode is reusable. Every N2 number then available
+came from the H3 enrichment scan and the H6 rank comparison, whose artifacts
+give `eps` of `0.02`, `0.011`, `0.01`, `0.005` and `0.0147`. Those experiments
+needed a small `D` to be affordable, so they sampled only the loose end of the
+threshold axis, and the production threshold of `1e-3` had never been run on N2
+at all. Reading a shallow segment at the loose end as the method's accuracy
+ceiling was an extrapolation from data that did not support it. The high-accuracy
+numbers that were available, `0.0034` and `0.0012 mH`, were H2O at `1e-3` and
+`1e-4`, so system and threshold had both changed at once and neither was held
+fixed. The recorded `±1 mH` five-state result was also simply overlooked.
 
 ### S2. There is no comparison against any competitor, only against the oracle
 
@@ -234,8 +274,25 @@ was wrong and has been withdrawn. CAS(14,10) needs that build streamed.
   path.** The Schmidt blocks are indexed by electron number, not by spin, and
   no `<S^2>` is computed for the generalized Ritz states. For a multi-state
   method targeting triplets this needs to be shown, not assumed.
-- **No error estimator links `svd_eps` to the energy error.** DMRG has discarded
-  weight; there is no analogue here, a priori or a posteriori.
+- **The discarded weight exists but has never been calibrated against the energy
+  error.** An earlier version of this document said there was no analogue of
+  DMRG's discarded weight. That was wrong: `density_matrix.py:288` computes
+  `discarded_weight = sum of sigma^2 below the threshold` and both pipelines
+  record it. What is missing is any measured relation between it and the energy
+  error, which is what would turn it into a usable a posteriori estimator. The
+  curves in S1 now provide the data to fit one: for the ground state the recorded
+  pairs run from `1.2e-4` at `3.009 mH` to the `1e-3` threshold's value.
+- **`D` is a product-grid count and can exceed the CI dimension, which matters
+  because every matched-cost comparison uses `D` as its axis.** Measured on H2O:
+  the CAS has 100 determinants, `sum_n dim_A(n) dim_B(n) = 196`, and the reported
+  `D_total` at `eps = 1e-4` is 148. `C^(n)` is structurally sparse in `Ms`, only
+  100 of the 196 grid positions correspond to real `Ms = 0` determinants, and the
+  Schmidt product basis is formed from all `r_A x r_B` combinations with no
+  compatibility filter (`schmidt_partition.py:93-95`). For N2 CAS(10e,9o) the
+  ceiling is 43,186 against 15,876 determinants. Whether the surplus directions
+  are null, redundant or physically meaningful has not been established, and
+  neither has the effect on the H3 and H6 matched-dimension comparisons, which
+  all match on `D`.
 - **The GOK equal-weight condition is a default, not a constraint.** Equal
   weights are the default in `density_matrix.py`, which satisfies it, but
   nothing rejects a user-supplied weight vector that splits a degenerate block,
@@ -258,10 +315,13 @@ outside the live path should be assumed rotten until run.
 ## Three framings, and a recommendation
 
 **Framing A, a performance paper**: "a new self-consistent multi-state
-downfolding method". Requires closing S1 by a large factor and winning or at
-least drawing the S2 comparisons. This is the highest-value and by far the
-highest-risk option, and on current evidence the accuracy gap is too large to
-close by tuning; it would need S7 to pay off.
+downfolding method". This is now the more likely option, and an earlier version
+of this document wrongly rated it as barely reachable. The ground state already
+reaches `0.283 mH` at `D = 2466` self-consistently from a non-exact seed, so the
+machinery delivers chemical accuracy; what is missing is the same for several
+states at once, where a known candidate fix exists and has never been tested on a
+system that can express it. The remaining requirement is then the S2 comparisons,
+which must at least be drawn.
 
 **Framing B, an analysis paper** -- *recommended*: "self-consistent basis
 rebuilding in truncated CI: why the naive outer map cannot work, and what
@@ -291,14 +351,27 @@ journal fit matters.
 **Framing C, the rectangular-rank paper**: too thin. One win, one tie, one
 system.
 
-**Recommendation: build toward B now, and treat S7 as the experiment that
-decides whether A is also available.** They share most of the required work, so
-committing to B costs little optionality.
+**Recommendation: run H7 on N2 at `eps = 1e-3` first, then decide.** It is one
+cheap experiment, it is the difference between the two framings, and the record
+predicts it is worth roughly an order of magnitude on the excited states. If the
+four-state error drops toward the `±1 mH` the project has already recorded with
+per-state centering, Framing A is the paper and the analysis content becomes a
+strong section inside it. If it does not, Framing B is the honest paper and the
+multi-state cost becomes the recorded negative result. Either way the Framing B
+content is already measured and is not lost, so the decision costs nothing to
+defer by one experiment.
+
+Note that S7, the bipartition study, was previously named as the deciding
+experiment. It is not: with one state already at `0.283 mH`, the bipartition is
+evidently good enough, and the open question moved to the multi-state basis.
 
 ## What to add before submission
 
-Ordered. Items 1-6 are required under either framing.
+Ordered. Item 0 decides the framing; items 1-6 are required under either.
 
+0. **H7 on N2 at `eps = 1e-3`, per-state against shared Omega, four states.**
+   The highest-value experiment available and cheap: the single-state run at that
+   threshold took 309 s and 1.7 GiB. It decides which paper this is.
 1. **Read Killingbeck & Jolicard 2003.** Cheap, blocking, and it gates a claim.
 2. **Size consistency.** Two non-interacting fragments at large separation, error
    against the sum of the monomers, at several `svd_eps`. Cheap and currently a
@@ -313,10 +386,11 @@ Ordered. Items 1-6 are required under either framing.
 6. **The coincidence detector.** Parameter-perturbation robustness, per the
    project's own Phase 18 lesson.
 7. **S7, the bipartition study.** A|B size, canonical versus natural versus
-   localized orbitals, several cuts, on N2 and one more system. This is the
-   experiment that decides whether Framing A is reachable: if a better cut moves
-   the 12 mH at `D ~ 1560` down by a large factor, the performance paper is live;
-   if it does not, S1 is structural and Framing B is the honest paper.
+   localized orbitals, several cuts, on N2 and one more system. Demoted from
+   deciding experiment to ordinary sensitivity study now that one state reaches
+   `0.283 mH`, but still needed, because nothing establishes that the present cut
+   is a good choice rather than merely an adequate one, and because the
+   multi-state basis cost may depend on it.
 8. **Competitor comparisons (S2).** Dressed selected CI on the same P space
    first, because it is the one that can falsify the method outright. Then
    SA-DMRG at matched retained dimension. C2 is the natural shared benchmark and
@@ -339,9 +413,10 @@ disappointment.
 
 - Dressed selected CI on the same P space reproduces the energies to within
   noise. Then the dressed Omega is a re-parameterization and there is no method.
-- The bipartition study finds no cut that materially improves the error-versus-`D`
-  curve. Then S1 is structural for this class of bipartition, and no performance
-  claim is available at any dimension reachable by this construction.
+- Per-state Omega does not materially close the four-state gap, and no cut from
+  the bipartition study improves the multi-state error-versus-`D` curve either.
+  Then the multi-state cost is structural for this construction, and no
+  multi-state performance claim is available at any dimension it can reach.
 - The converged answer depends materially on `lambda_0` or `decay`. Then the
   fixed point is a property of the schedule, not of the method.
 - SA-DMRG at matched retained dimension is better on every system tested. Then
