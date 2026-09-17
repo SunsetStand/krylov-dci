@@ -124,7 +124,9 @@ def main():
     verbose = not args.quiet
 
     # Import and run
-    from dm_svd_dci.pipeline import run_dm_svd_dci
+    # dm_svd_dci.pipeline was renamed _legacy_pipeline in the 2026-09-02
+    # reorganization, which left this import stale and broke every caller.
+    from dm_svd_dci._legacy_pipeline import run_dm_svd_dci
 
     print("=" * 70)
     print("dmSVD + Krylov-dCI Pipeline")

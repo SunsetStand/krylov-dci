@@ -532,16 +532,16 @@ def run_dm_svd_dci(
 
     use_matvec = (H_QQ_matvec is not None)
     if use_matvec:
-        from dm_svd_dci.krylov_propagator import build_krylov_full_matvec as _bld_krylov
-        from dm_svd_dci.krylov_propagator import propagate_krylov_mgs_matvec as _prop_krylov
-        from dm_svd_dci.effective_ham import run_effective_ham_at_m_matvec as _run_eff
-        from dm_svd_dci.effective_ham import run_effective_ham_per_state_matvec as _run_per_state
+        from dm_svd_dci._legacy_krylov_propagator import build_krylov_full_matvec as _bld_krylov
+        from dm_svd_dci._legacy_krylov_propagator import propagate_krylov_mgs_matvec as _prop_krylov
+        from dm_svd_dci._legacy_effective_ham import run_effective_ham_at_m_matvec as _run_eff
+        from dm_svd_dci._legacy_effective_ham import run_effective_ham_per_state_matvec as _run_per_state
         H_QQ_diag = H_QQ_diag_stream  # from streaming builder
     else:
-        from dm_svd_dci.krylov_propagator import build_krylov_full as _bld_krylov
-        from dm_svd_dci.krylov_propagator import propagate_krylov_mgs as _prop_krylov
-        from dm_svd_dci.effective_ham import run_effective_ham_at_m as _run_eff
-        from dm_svd_dci.effective_ham import run_effective_ham_per_state as _run_per_state
+        from dm_svd_dci._legacy_krylov_propagator import build_krylov_full as _bld_krylov
+        from dm_svd_dci._legacy_krylov_propagator import propagate_krylov_mgs as _prop_krylov
+        from dm_svd_dci._legacy_effective_ham import run_effective_ham_at_m as _run_eff
+        from dm_svd_dci._legacy_effective_ham import run_effective_ham_per_state as _run_per_state
         H_QQ_diag = np.diag(H_QQ)
 
     res = {}
@@ -668,9 +668,16 @@ def run_dm_svd_dci(
                   f"(ΔE = {res['dE_m1_mH']:+.3f} mH)")
         print(f"  Schmidt: r_total={metrics['r_total']}, D={D}, "
               f"|P|={part['p_dim']}, |Q|={part['q_dim']}")
-        print(f"  H^emb norms: HA={hemb_norms['norm_HA']:.1f}, "
-              f"HB={hemb_norms['norm_HB']:.1f}, "
-              f"HAB={hemb_norms['norm_HAB']:.1f}")
+        # Streaming scheme B never assembles a dense H^emb, so it leaves
+        # hemb_norms empty.  Indexing it unconditionally crashed every verbose
+        # scheme B run here, after the science was done but before the results
+        # JSON was written.
+        if hemb_norms:
+            print(f"  H^emb norms: HA={hemb_norms['norm_HA']:.1f}, "
+                  f"HB={hemb_norms['norm_HB']:.1f}, "
+                  f"HAB={hemb_norms['norm_HAB']:.1f}")
+        else:
+            print("  H^emb norms: not computed (streaming scheme, no dense H^emb)")
         print(f"  Krylov: r₀={r0}" +
               (f", r₁={res.get('r1', 'N/A')}" if m_max >= 1 else ""))
         if 'E_eff_per_state' in res and sa_states > 1:
