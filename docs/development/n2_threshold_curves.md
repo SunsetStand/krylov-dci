@@ -34,33 +34,62 @@ converges in every row.
 
 ## Four states covering the three lowest levels, sharing one basis
 
-| `svd_eps` | `D` | `|P|` | `|Q|` | weighted error | worst state | converged | wall | peak RSS |
-|---|---|---|---|---|---|---|---|---|
-| 1e-2 | 216 | 199 | 17 | `18.203` | `38.591` | no | 29 s | 454 MiB |
-| 5e-3 | 978 | 635 | 343 | `12.710` | `32.234` | no | 156 s | 844 MiB |
-| 3e-3 | 2517 | 905 | 1612 | `9.473` | `29.321` | yes | 534 s | 1714 MiB |
-| 2e-3 | 2841 | 945 | 1896 | `7.653` | `22.533` | yes | 1069 s | 2249 MiB |
-| 1e-3 | 4987 | 1117 | 3870 | `6.999` | `13.411` | yes | 1664 s | 4082 MiB |
+**Scored against the committed reference bundle.** An earlier version of this
+document reported this table against `evaluate_reference_energies`, whose
+unvalidated `nroots = 4` solve placed the fourth reference `27.2736 mH` too
+high by missing a member of the degenerate `3Pi_g` level. That defect is fixed
+in `7b6c72d`; these are the corrected numbers, and the per-state resolution is
+new.
+
+| `svd_eps` | `D` | weighted | S0 `Ag` | S1 `B1u` | S2 `B2g` | S3 `B3g` | converged | wall | peak RSS |
+|---|---|---|---|---|---|---|---|---|---|
+| 1e-2 | 216 | `25.022` | `7.119` | `15.385` | `38.591` | `38.991` | no | 30 s | 454 MiB |
+| 5e-3 | 978 | `19.529` | `2.639` | `9.720` | `32.234` | `33.522` | no | 152 s | 844 MiB |
+| 3e-3 | 2517 | `16.292` | **`1.321`** | `4.454` | `29.321` | `30.070` | yes | 522 s | 1662 MiB |
+| 2e-3 | 2841 | `12.996` | **`0.850`** | `4.276` | `22.533` | `24.323` | yes | 1010 s | 2168 MiB |
+| 1e-3 | 4987 | `7.321` | **`0.342`** | **`1.249`** | `13.411` | `14.280` | yes | 1609 s | 3920 MiB |
 
 ## What the two curves say together
 
-**The threshold is no longer the limiting variable for the multi-state case.**
-From `3e-3` to `1e-3` the weighted error falls only `9.473 -> 7.653 -> 6.999 mH`
-while `D` nearly doubles, `2517 -> 4987`. The returns are clearly diminishing.
+**The multi-state curve has not plateaued.** The corrected weighted error falls
+`16.292 -> 12.996 -> 7.321 mH` from `eps = 3e-3` to `1e-3`, and the last step
+nearly halves it. An earlier version of this document concluded the opposite,
+that returns were diminishing and the threshold had stopped being the limiting
+variable. That conclusion was an artifact of the defective reference, which
+compressed the apparent progression to `9.473 -> 7.653 -> 6.999`.
 
-**At `eps = 1e-3` the two differ by a factor of 25**, `0.283` against
-`6.999 mH`, and the four-state run holds the larger basis, `4987` against `2466`.
+**The error is concentrated in the degenerate pair, and the states separate
+cleanly by symmetry.** At `eps = 1e-3` the `Ag` ground state is at `0.342 mH`
+and the `B1u` triplet at `1.249 mH`, both inside chemical accuracy, while the two
+`3Pi_g` components sit at `13.411` and `14.280 mH`. S2 and S3 track each other
+throughout, splitting by only `0.4` to `1.8 mH`, so they behave as one object.
+They converge roughly three times more slowly in `eps` than S0 and S1.
 
-So the accuracy of the construction is not in question. What costs is requiring
-one basis to serve four states at once, two of which are the exactly degenerate
-`3Pi_g` components. The record contains the converse measurement and the two
-agree rather than conflict: a ground-state-only basis overestimates every triplet
-by `+323` to `+372 mH`, so a shared basis is necessary; these curves show it is
-also expensive.
+**The degeneracy splitting originates in the Schmidt basis, not in root matching
+or reconstruction.** Measured at `eps = 3e-3` and `1e-3`, the splitting of the
+method's own pair and the splitting of the exact diagonalization of the same
+`H_emb` are identical to every printed digit, `0.7497` and `0.8685 mH`
+respectively. The wave-operator error stays at `1e-10 mH` in every row, so the
+downfolding is exact and the entire error is dmSVD truncation, as before.
 
-The wave-operator error is `1.4e-10` to `2.8e-10 mH` in every row, so as before
-the entire error is dmSVD truncation of the model space and the downfolding is a
-solver.
+**The measurement is at the local memory wall, not at a scientific limit.** The
+`eps = 1e-3` four-state point needs `3920 MiB` at `D = 4987`; one further
+tightening would exceed this machine. So the honest statement is that the four
+state curve was still falling steeply where the measurement had to stop.
+
+**Consequence: the accuracy goal and the scalability work are the same problem.**
+Chemical accuracy on the `3Pi_g` pair evidently needs a larger `D` than this
+machine reaches, and what blocks a larger `D` is the `4.2 x M x D` determinant
+space expansion in the embedded-Hamiltonian build. Streaming that build, or the
+rank-`r` Q-space compression analysed in
+`docs/theory/hpq_svd_qspace_compression_analysis.md`, is therefore not merely a
+reach-extension exercise: it is the route to the remaining accuracy.
+
+Single state against four states, for reference: at `eps = 1e-3` the ground state
+alone gives `0.283 mH` at `D = 2466`, and inside the four-state calculation the
+same state gives `0.342 mH` at `D = 4987`. Sharing the basis costs the ground
+state very little. What it costs is concentrated on the states whose entanglement
+structure the shared basis represents worst.
 
 ## The candidate fix is in the record, not in a new construction
 
