@@ -79,72 +79,79 @@ These are worth listing because they are what any paper would be built on.
 
 ## The shortcomings, ranked by how much they threaten publication
 
-### S1. Accuracy is reached for one state; the binding constraint is the shared multi-state basis
+### S1. Accuracy: one state is there, and the residue is the degenerate pair
 
-**This section replaces an earlier version that reached the opposite conclusion.
-That version was wrong, and the reason it was wrong is recorded in S1b.**
+N2 CAS(10e,9o), Lanczos seed, self-consistent, `enrichment_strength = 0`, scored
+against the committed bundle. Full curves and caveats:
+`docs/development/n2_threshold_curves.md`.
 
-N2 CAS(10e,9o), Lanczos seed, self-consistent, `enrichment_strength = 0`,
-converged in every row, measured 2026-09-17. Ground state alone:
+Ground state alone, converged in every row:
 
-| `svd_eps` | `D` | error | wall | peak RSS |
-|---|---|---|---|---|
-| 1e-2 | 342 | `3.009 mH` | 24 s | 287 MiB |
-| 5e-3 | 810 | **`1.209 mH`** | 89 s | 525 MiB |
-| 3e-3 | 942 | **`0.771 mH`** | 108 s | 595 MiB |
-| 1e-3 | 2466 | **`0.283 mH`** | 309 s | 1659 MiB |
+| `svd_eps` | `D` | error |
+|---|---|---|
+| 1e-2 | 342 | `3.009 mH` |
+| 5e-3 | 810 | **`1.209 mH`** |
+| 3e-3 | 942 | **`0.771 mH`** |
+| 1e-3 | 2466 | **`0.283 mH`** |
 
-Chemical accuracy (`1.6 mH`) is crossed at `eps = 5e-3` and `D = 810`, and the
-error keeps falling to `0.283 mH`. This is from a seed that reads no exact CI,
-in the corrected active space, with the outer loop converged.
+Four states covering the three lowest levels, sharing one basis:
 
-Four states covering the three lowest levels, sharing one basis, same settings:
+| `svd_eps` | `D` | weighted | S0 `Ag` | S1 `B1u` | S2 `B2g` | S3 `B3g` | conv |
+|---|---|---|---|---|---|---|---|
+| 1e-2 | 216 | `25.022` | `7.119` | `15.385` | `38.591` | `38.991` | no |
+| 5e-3 | 978 | `19.529` | `2.639` | `9.720` | `32.234` | `33.522` | no |
+| 3e-3 | 2517 | `16.292` | **`1.321`** | `4.454` | `29.321` | `30.070` | yes |
+| 2e-3 | 2841 | `12.996` | **`0.850`** | `4.276` | `22.533` | `24.323` | yes |
+| 1e-3 | 4987 | `7.321` | **`0.342`** | **`1.249`** | `13.411` | `14.280` | yes |
 
-| `svd_eps` | `D` | weighted error | worst single state |
-|---|---|---|---|
-| 1e-2 | 216 | `18.203 mH` | `38.591 mH` |
-| 5e-3 | 978 | `12.710 mH` | `32.234 mH` |
-| 3e-3 | 2517 | `9.473 mH` | `29.321 mH` |
-| 2e-3 | 2841 | `7.653 mH` | `22.533 mH` |
+Four statements, all measured:
 
-At comparable embedded dimension the gap is about twelve fold: `0.771 mH` for one
-state at `D = 942` against `9.473 mH` for four states at `D = 2517`, where the
-four-state run has the larger basis.
+1. **Chemical accuracy is reached**, for the ground state from `eps = 5e-3` alone
+   and from `3e-3` inside the four-state calculation, and for the `B1u` triplet at
+   `1e-3`. From a seed that reads no exact CI, self-consistently, in the corrected
+   active space.
+2. **The residual error is concentrated in the exactly degenerate `3Pi_g` pair**,
+   `13.4` and `14.3 mH` at `eps = 1e-3` against `0.34` and `1.25` for the other
+   two. S2 and S3 track each other to within `0.4` to `1.8 mH` and converge about
+   three times more slowly in `eps`, so they behave as one object that the shared
+   basis represents badly.
+3. **The curve has not plateaued.** `16.292 -> 12.996 -> 7.321 mH` from `3e-3` to
+   `1e-3`, the last step nearly halving. The measurement stopped at this
+   machine's memory wall, `3920 MiB` at `D = 4987`, not at a scientific limit.
+4. **Sharing the basis costs the ground state almost nothing**: `0.283 mH` alone
+   at `D = 2466` against `0.342 mH` inside the four-state run. The cost falls
+   entirely on the states the shared basis represents worst.
 
-**So the constraint is not the accuracy of the method. It is the cost of one
-basis that must serve four states simultaneously, two of which are the exactly
-degenerate `3Pi_g` components.** The record contains the converse measurement and
-the two agree: a ground-state-only basis overestimates every triplet by `+323`
-to `+372 mH`, so a shared basis is necessary, and it is expensive.
+**H7 does not fix it, which was the prediction and it was wrong.**
+`omega_mode='per_state'` at `eps = 3e-3` gives `9.405` against the shared
+`9.473 mH` on the old scoring, an advantage of `0.068 mH` barely above `tol_E`,
+it did not converge, it took 4762 s against 534 s, and at `2e-3` and `1e-3` it
+raises `LinAlgError: state set is linearly dependent` with a per-state graph
+metric whose minimum eigenvalue is `-5.6e-17`. So it is also numerically fragile
+and is not the equivalent of job 15372's per-state Löwdin centering.
 
-The record also contains a candidate fix, and it is not a new construction:
+**The degeneracy splitting is in the Schmidt basis, not in root matching.** At
+`eps = 3e-3` and `1e-3` the method's own pair splitting and the splitting of the
+exact diagonalization of the same `H_emb` agree to every printed digit, `0.7497`
+and `0.8685 mH`. The wave-operator error stays at `1e-10 mH` throughout, so the
+downfolding remains exact and the whole error is dmSVD truncation.
 
-| Job | Space | `eps` | `D` | grid ceiling | Error | Downfolding |
-|---|---|---|---|---|---|---|
-| 15371, gs | CAS(10,10) | 1e-3 | 4,668 | 184,756 | `+0.144 mH` | per-state Löwdin `m=1` |
-| 15372, sa 5 states | CAS(10,10) | 1e-3 | 15,198 | 184,756 | all within `±1 mH` | per-state Löwdin `m=1` |
-| Gate C, sa 4 states | CAS(10e,9o) | 2e-3 | 2,841 | 43,186 | `7.653 mH` | shared residual-dressed Omega |
-
-Chemical accuracy on five states has already been achieved in this project,
-using **per-state** Löwdin centering rather than a single shared wave operator.
-This repository's own record states the mechanism: the earlier observation that
-excited states degrade with `m` "was an artifact of shared Krylov bases", and
-"the Krylov basis MUST be centered at the target state's energy". Hypothesis H7,
-shared versus per-state Omega, has been tested only on H2O, which returned
-`INDISTINGUISHABLE` on the system least able to express the effect.
-
-**Running H7 properly on N2 at `eps = 1e-3` is therefore the single highest-value
-experiment available**, and it is cheap. See
-`docs/theory/hpq_svd_qspace_compression_analysis.md` for the structural reason
-the same choice appears as whether to precondition the Q-space compression by
-`1/(E_k - diag H_QQ)`: the bare coupling span is energy independent and hence
-shared, while that preconditioning makes it per-state.
+**Consequence, and it merges two lines of work.** Chemical accuracy on the
+`3Pi_g` pair needs a larger `D` than this machine reaches, and what blocks a
+larger `D` is the `4.2 x M x D` determinant-space expansion in the
+embedded-Hamiltonian build. So S9, the scalability item, is not a separate
+reach-extension exercise: it is the route to the remaining accuracy. The rank-`r`
+Q-space compression analysed in
+`docs/theory/hpq_svd_qspace_compression_analysis.md` and the streamed build are
+therefore on the critical path for the accuracy claim, not after it.
 
 ### S1b. Why the earlier assessment got this backwards
 
-Recorded because the failure mode is reusable. Every N2 number then available
-came from the H3 enrichment scan and the H6 rank comparison, whose artifacts
-give `eps` of `0.02`, `0.011`, `0.01`, `0.005` and `0.0147`. Those experiments
+Recorded because the failure modes are reusable, and there were three.
+
+**The threshold axis had only been sampled at its loose end.** Every N2 number
+then available came from the H3 enrichment scan and the H6 rank comparison, whose
+artifacts give `eps` of `0.02`, `0.011`, `0.01`, `0.005` and `0.0147`. Those experiments
 needed a small `D` to be affordable, so they sampled only the loose end of the
 threshold axis, and the production threshold of `1e-3` had never been run on N2
 at all. Reading a shallow segment at the loose end as the method's accuracy
@@ -152,6 +159,23 @@ ceiling was an extrapolation from data that did not support it. The high-accurac
 numbers that were available, `0.0034` and `0.0012 mH`, were H2O at `1e-3` and
 `1e-4`, so system and threshold had both changed at once and neither was held
 fixed. The recorded `±1 mH` five-state result was also simply overlooked.
+
+**The reference itself was wrong, which produced a false plateau.**
+`evaluate_reference_energies` took an unvalidated `nroots = n_states` solve,
+which on this system returns the fourth reference `27.2736 mH` too high. Scored
+against it the four-state progression read `9.473 -> 7.653 -> 6.999 mH` and
+looked like diminishing returns; scored correctly it is
+`16.292 -> 12.996 -> 7.321` and is still falling steeply. A wrong reference is
+indistinguishable from a wrong method, which is why the fix in `7b6c72d` raises
+rather than returning an unvalidated answer.
+
+**Per-state numbers from an unconverged run were read as a diagnosis.** The
+`per_state` run at `eps = 3e-3` reported `S2 = 29.479` and `S3 = 2.212 mH`,
+which was read as the degenerate pair being split by 27 mH. That run did not
+converge and was scored against the defective reference; the converged shared run
+gives `13.411` and `14.280`, a splitting of `0.87 mH`. Per-state detail from a
+run whose `converged` flag is false is not evidence, which is the same lesson
+Gate B recorded about convergence flags in the opposite direction.
 
 ### S2. There is no comparison against any competitor, only against the oracle
 
