@@ -418,16 +418,62 @@ def seed_block_support(state_blocks: List[Dict[int, np.ndarray]],
     }
 
 
-def evaluate_reference_energies(sys_data: Dict, n_states: int) -> Optional[np.ndarray]:
+def evaluate_reference_energies(sys_data: Dict, n_states: int,
+                                max_margin: int = 8,
+                                energy_tol: float = 1e-8,
+                                degenerate_tol: float = 1e-9
+                                ) -> Optional[np.ndarray]:
     """Exact CASCI energies, for error reporting only.
 
     This is the evaluator boundary.  Nothing in the production path may consume
     its output, and it may be skipped entirely.
+
+    A plain ``nroots = n_states`` solve is **not** safe and must not be used
+    here.  On N2 CAS(10e,9o) it returns a root subset that misses one member of
+    the exactly degenerate 3Pi_g level, reports ``converged = True`` for every
+    root, and places the fourth reference energy 27.27 mH too high, which
+    silently corrupts every error this function is used to compute.  Gate B
+    established the fix and it is used here: overshoot the root count and
+    self-validate, escalating the margin until the lowest ``n_states``
+    energies stop moving and no degenerate level straddles the cut.
+
+    Raises:
+        RuntimeError: if the escalation cannot validate within ``max_margin``.
+            Returning an unvalidated reference is worse than failing, because a
+            wrong reference is indistinguishable from a wrong method.
     """
     from pyscf import mcscf
-    cas = mcscf.CASCI(sys_data['mf'], sys_data['n_active'],
-                      sum(sys_data['n_active_elec']))
-    cas.frozen = sys_data['n_core']
-    cas.fcisolver.nroots = n_states
-    cas.kernel()
-    return np.atleast_1d(np.asarray(cas.e_tot, dtype=float)).reshape(-1)[:n_states]
+    from dm_svd_dci.reference_bundle import group_into_levels
+
+    previous = None
+    for margin in range(max_margin + 1):
+        nroots = n_states + margin
+        cas = mcscf.CASCI(sys_data['mf'], sys_data['n_active'],
+                          sum(sys_data['n_active_elec']))
+        cas.frozen = sys_data['n_core']
+        cas.fcisolver.nroots = nroots
+        cas.kernel()
+        energies = np.sort(
+            np.atleast_1d(np.asarray(cas.e_tot, dtype=float)).reshape(-1))
+        lowest = energies[:n_states]
+
+        if len(energies) < nroots:
+            # The active space is exhausted, so this is the full spectrum and
+            # the lowest n_states are exact by construction.
+            return lowest
+
+        levels = group_into_levels(energies, degenerate_tol)
+        straddles = any(min(level) < n_states <= max(level) for level in levels)
+
+        if (previous is not None and not straddles
+                and float(np.max(np.abs(lowest - previous))) < energy_tol):
+            return lowest
+        previous = lowest
+
+    raise RuntimeError(
+        f"reference energies for {n_states} states did not stabilize within "
+        f"margin {max_margin}: the lowest {n_states} energies still move by "
+        f"{float(np.max(np.abs(lowest - previous))):.3e} Ha or a degenerate "
+        f"level straddles the cut. Raise max_margin or use "
+        f"dm_svd_dci.reference_bundle.build_reference_bundle, which resolves "
+        f"by irrep.")
