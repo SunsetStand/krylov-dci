@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 
 from dm_svd_dci.initializers import (  # noqa: E402
     NON_EXACT_SEEDS,
+    SEEDS_REQUIRING_SYMMETRY,
     build_initial_states,
 )
 from dm_svd_dci.pipeline_state_averaged import (  # noqa: E402
@@ -118,7 +119,10 @@ def test_every_non_exact_seed_is_isolated():
             atom=H2['atom'], basis=H2['basis'],
             n_active=H2['n_active'], n_active_elec=H2['n_active_elec'],
             n_core=H2['n_core'], verbose=False, solve_exact=False)
-        for seed in NON_EXACT_SEEDS:
+        # lanczos_symm needs setup_system(symmetry=...) for orbsym; it is
+        # covered by tests/regression/test_seed_irrep_coverage.py instead.
+        for seed in (s for s in NON_EXACT_SEEDS
+                     if s not in SEEDS_REQUIRING_SYMMETRY):
             vectors, provenance = build_initial_states(
                 data, H2['sa_states'], seed=seed, verbose=False)
             _check(len(vectors) == H2['sa_states'],

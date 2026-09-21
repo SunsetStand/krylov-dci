@@ -24,7 +24,14 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
-from dm_svd_dci.initializers import SEED_FAMILIES  # noqa: E402
+from dm_svd_dci.initializers import (SEED_FAMILIES,  # noqa: E402
+                                     SEEDS_REQUIRING_SYMMETRY)
+
+# lanczos_symm needs setup_system(symmetry=...) for orbsym, which this
+# harness does not build; tests/regression/test_seed_irrep_coverage.py
+# covers it.
+PLAIN_SEEDS = tuple(s for s in SEED_FAMILIES
+                    if s not in SEEDS_REQUIRING_SYMMETRY)
 from dm_svd_dci.pipeline_state_averaged import (  # noqa: E402
     run_state_averaged_dci,
 )
@@ -53,7 +60,7 @@ def _run(seed, complete):
 
 def test_completion_makes_every_seed_reach_the_same_fixed_point():
     print('H1 on H2: all seeds reach the same fixed point', flush=True)
-    for seed in SEED_FAMILIES:
+    for seed in PLAIN_SEEDS:
         result = _run(seed, True)
         error = float(np.max(np.abs(result['errors_mH'])))
         support = result['seed_provenance']['block_support']
@@ -80,7 +87,7 @@ def test_trap_is_still_reproducible_without_completion():
 
 def test_empty_block_predicts_failure():
     print('empty-block diagnostic predicts failure exactly', flush=True)
-    for seed in SEED_FAMILIES:
+    for seed in PLAIN_SEEDS:
         for complete in (False, True):
             if seed == 'exact' and not complete:
                 continue

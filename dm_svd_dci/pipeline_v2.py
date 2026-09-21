@@ -43,11 +43,28 @@ def setup_system(
     nroots: int = 1,
     verbose: bool = True,
     solve_exact: bool = True,
+    symmetry: Optional[str] = None,
 ) -> Dict:
     """Initialize PySCF molecule, RHF, CASCI, and backend.
 
     With ``solve_exact=False`` the exact CASCI kernel is skipped and
     ``fcivec``, ``ci_flat`` and ``E_fci`` are returned as ``None``.  The
+    With ``symmetry`` set to a point group such as ``'D2h'`` the molecule is
+    built symmetry-adapted, so the active orbitals are pure irreps instead of
+    arbitrary rotations within each degenerate set, and ``orbsym`` is returned
+    so that determinant irreps are well defined.  Measured on N2 CAS(10e,9o):
+    without it ``label_orb_symm`` rejects active orbitals 3 to 6 as
+    unsymmetrized with norms near ``1/sqrt(2)``, because the degenerate pi
+    pairs come back mixed.  The RHF energy is unchanged to every digit.
+
+    **The CI solver is pinned to ``direct_spin1`` whenever ``symmetry`` is
+    set.**  PySCF would otherwise select ``direct_spin1_symm`` for a
+    symmetry-adapted molecule and restrict every solve to a single ``wfnsym``,
+    which on this system returns the six lowest ``Ag`` roots and silently drops
+    both ``B1u`` and the degenerate ``3Pi_g`` pair, leaving the reference
+    hundreds of mH out.  Symmetry is wanted in the orbitals, not in the solver.
+
+    The
     active-space integrals are taken before the kernel would run, so nothing
     else in the returned dictionary depends on it.  The state-averaged
     production path uses this so that no exact CI coefficients are computed
@@ -60,7 +77,8 @@ def setup_system(
 
     t0 = time.perf_counter()
 
-    mol = gto.M(atom=atom, basis=basis, verbose=0, spin=0)
+    mol = gto.M(atom=atom, basis=basis, verbose=0, spin=0,
+                **({'symmetry': symmetry} if symmetry else {}))
     mf = scf.RHF(mol).run(verbose=0)
 
     n_elec_total = sum(n_active_elec)
@@ -68,9 +86,15 @@ def setup_system(
 
     cas = mcscf.CASCI(mf, n_act, n_elec_total)
     cas.frozen = n_core
+    if symmetry:
+        # See the docstring: a symmetry-adapted molecule makes PySCF pick
+        # direct_spin1_symm, which would restrict the solve to one irrep.
+        from pyscf.fci import direct_spin1
+        cas.fcisolver = direct_spin1.FCI(mol)
     h1eff, ecore = cas.get_h1eff()
     h2eff = cas.get_h2eff()
     if solve_exact:
+        cas.fcisolver.nroots = nroots
         cas.kernel()
         fcivec = cas.ci
         ci_flat = fcivec.reshape(-1)
@@ -83,6 +107,18 @@ def setup_system(
     na, nb = n_active_elec
     alpha_strs = cistring.gen_strings4orblist(range(n_act), na)
     beta_strs = cistring.gen_strings4orblist(range(n_act), nb)
+
+    orbsym = None
+    if symmetry:
+        from pyscf import symm
+        mo_active = np.asarray(mf.mo_coeff[:, n_core:n_core + n_act])
+        try:
+            orbsym = np.asarray(symm.label_orb_symm(
+                mol, mol.irrep_id, mol.symm_orb, mo_active), dtype=int)
+        except Exception as error:                            # noqa: BLE001
+            if verbose:
+                print(f"  orbsym unavailable: {type(error).__name__}: {error}")
+            orbsym = None
 
     q_idx = QSpaceIndex(alpha_strs, beta_strs, n_act, n_active_elec, h1eff, h2eff)
     backend = KDCIBackend(q_idx)
@@ -111,6 +147,7 @@ def setup_system(
         'alpha_strs': alpha_strs, 'beta_strs': beta_strs,
         'na': na, 'nb': nb, 'M_all': M_all,
         'q_idx': q_idx, 'backend': backend, 'ham': ham,
+        'symmetry': symmetry, 'orbsym': orbsym,
     }
 
 

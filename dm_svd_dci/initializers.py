@@ -21,10 +21,15 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-SEED_FAMILIES = ('exact', 'lanczos', 'hf', 'cis', 'trunc', 'selci',
-                 'perturbed')
+SEED_FAMILIES = ('exact', 'lanczos', 'lanczos_symm', 'hf', 'cis', 'trunc',
+                 'selci', 'perturbed')
 PREFERRED_SEED = 'lanczos'
 NON_EXACT_SEEDS = tuple(name for name in SEED_FAMILIES if name != 'exact')
+# Seeds that need ``setup_system(symmetry=...)`` because they read ``orbsym``.
+# Callers that enumerate families must filter on this rather than on a name,
+# and must not silently fall back: a seed that quietly drops its irrep
+# completeness reintroduces exactly the exclusion it exists to prevent.
+SEEDS_REQUIRING_SYMMETRY = ('lanczos_symm',)
 
 
 class InitializerError(RuntimeError):
@@ -74,6 +79,53 @@ class _ActiveSpace:
             self.n_active, self.n_elec).reshape(-1)
 
 
+ABELIAN_GROUPS = ('D2h', 'C2v', 'C2h', 'D2', 'Cs', 'Ci', 'C2', 'C1')
+
+
+def _determinant_irreps(space: '_ActiveSpace', orbsym: np.ndarray) -> np.ndarray:
+    """Irrep id of every determinant, as alpha XOR beta string irrep.
+
+    The XOR product rule holds for Abelian point groups in PySCF's irrep-id
+    convention, which is what ``direct_spin1_symm`` itself relies on.  Gate B
+    already established that symmetry-resolved work on this project must use
+    ``D2h`` rather than ``Dooh``, so the restriction costs nothing here.
+    """
+    from pyscf.fci import cistring
+    from pyscf.fci.direct_spin1_symm import _gen_strs_irrep
+
+    alpha = cistring.gen_strings4orblist(range(space.n_active), space.n_elec[0])
+    beta = cistring.gen_strings4orblist(range(space.n_active), space.n_elec[1])
+    a = np.asarray(_gen_strs_irrep(alpha, orbsym), dtype=int)
+    b = np.asarray(_gen_strs_irrep(beta, orbsym), dtype=int)
+    return (a[:, None] ^ b[None, :]).reshape(-1)
+
+
+def seed_irrep_weights(states: Sequence[np.ndarray], space: '_ActiveSpace',
+                       orbsym: np.ndarray) -> Dict[int, float]:
+    """Mean weight the seed places in each irrep's determinant subspace.
+
+    This is the production-safe coverage check: it needs no exact CI, only the
+    seed and ``orbsym``.  A zero entry means every target state of that irrep
+    is **unreachable**, because the state-averaged density never acquires the
+    structure and the outer map cannot increase a retained rank
+    (``docs/theory/outer_map_rank_contraction.md``).
+
+    Measured on N2 CAS(10e,9o): the default ``lanczos`` seed puts ``6.8e-26``
+    on the ``3Pi_g`` pair, the same exclusion Gate B measured at ``6.76e-26``
+    for a naive Davidson guess, which is why its ``3Pi_g`` energies come out
+    ``29 mH`` high while its ground state reaches ``1.3 mH``.  Detail:
+    ``docs/development/seed_irrep_coverage_finding.md``.
+    """
+    det_irrep = _determinant_irreps(space, orbsym)
+    weights: Dict[int, float] = {}
+    for irrep in sorted({int(value) for value in det_irrep}):
+        mask = det_irrep == irrep
+        total = sum(float(np.sum(np.asarray(v).ravel()[mask] ** 2))
+                    for v in states)
+        weights[int(irrep)] = total / max(len(states), 1)
+    return weights
+
+
 def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
                              n_states: int) -> List[np.ndarray]:
     """Diagonalize H restricted to ``addresses`` and embed the lowest roots."""
@@ -103,7 +155,8 @@ def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
 
 
 def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
-                  partition: Optional[Dict] = None) -> List[np.ndarray]:
+                  partition: Optional[Dict] = None,
+                  orbsym: Optional[np.ndarray] = None) -> List[np.ndarray]:
     """Early-stopped block Lanczos in the FULL CAS space.
 
     This is the preferred non-exact seed, and it selects no determinants at
@@ -126,10 +179,25 @@ def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
     represented in the starting block, so the Krylov space carries weight
     there from the first step.
 
+    With ``orbsym`` the starting block additionally carries the
+    lowest-diagonal determinant of **every irrep**, which is what the
+    ``lanczos_symm`` family uses.  Without it the starting block is chosen by
+    diagonal energy alone and is symmetry-trapped: a Krylov expansion cannot
+    create weight in an irrep its starting block does not touch, so target
+    states in that irrep are unreachable no matter how many steps are taken.
+    That is the same exclusion Gate B found in the reference solve, and it costs
+    at most one extra starting vector per irrep.
+
     Cost is ``steps`` sigma applications per starting vector, matrix-free, with
     no convergence requirement.
     """
     start: List[int] = []
+    if orbsym is not None:
+        det_irrep = _determinant_irreps(space, orbsym)
+        for irrep in sorted({int(value) for value in det_irrep}):
+            members = np.flatnonzero(det_irrep == irrep)
+            if members.size:
+                start.append(int(members[np.argmin(space.hdiag[members])]))
     if partition is not None:
         for _, block in sorted(partition.items()):
             members = [int(det) for (_, _, det) in block['coeff_map']]
@@ -315,17 +383,41 @@ def build_initial_states(
     space = _ActiveSpace(sys_data)
     size = max(subspace_size, 4 * n_states)
 
-    if seed == 'lanczos':
-        vectors = _lanczos_seed(space, n_states, lanczos_steps, partition)
+    if seed in ('lanczos', 'lanczos_symm'):
+        orbsym = None
+        if seed == 'lanczos_symm':
+            orbsym = sys_data.get('orbsym')
+            if orbsym is None:
+                raise InitializerError(
+                    "seed='lanczos_symm' needs orbsym, which setup_system "
+                    "returns only when its symmetry argument is set to an "
+                    "Abelian point group such as 'D2h'. Without symmetry the "
+                    "active orbitals are arbitrary rotations within each "
+                    "degenerate set, so determinant irreps are not defined.")
+            group = getattr(sys_data.get('mol'), 'groupname', None)
+            if group is not None and str(group) not in ABELIAN_GROUPS:
+                raise InitializerError(
+                    f"seed='lanczos_symm' needs an Abelian point group for the "
+                    f"alpha-XOR-beta irrep product rule, got {group!r}. Use "
+                    f"'D2h' rather than 'Dooh', as Gate B established.")
+        vectors = _lanczos_seed(space, n_states, lanczos_steps, partition,
+                                orbsym=orbsym)
         provenance.update({
             'lanczos_steps': int(lanczos_steps),
             'selects_determinants': False,
             'block_completion_applied': False,
             'subspace_dimension': int(space.dimension),
+            'irrep_complete_start': orbsym is not None,
         })
+        if orbsym is not None:
+            provenance['seed_irrep_weights'] = {
+                str(k): v for k, v in
+                seed_irrep_weights(vectors, space, orbsym).items()}
         if verbose:
-            print(f'  seed: lanczos, {lanczos_steps} steps in the full CAS '
-                  f'space, no determinant selection', flush=True)
+            extra = (', irrep-complete starting block'
+                     if orbsym is not None else '')
+            print(f'  seed: {seed}, {lanczos_steps} steps in the full CAS '
+                  f'space, no determinant selection{extra}', flush=True)
         return vectors, provenance
 
     if seed == 'hf':
@@ -451,6 +543,12 @@ def evaluate_reference_energies(sys_data: Dict, n_states: int,
         cas = mcscf.CASCI(sys_data['mf'], sys_data['n_active'],
                           sum(sys_data['n_active_elec']))
         cas.frozen = sys_data['n_core']
+        # Pin the symmetry-agnostic solver. On a symmetry-adapted molecule
+        # PySCF would pick direct_spin1_symm and restrict the solve to one
+        # wfnsym, which on N2 CAS(10e,9o) returns only Ag roots and drops both
+        # B1u and the degenerate 3Pi_g pair. Harmless without symmetry.
+        from pyscf.fci import direct_spin1
+        cas.fcisolver = direct_spin1.FCI(sys_data['mf'].mol)
         cas.fcisolver.nroots = nroots
         cas.kernel()
         energies = np.sort(

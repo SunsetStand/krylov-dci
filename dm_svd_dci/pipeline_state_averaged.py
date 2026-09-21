@@ -84,6 +84,7 @@ def run_state_averaged_dci(
     seed_random_seed: int = 0,
     seed_complete_blocks: bool = True,
     seed_lanczos_steps: int = 3,
+    symmetry: Optional[str] = None,
     rank_mode: str = 'rectangular',
     apply_dressing: bool = True,
     omega_mode: str = 'shared',
@@ -121,7 +122,8 @@ def run_state_averaged_dci(
     sys_data = setup_system(
         atom=atom, basis=basis,
         n_active=n_active, n_active_elec=n_active_elec,
-        n_core=n_core, nroots=1, verbose=verbose, solve_exact=False)
+        n_core=n_core, nroots=1, verbose=verbose, solve_exact=False,
+        symmetry=symmetry)
 
     # Initializer boundary.  Only seed='exact' reads exact CI, and it is a
     # control rather than a production path.
@@ -494,6 +496,7 @@ def run_state_averaged_dci(
             'seed': seed,
             'seed_complete_blocks': seed_complete_blocks,
             'seed_lanczos_steps': seed_lanczos_steps,
+            'symmetry': symmetry,
             'rank_mode': rank_mode,
             'apply_dressing': apply_dressing,
             'omega_mode': omega_mode,
