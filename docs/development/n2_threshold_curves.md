@@ -91,6 +91,32 @@ same state gives `0.342 mH` at `D = 4987`. Sharing the basis costs the ground
 state very little. What it costs is concentrated on the states whose entanglement
 structure the shared basis represents worst.
 
+## The irrep-complete seed, measured
+
+`seed='lanczos_symm'` with `symmetry='D2h'` (`ca2cecb`) replaces the default
+seed's starting block with one that carries the lowest-diagonal determinant of
+every irrep. Same controls, same thresholds, `enrichment_strength = 0`:
+
+| `svd_eps` | seed | `D` | weighted | S0 `Ag` | S1 `B1u` | S2 `B2g` | S3 `B3g` |
+|---|---|---|---|---|---|---|---|
+| 3e-3 | `lanczos`/3 | 2517 | `16.291` | `1.321` | `4.454` | `29.321` | `30.070` |
+| 3e-3 | `lanczos_symm`/6 | 2686 | `6.588` | `1.325` | `11.981` | `5.839` | `7.207` |
+| 3e-3 | `lanczos_symm`/10 | 3192 | `2.294` | `1.084` | `3.764` | `2.067` | `2.264` |
+| 2e-3 | `lanczos`/3 | 2841 | `12.996` | `0.850` | `4.276` | `22.533` | `24.323` |
+| **2e-3** | **`lanczos_symm`/10** | 4796 | **`1.540`** | **`0.892`** | `2.513` | **`1.329`** | **`1.428`** |
+
+**At `eps = 2e-3` the four-state weighted error is `1.540 mH`, inside chemical
+accuracy**, and three of the four states are individually inside it. The `3Pi_g`
+pair improves 17-fold, from `22.533 / 24.323` to `1.329 / 1.428 mH`. The
+remaining outlier is S1 `B1u` at `2.513 mH`, which is also the state whose seed
+coverage saturates slowest with Lanczos steps.
+
+Cost at that point: `D = 4796`, `3240 MiB`, `1205 s` on one thread. The
+`eps = 1e-3` point needs roughly `6 GB` and did not fit on the local machine;
+it is the outstanding measurement and belongs on the cluster. Driver and
+launcher: `scripts/diagnostics/run_n2_symm_seed_scan.py`,
+`batch/diagnostics/n2_symm_seed_scan.slurm`.
+
 ## The candidate fix is in the record, not in a new construction
 
 | Job | Space | `eps` | `D` | grid ceiling | Error | Downfolding |
