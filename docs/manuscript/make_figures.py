@@ -173,8 +173,54 @@ def figure_dynamics():
     plt.close(fig)
 
 
+def figure_dissociation():
+    rows = [r for r in load('results/n2_dissociation/n2_dissociation.json')
+            if r['svd_eps'] == 1e-3 and 'error' not in r]
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.8))
+    fig.subplots_adjust(wspace=0.32)
+    ax = axes[0]
+    style(ax)
+    ax.axhline(CHEM, color=INK2, linewidth=1.0, linestyle='--', zorder=1)
+    for k, (arm, name) in enumerate((('P_all', 'P = all blocks'),
+                                     ('fixed_P', 'P = {8, 9, 10}'))):
+        pts = sorted((r for r in rows if r['arm'] == arm), key=lambda r: r['R'])
+        good = [r for r in pts if abs(r['s2']) < 0.1]
+        bad = [r for r in pts if abs(r['s2']) >= 0.1]
+        ax.plot([r['R'] for r in good], [max(abs(r['error_mH']), 1e-4) for r in good],
+                color=SLOT[k], linewidth=1.8, marker=MARK[k], markersize=6,
+                label=name, zorder=2)
+        if bad:
+            ax.plot([r['R'] for r in bad], [abs(r['error_mH']) for r in bad],
+                    linestyle='none', marker=MARK[k], markersize=6.5,
+                    markerfacecolor='white', markeredgecolor=SLOT[k],
+                    markeredgewidth=1.4, zorder=3,
+                    label='converged to a quintet, $S^2 = 6$')
+    ax.set_yscale('log')
+    ax.set_xlabel('N$-$N distance (\u00c5)')
+    ax.set_ylabel('distance from exact singlet (mH)')
+    ax.set_title('(a) ground-state error, $\\varepsilon = 10^{-3}$',
+                 loc='left', color=INK)
+    ax.text(2.25, CHEM * 1.15, 'chemical accuracy', color=INK2, fontsize=7.5)
+    handles, labels = ax.get_legend_handles_labels()
+    fig.subplots_adjust(bottom=0.27)
+    fig.legend(handles, labels, loc='lower center', ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, 0.0), fontsize=7.5)
+    ax = axes[1]
+    style(ax)
+    ref = sorted({r['R']: r['exact_weight_outside_fixed_P'] for r in rows}.items())
+    ax.plot([x for x, _ in ref], [y for _, y in ref], color=SLOT[0],
+            linewidth=1.8, marker='o', markersize=6)
+    ax.set_xlabel('N$-$N distance (\u00c5)')
+    ax.set_ylabel('exact weight outside P = {8, 9, 10}')
+    ax.set_title('(b) weight the fixed P set misses', loc='left', color=INK)
+    for ext in ('png', 'pdf'):
+        fig.savefig(os.path.join(OUT, f'fig_n2_dissociation.{ext}'))
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     figure_threshold_curves()
     figure_lanczos()
     figure_dynamics()
+    figure_dissociation()
     print('figures written to', OUT)
