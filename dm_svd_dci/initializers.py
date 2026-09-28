@@ -154,6 +154,32 @@ def _diagonalize_in_subspace(space: _ActiveSpace, addresses: Sequence[int],
     return vectors
 
 
+LANCZOS_ORTHO_TOL = 1e-10
+
+
+def _orthogonalize_twice(vector: np.ndarray,
+                         basis: Sequence[np.ndarray]) -> np.ndarray:
+    """Modified Gram-Schmidt against ``basis``, applied twice.
+
+    One pass is not enough for a long block Krylov chain.  Measured on N2
+    CAS(10e,9o) with the irrep-complete starting block, single-pass MGS let
+    ``max|K^T K - I|`` grow geometrically with the number of steps: 5.5e-10 at
+    6, 1.9e-5 at 10, 3.8e-3 at 12, 0.63 at 14.  Because the Rayleigh-Ritz is a
+    standard eigenproblem it silently stops being variational once that happens:
+    at 12 steps its lowest root was 0.27 mH *below* the exact ground state and
+    at 14 steps 17.5 Ha below, so the seed returned states 2.2 to 2.8 Ha above
+    the true ones and the outer loop diverged, 321 mH on the ground state.  A
+    second pass, "twice is enough" in the Kahan-Parlett sense, holds
+    orthogonality at machine precision.  Detail:
+    docs/development/lanczos_seed_orthogonality_defect.md
+    """
+    out = np.array(vector, dtype=float, copy=True)
+    for _ in range(2):
+        for existing in basis:
+            out -= float(np.dot(existing, out)) * existing
+    return out
+
+
 def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
                   partition: Optional[Dict] = None,
                   orbsym: Optional[np.ndarray] = None) -> List[np.ndarray]:
@@ -211,8 +237,7 @@ def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
     for address in start:
         vector = np.zeros(space.dimension)
         vector[address] = 1.0
-        for existing in basis:
-            vector -= float(np.dot(existing, vector)) * existing
+        vector = _orthogonalize_twice(vector, basis)
         norm = float(np.linalg.norm(vector))
         if norm > 1e-12:
             basis.append(vector / norm)
@@ -221,9 +246,7 @@ def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
     for _ in range(max(steps, 0)):
         new_frontier = []
         for vector in frontier:
-            candidate = space.sigma(vector)
-            for existing in basis:
-                candidate -= float(np.dot(existing, candidate)) * existing
+            candidate = _orthogonalize_twice(space.sigma(vector), basis)
             norm = float(np.linalg.norm(candidate))
             if norm > 1e-10:
                 candidate /= norm
@@ -234,6 +257,14 @@ def _lanczos_seed(space: _ActiveSpace, n_states: int, steps: int,
         frontier = new_frontier
 
     krylov = np.column_stack(basis)
+    # The Rayleigh-Ritz below is a *standard* eigenproblem and is variational
+    # only if krylov is orthonormal.  Verify rather than assume; a final
+    # SVD re-orthonormalization keeps the span and restores the guarantee.
+    gram_error = float(np.max(np.abs(krylov.T @ krylov
+                                     - np.eye(krylov.shape[1]))))
+    if gram_error > LANCZOS_ORTHO_TOL:
+        left, singular, _ = np.linalg.svd(krylov, full_matrices=False)
+        krylov = left[:, singular > singular[0] * 1e-10]
     projected = krylov.T @ np.column_stack(
         [space.sigma(krylov[:, i]) for i in range(krylov.shape[1])])
     projected = 0.5 * (projected + projected.T)
