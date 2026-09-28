@@ -443,6 +443,9 @@ def run_state_averaged_dci(
             None if embedded_energies is None
             else (energies_sorted - np.sort(embedded_energies)) * 1000.0),
         'state_weights': weights,
+        # Final coefficient blocks, for diagnostics such as <S^2>. Never
+        # serialized: the JSON summary must stay small (see below).
+        'final_state_blocks': result['state_blocks'],
         'converged': result['converged'],
         'n_outer_iter': result['n_outer_iter'],
         'outer_history': result['history'],
@@ -538,7 +541,9 @@ def run_state_averaged_dci(
         output_path = os.path.join(
             output_dir, 'state_averaged_sc_dmsvd_results.json')
         with open(output_path, 'w', encoding='utf-8') as handle:
-            json.dump(_make_serializable(output), handle, indent=2)
+            json.dump(_make_serializable(
+                {key: value for key, value in output.items()
+                 if key != 'final_state_blocks'}), handle, indent=2)
         if verbose:
             print(f"  Results saved to {output_path}")
 
