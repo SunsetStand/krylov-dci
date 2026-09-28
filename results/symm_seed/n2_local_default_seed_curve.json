@@ -1,0 +1,91 @@
+{
+ "description": "N2 CAS(10e,9o)/cc-pVDZ, default lanczos seed (3 steps), no symmetry, enrichment 0, scored against the committed reference bundle. Local WSL.",
+ "four_state": [
+  {
+   "svd_eps": 0.01,
+   "D": 216,
+   "per_state_error_mH": [
+    7.119061917464364,
+    15.385009260427296,
+    38.5909104374349,
+    38.990998520858966
+   ],
+   "weighted_error_mH": 25.02149503404638,
+   "converged": false
+  },
+  {
+   "svd_eps": 0.005,
+   "D": 978,
+   "per_state_error_mH": [
+    2.6393791082739426,
+    9.719584252664504,
+    32.23363263116141,
+    33.52211418413731
+   ],
+   "weighted_error_mH": 19.528677544059292,
+   "converged": false
+  },
+  {
+   "svd_eps": 0.003,
+   "D": 2517,
+   "per_state_error_mH": [
+    1.3213350030838455,
+    4.453834607957674,
+    29.32052307703259,
+    30.070200324956886
+   ],
+   "weighted_error_mH": 16.29147325325775,
+   "converged": true
+  },
+  {
+   "svd_eps": 0.002,
+   "D": 2841,
+   "per_state_error_mH": [
+    0.8499783112512205,
+    4.276462020698091,
+    22.53333587989914,
+    24.32341281338779
+   ],
+   "weighted_error_mH": 12.99579725630906,
+   "converged": true
+  },
+  {
+   "svd_eps": 0.001,
+   "D": 4987,
+   "per_state_error_mH": [
+    0.34217625464805224,
+    1.2491416988495985,
+    13.411287976268227,
+    14.279815107016702
+   ],
+   "weighted_error_mH": 7.320605259195645,
+   "converged": true
+  }
+ ],
+ "ground_state_only": [
+  {
+   "svd_eps": 0.01,
+   "D": 342,
+   "error_mH": 3.00891707551898,
+   "converged": true
+  },
+  {
+   "svd_eps": 0.005,
+   "D": 810,
+   "error_mH": 1.209452512085818,
+   "converged": true
+  },
+  {
+   "svd_eps": 0.003,
+   "D": 942,
+   "error_mH": 0.7712035211540069,
+   "converged": true
+  },
+  {
+   "svd_eps": 0.001,
+   "D": 2466,
+   "error_mH": 0.2825459353914539,
+   "converged": true
+  }
+ ]
+}

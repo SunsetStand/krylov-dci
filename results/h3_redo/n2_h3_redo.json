@@ -1,0 +1,809 @@
+[
+ {
+  "label": "sc_no_enrichment",
+  "eps": 0.01,
+  "n_outer_max": 12,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 387,
+  "per_state_mH": [
+   8.729745299703495,
+   13.994004743608457,
+   8.747499894312227,
+   9.281632375476079
+  ],
+  "weighted_mH": 10.188220578275065,
+  "converged": true,
+  "n_outer": 12,
+  "D_trajectory": [
+   574,
+   439,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387
+  ],
+  "projector_distance": [
+   null,
+   3.3173955994707107,
+   1.73206521226041,
+   0.015180148481438794,
+   0.0014217198043254577,
+   0.00012865110648744858,
+   1.1590381429713944e-05,
+   1.0433949503932612e-06,
+   9.391211543516411e-08,
+   8.452264164888643e-09,
+   7.607082099745681e-10,
+   6.846397594178759e-11
+  ],
+  "mean_residual_norm": [
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "min_per_state_mH": 8.729745299703495,
+  "wall": 47.98795653399998
+ },
+ {
+  "label": "sc_constant_0.5",
+  "eps": 0.01,
+  "n_outer_max": 12,
+  "enrichment": 0.5,
+  "decay": 1.0,
+  "D": 637,
+  "per_state_mH": [
+   8.455141090422558,
+   10.42418101629039,
+   6.963097770551485,
+   7.035679426962815
+  ],
+  "weighted_mH": 8.219524826056812,
+  "converged": false,
+  "n_outer": 12,
+  "D_trajectory": [
+   574,
+   556,
+   634,
+   638,
+   556,
+   640,
+   559,
+   637,
+   572,
+   609,
+   562,
+   637
+  ],
+  "projector_distance": [
+   null,
+   3.809287810739019,
+   4.059586813239361,
+   4.515485065861546,
+   4.5412137847262475,
+   4.526854831166749,
+   4.436141761271913,
+   4.473873164095057,
+   4.841860683242946,
+   4.828335390063688,
+   4.652468037125197,
+   4.616677563263674
+  ],
+  "mean_residual_norm": [
+   null,
+   0.10467222473888238,
+   0.11933415863380796,
+   0.12521823806699678,
+   0.12288557636470701,
+   0.1311051694589483,
+   0.12548931250961018,
+   0.12909806556178832,
+   0.12517534762505567,
+   0.1314198738742508,
+   0.12485944536616184,
+   0.12952151565633102
+  ],
+  "min_per_state_mH": 6.963097770551485,
+  "wall": 67.77345173000003
+ },
+ {
+  "label": "frozen",
+  "eps": 0.03,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 101,
+  "per_state_mH": [
+   23.0399554925782,
+   35.74607158577692,
+   20.49422388364519,
+   24.499079550992064
+  ],
+  "weighted_mH": 25.944832628248093,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   101
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 20.49422388364519,
+  "wall": 5.673474476000138
+ },
+ {
+  "label": "frozen",
+  "eps": 0.025,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 125,
+  "per_state_mH": [
+   14.74179796827002,
+   35.746071585577965,
+   20.49422388361677,
+   21.233144370384593
+  ],
+  "weighted_mH": 23.053809451962337,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   125
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 14.74179796827002,
+  "wall": 5.420556874999875
+ },
+ {
+  "label": "frozen",
+  "eps": 0.02,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 149,
+  "per_state_mH": [
+   14.74179796827002,
+   27.277181119416127,
+   15.110080554251226,
+   17.051783491666583
+  ],
+  "weighted_mH": 18.54521078340099,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   149
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 14.74179796827002,
+  "wall": 5.677074420000054
+ },
+ {
+  "label": "frozen",
+  "eps": 0.017,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 219,
+  "per_state_mH": [
+   14.583212914686783,
+   22.514726479030855,
+   12.994910409972249,
+   14.703963085878513
+  ],
+  "weighted_mH": 16.1992032223921,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   219
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 12.994910409972249,
+  "wall": 6.0580484290001095
+ },
+ {
+  "label": "frozen",
+  "eps": 0.015,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 288,
+  "per_state_mH": [
+   10.543025051973132,
+   15.957751204737747,
+   12.944552782059304,
+   13.338303099146742
+  ],
+  "weighted_mH": 13.195908034479231,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   288
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 10.543025051973132,
+  "wall": 6.546016146000056
+ },
+ {
+  "label": "frozen",
+  "eps": 0.013,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 372,
+  "per_state_mH": [
+   7.857488938185497,
+   14.848656646904601,
+   9.53870579833449,
+   10.911897101053114
+  ],
+  "weighted_mH": 10.789187121119426,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   372
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 7.857488938185497,
+  "wall": 7.343607044000009
+ },
+ {
+  "label": "frozen",
+  "eps": 0.012,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 469,
+  "per_state_mH": [
+   6.917907649309996,
+   14.43376418687592,
+   8.60970152585594,
+   9.132995604034022
+  ],
+  "weighted_mH": 9.773592241518969,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   469
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 6.917907649309996,
+  "wall": 8.239539881000155
+ },
+ {
+  "label": "frozen",
+  "eps": 0.011,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 516,
+  "per_state_mH": [
+   6.505925261834022,
+   14.32430693034803,
+   8.005766240586354,
+   8.674403471104597
+  ],
+  "weighted_mH": 9.37760047596825,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   516
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 6.505925261834022,
+  "wall": 8.574691532000088
+ },
+ {
+  "label": "frozen",
+  "eps": 0.01,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 574,
+  "per_state_mH": [
+   6.504009009930201,
+   13.356272168778105,
+   7.679795308504822,
+   8.314908311220393
+  ],
+  "weighted_mH": 8.96374619960838,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   574
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 6.504009009930201,
+  "wall": 9.096654489000002
+ },
+ {
+  "label": "frozen",
+  "eps": 0.009,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 754,
+  "per_state_mH": [
+   4.490987014534653,
+   10.97709566016647,
+   6.567231280470764,
+   7.937087001920418
+  ],
+  "weighted_mH": 7.493100239273076,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   754
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 4.490987014534653,
+  "wall": 11.25554084600003
+ },
+ {
+  "label": "frozen",
+  "eps": 0.008,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 1014,
+  "per_state_mH": [
+   3.7953413419700155,
+   8.777168419143777,
+   5.375660718655695,
+   6.78009813104552
+  ],
+  "weighted_mH": 6.182067152703752,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   1014
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 3.7953413419700155,
+  "wall": 14.539059099000042
+ },
+ {
+  "label": "frozen",
+  "eps": 0.007,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 1400,
+  "per_state_mH": [
+   3.312464259224157,
+   7.9791751142579415,
+   4.0244076046036525,
+   5.421547740482424
+  ],
+  "weighted_mH": 5.184398679642044,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   1400
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 3.312464259224157,
+  "wall": 19.43804415800014
+ },
+ {
+  "label": "sc_annealed_0.5_d0.5",
+  "eps": 0.01,
+  "n_outer_max": 30,
+  "enrichment": 0.5,
+  "decay": 0.5,
+  "D": 376,
+  "per_state_mH": [
+   8.737577520150808,
+   14.771739114706861,
+   8.866012214895136,
+   9.408424778470703
+  ],
+  "weighted_mH": 10.445938407055877,
+  "converged": true,
+  "n_outer": 13,
+  "D_trajectory": [
+   574,
+   426,
+   420,
+   396,
+   396,
+   396,
+   376,
+   376,
+   376,
+   376,
+   376,
+   376,
+   376
+  ],
+  "projector_distance": [
+   null,
+   3.481959445402088,
+   1.011696896263754,
+   1.415735372599274,
+   0.03088438406316119,
+   0.014565073231525548,
+   1.0000251665779722,
+   0.00759310699859794,
+   0.0030532849660228566,
+   0.0013899842127220732,
+   0.0006746382242530377,
+   0.0003343410013483761,
+   0.00016673424343327599
+  ],
+  "mean_residual_norm": [
+   null,
+   0.10467222473888238,
+   0.13147775650849683,
+   0.14154212219691292,
+   0.14505203798638572,
+   0.14621484532194742,
+   0.14659074096498467,
+   0.1483895859513401,
+   0.14952796454885114,
+   0.14992108967540646,
+   0.15004471037778613,
+   0.15008289469745378,
+   0.15009474334331993
+  ],
+  "min_per_state_mH": 8.737577520150808,
+  "wall": 48.70193868000024
+ },
+ {
+  "label": "sc_annealed_0.5_d0.3",
+  "eps": 0.01,
+  "n_outer_max": 30,
+  "enrichment": 0.5,
+  "decay": 0.3,
+  "D": 387,
+  "per_state_mH": [
+   8.74069167225855,
+   13.99818497438332,
+   8.743787547814463,
+   9.272424810660596
+  ],
+  "weighted_mH": 10.188772251279232,
+  "converged": true,
+  "n_outer": 12,
+  "D_trajectory": [
+   574,
+   431,
+   407,
+   407,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387,
+   387
+  ],
+  "projector_distance": [
+   null,
+   3.333851956943288,
+   1.4143036437286804,
+   0.003918164300213757,
+   1.0000001072340785,
+   0.0016705870200131603,
+   0.00018463637578593984,
+   1.759508521636915e-05,
+   1.6097212688559908e-06,
+   1.455779604746906e-07,
+   1.3120967473842572e-08,
+   1.1813987232696086e-09
+  ],
+  "mean_residual_norm": [
+   null,
+   0.10467222473888238,
+   0.1312097600920166,
+   0.14122633365755305,
+   0.14439308007452673,
+   0.14706035264530676,
+   0.14846778532152255,
+   0.14893926216703957,
+   0.14908496704718374,
+   0.14912905739800797,
+   0.14914231847639875,
+   0.1491462998540785
+  ],
+  "min_per_state_mH": 8.74069167225855,
+  "wall": 45.745560210999884
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0128,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 392,
+  "per_state_mH": [
+   7.494252316917027,
+   14.848612316555432,
+   9.538514577798196,
+   10.911872755684726
+  ],
+  "weighted_mH": 10.698312991738845,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   392
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 7.494252316917027,
+  "wall": 7.5290118220000295
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0126,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 412,
+  "per_state_mH": [
+   7.49425231713019,
+   14.755638189484444,
+   8.679449063706102,
+   10.911872755684726
+  ],
+  "weighted_mH": 10.460303081501365,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   412
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 7.49425231713019,
+  "wall": 7.654349398999784
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0124,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 432,
+  "per_state_mH": [
+   7.494252316760708,
+   14.661809641594914,
+   8.679449063762945,
+   10.049798012587985
+  ],
+  "weighted_mH": 10.221327258676638,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   432
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 7.494252316760708,
+  "wall": 7.813663094999811
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0122,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 448,
+  "per_state_mH": [
+   6.917907649295785,
+   14.518828772963843,
+   8.609701525827518,
+   9.983222277611503
+  ],
+  "weighted_mH": 10.007415056424662,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   448
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 6.917907649295785,
+  "wall": 7.974161151999851
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0098,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 584,
+  "per_state_mH": [
+   6.398055551414927,
+   13.35627216870705,
+   7.679795308575876,
+   8.175491057968998
+  ],
+  "weighted_mH": 8.902403521666713,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   584
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 6.398055551414927,
+  "wall": 9.370792473000165
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0096,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 602,
+  "per_state_mH": [
+   5.697120407063494,
+   13.356057241466601,
+   7.67112802473946,
+   8.167692708397567
+  ],
+  "weighted_mH": 8.72299959541678,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   602
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 5.697120407063494,
+  "wall": 9.522788517000208
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0094,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 630,
+  "per_state_mH": [
+   5.361101153610548,
+   13.156861738096381,
+   7.529154371766822,
+   8.167692708639152
+  ],
+  "weighted_mH": 8.553702493028226,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   630
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 5.361101153610548,
+  "wall": 9.880505148000339
+ },
+ {
+  "label": "frozen",
+  "eps": 0.0092,
+  "n_outer_max": 1,
+  "enrichment": 0.0,
+  "decay": 1.0,
+  "D": 640,
+  "per_state_mH": [
+   5.137710867927581,
+   13.156861738153225,
+   7.529154371695768,
+   8.150137688872405
+  ],
+  "weighted_mH": 8.493466166662245,
+  "converged": false,
+  "n_outer": 1,
+  "D_trajectory": [
+   640
+  ],
+  "projector_distance": [
+   null
+  ],
+  "mean_residual_norm": [
+   null
+  ],
+  "min_per_state_mH": 5.137710867927581,
+  "wall": 9.957230987000003
+ }
+]

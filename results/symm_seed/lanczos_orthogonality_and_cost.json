@@ -1,0 +1,55 @@
+{
+ "description": "Lanczos seed, N2 CAS(10e,9o), irrep-complete start block of 17 vectors. Single-pass MGS before c4c953d. Lowest Ritz value minus the exact ground state, standard eigenproblem, and the same basis orthonormalized first.",
+ "steps": [
+  6,
+  8,
+  10,
+  12,
+  14,
+  16
+ ],
+ "basis_size": [
+  119,
+  153,
+  187,
+  221,
+  255,
+  289
+ ],
+ "gram_error": [
+  5.47e-10,
+  9.81e-08,
+  1.88e-05,
+  0.00375,
+  0.628,
+  0.926
+ ],
+ "lowest_ritz_minus_exact_mH_single_pass": [
+  0.045,
+  0.003,
+  0.0,
+  -0.268,
+  -17530.886,
+  -28083.392
+ ],
+ "lowest_ritz_minus_exact_mH_orthonormalized": [
+  0.045,
+  0.003,
+  0.0,
+  0.0,
+  0.0,
+  0.0
+ ],
+ "sigma_calls_seed": {
+  "3": 119,
+  "6": 221,
+  "10": 357,
+  "14": 493,
+  "20": 697
+ },
+ "sigma_calls_exact_davidson": {
+  "nroots=4": 80,
+  "nroots=6": 145
+ },
+ "exact_casci_wall_seconds_local": 0.7
+}

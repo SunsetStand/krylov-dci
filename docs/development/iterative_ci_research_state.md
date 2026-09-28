@@ -363,6 +363,21 @@ projector distance falls to `1.1e-11`.
 
 **H3 reverses at matched dimension on N2, with a converged fixed point:**
 
+> **Withdrawn, 2026-09-28.** The energy advantages in this section (`+2.71`,
+> `+2.8131`, `+2.5322 mH`) do not survive a fair comparison. They were obtained
+> with the default `lanczos` seed, which has projection `6.8e-26` on the
+> `3Pi_g` pair so that two of the four targets were unreachable in both arms
+> (`seed_irrep_coverage_finding.md`), and they were scored against a reference
+> whose fourth root was `27.27 mH` too high (`7b6c72d`); since the weighted error
+> takes absolute values, the wrong root does not cancel between arms. Redone with
+> the irrep-complete seed and scored against the bundle, self-consistency beats a
+> frozen basis at matched dimension by `+0.34` to `+0.51 mH`, by moving accuracy
+> from the ground state to the excited states, and enrichment brings no
+> measurable benefit: `results/h3_redo/n2_h3_redo.json`, manuscript Section 4.4.
+> The mechanistic findings here, the rank contraction, the residual plateau near
+> `0.13` and the limit cycle under constant enrichment, do reproduce.
+
+
 | | self-consistent, converged | frozen at matched `D` | advantage |
 |---|---|---|---|
 | `decay = 0.5` | `D=178`, `17.5816 mH` | `D=177`, `20.3947 mH` | **`+2.8131 mH`** |
