@@ -1,0 +1,242 @@
+{
+ "environment": {
+  "host": "amd-cpu (group cluster, partition amd)",
+  "python": "3.10.19",
+  "numpy": "1.26.4",
+  "scipy": "1.15.3",
+  "pyscf": "2.12.0",
+  "commit": "1db8aaa",
+  "threads": "OMP/MKL/OPENBLAS/NUMEXPR = 1",
+  "note": "Transcribed from the job logs the user relayed; the full JSONs remain on the cluster under /data/home/wangcx/krylov-dci-run-artifacts/symm_seed/."
+ },
+ "local_environment": {
+  "host": "local WSL",
+  "python": "3.12.3",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1",
+  "pyscf": "2.14.0"
+ },
+ "reference_bundle_checksum": "ad5b19d6674d54411f704bd3ed4b65aab9741d5373037868fc8fb76e85133d9d",
+ "hamiltonian_layer_check": {
+  "slurm_job": "envcheck",
+  "rhf": -108.954086605867,
+  "ecore": -77.4174226859,
+  "orbsym": [
+   0,
+   5,
+   0,
+   6,
+   7,
+   2,
+   3,
+   5,
+   0
+  ],
+  "reference_minus_bundle_mH": [
+   4.999379e-08,
+   1.919886e-08,
+   3.137757e-08,
+   3.137757e-08
+  ],
+  "seed_projection_steps10": {
+   "S0": 1.0,
+   "S1": 0.70851,
+   "degenerate_pair_sum": 1.9553
+  },
+  "verdict": "identical to local at the printed precision"
+ },
+ "points": [
+  {
+   "slurm_job": "smoke",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 6,
+   "svd_eps": 0.01,
+   "D": 340,
+   "weighted_error_mH": 15.565,
+   "per_state_error_mH": [
+    7.766,
+    23.417,
+    15.257,
+    15.819
+   ],
+   "max_error_mH": 23.417,
+   "all_states_chemically_accurate": false,
+   "degenerate_split_mH": 0.562,
+   "block9_rank": [
+    6,
+    5
+   ],
+   "converged": false,
+   "wall_seconds": 66,
+   "peak_rss_mib": 368
+  },
+  {
+   "slurm_job": "envcheck",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 10,
+   "svd_eps": 0.003,
+   "D": 3299,
+   "weighted_error_mH": 2.235,
+   "per_state_error_mH": [
+    1.075,
+    3.643,
+    1.991,
+    2.233
+   ],
+   "max_error_mH": 3.643,
+   "all_states_chemically_accurate": false,
+   "degenerate_split_mH": 0.241,
+   "block9_rank": [
+    8,
+    6
+   ],
+   "converged": true,
+   "wall_seconds": 884,
+   "peak_rss_mib": 2195
+  },
+  {
+   "slurm_job": "20910_0",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 10,
+   "svd_eps": 0.002,
+   "D": 4779,
+   "weighted_error_mH": 1.552,
+   "per_state_error_mH": [
+    0.799,
+    2.592,
+    1.301,
+    1.515
+   ],
+   "max_error_mH": 2.592,
+   "all_states_chemically_accurate": false,
+   "degenerate_split_mH": 0.214,
+   "block9_rank": [
+    9,
+    7
+   ],
+   "converged": true,
+   "wall_seconds": 1667,
+   "peak_rss_mib": 3220
+  },
+  {
+   "slurm_job": "20910_1",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 10,
+   "svd_eps": 0.001,
+   "D": 6805,
+   "weighted_error_mH": 0.906,
+   "per_state_error_mH": [
+    0.303,
+    1.706,
+    0.746,
+    0.87
+   ],
+   "max_error_mH": 1.706,
+   "all_states_chemically_accurate": false,
+   "degenerate_split_mH": 0.124,
+   "block9_rank": [
+    10,
+    8
+   ],
+   "converged": true,
+   "wall_seconds": 2918,
+   "peak_rss_mib": 4808
+  },
+  {
+   "slurm_job": "20910_2",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 14,
+   "svd_eps": 0.001,
+   "D": 2931,
+   "weighted_error_mH": 127.968,
+   "per_state_error_mH": [
+    321.083,
+    72.569,
+    57.19,
+    61.031
+   ],
+   "max_error_mH": 321.083,
+   "all_states_chemically_accurate": false,
+   "degenerate_split_mH": 3.841,
+   "block9_rank": [
+    5,
+    5
+   ],
+   "converged": false,
+   "wall_seconds": 3927,
+   "peak_rss_mib": 27354
+  },
+  {
+   "slurm_job": "20910_3",
+   "seed": "lanczos_symm",
+   "symmetry": "D2h",
+   "steps": 10,
+   "svd_eps": 0.0005,
+   "D": 9887,
+   "weighted_error_mH": 0.524,
+   "per_state_error_mH": [
+    0.129,
+    0.997,
+    0.464,
+    0.506
+   ],
+   "max_error_mH": 0.997,
+   "all_states_chemically_accurate": true,
+   "degenerate_split_mH": 0.042,
+   "block9_rank": [
+    10,
+    8
+   ],
+   "converged": true,
+   "wall_seconds": 5778,
+   "peak_rss_mib": 9094
+  }
+ ],
+ "local_overlap": [
+  {
+   "steps": 6,
+   "svd_eps": 0.01,
+   "D": 354,
+   "weighted_error_mH": 15.37,
+   "per_state_error_mH": [
+    7.865,
+    22.837,
+    14.71,
+    16.07
+   ],
+   "converged": true
+  },
+  {
+   "steps": 10,
+   "svd_eps": 0.003,
+   "D": 3192,
+   "weighted_error_mH": 2.294,
+   "per_state_error_mH": [
+    1.084,
+    3.764,
+    2.067,
+    2.264
+   ],
+   "converged": true
+  },
+  {
+   "steps": 10,
+   "svd_eps": 0.002,
+   "D": 4796,
+   "weighted_error_mH": 1.54,
+   "per_state_error_mH": [
+    0.892,
+    2.513,
+    1.329,
+    1.428
+   ],
+   "converged": true
+  }
+ ],
+ "note_20910_2": "Invalid: produced by the Lanczos orthogonality defect fixed in c4c953d. At 14 steps the pre-fix seed returned states 2.2 to 2.8 Ha too high."
+}

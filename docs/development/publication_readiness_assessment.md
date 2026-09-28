@@ -279,7 +279,7 @@ coincidence detector, after a Phase 18 result of `|dE| <= 76 mH` turned out to
 be an artifact of using `ev[0]` for every root; that detector is not
 implemented.
 
-### S9. No cost argument exists, and the known bottleneck is unfixed
+### S9. The cost argument has been measured, and it is negative
 
 Peak memory on N2 is a constant `4.2 x M x D` across three decades of `D`; the
 `q x q` Hamiltonian is `0.1` to `2.3 percent` of peak. The bottleneck is the
@@ -339,13 +339,18 @@ outside the live path should be assumed rotten until run.
 ## Three framings, and a recommendation
 
 **Framing A, a performance paper**: "a new self-consistent multi-state
-downfolding method". This is now the more likely option, and an earlier version
-of this document wrongly rated it as barely reachable. The ground state already
-reaches `0.283 mH` at `D = 2466` self-consistently from a non-exact seed, so the
-machinery delivers chemical accuracy; what is missing is the same for several
-states at once, where a known candidate fix exists and has never been tested on a
-system that can express it. The remaining requirement is then the S2 comparisons,
-which must at least be drawn.
+downfolding method". **Not available in the current formulation.** The accuracy
+half is now established: with the irrep-complete seed every one of the four N2
+states is inside chemical accuracy at `eps = 5e-4`. The cost half fails, and
+structurally. The seed that reaches every target irrep applies `H` in the full
+CAS space 357 times against 145 for exact Davidson, the embedded basis at that
+accuracy is `62 percent` of the determinant count, and the whole method takes
+`5778 s` and `9.1 GB` against `0.7 s` for exact CASCI of the same four states.
+Every stage holds dense full-space vectors, so the method cannot reach the regime
+where the exact solve is impossible. See
+`docs/development/seed_cost_versus_exact_solve.md`. An earlier version of this
+paragraph rated Framing A the more likely option; that was written before the
+cost had been measured.
 
 **Framing B, an analysis paper** -- *recommended*: "self-consistent basis
 rebuilding in truncated CI: why the naive outer map cannot work, and what
@@ -375,19 +380,28 @@ journal fit matters.
 **Framing C, the rectangular-rank paper**: too thin. One win, one tie, one
 system.
 
-**Recommendation: run H7 on N2 at `eps = 1e-3` first, then decide.** It is one
-cheap experiment, it is the difference between the two framings, and the record
-predicts it is worth roughly an order of magnitude on the excited states. If the
-four-state error drops toward the `±1 mH` the project has already recorded with
-per-state centering, Framing A is the paper and the analysis content becomes a
-strong section inside it. If it does not, Framing B is the honest paper and the
-multi-state cost becomes the recorded negative result. Either way the Framing B
-content is already measured and is not lost, so the decision costs nothing to
-defer by one experiment.
+**Recommendation: Framing B, and a decision on whether to start a second
+method.** The recommendation recorded here earlier, to run H7 first, has been
+carried out and superseded. H7 was negative (`+0.068 mH`, unconverged, singular
+per-state metric at tighter thresholds). The multi-state gap was instead closed
+by the irrep-complete seed, which made the accuracy result and exposed the cost
+result.
 
-Note that S7, the bipartition study, was previously named as the deciding
-experiment. It is not: with one state already at `0.283 mH`, the bipartition is
-evidently good enough, and the open question moved to the multi-state basis.
+Framing B is now well supplied. On top of the rank contraction, the annealing
+proof and the error-budget separation it gains: the irrep-coverage condition on
+seeds, general for any method that rebuilds its basis from its own wavefunction
+under a rank contraction; a converged four-state result inside chemical accuracy
+as the proof of principle; and a measured, structural statement of why the
+formulation cannot be cheaper than the exact solve. A negative cost result stated
+this precisely is itself useful to the field, because TPSCI-like and DMET-like
+schemes that rebuild bases from dense wavefunctions share the structure.
+
+A performance paper would need a different formulation that never holds dense
+full-space vectors. The determinant-space effective Hamiltonian with a Q space
+compressed by the SVD of `H_PQ`, analysed in
+`docs/theory/hpq_svd_qspace_compression_analysis.md`, is the direction whose cost
+is set by the sparsity of `H_QP` rather than by `M`. That is a new method and a
+separate decision.
 
 ## What to add before submission
 

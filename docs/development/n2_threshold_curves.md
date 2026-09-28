@@ -117,6 +117,46 @@ it is the outstanding measurement and belongs on the cluster. Driver and
 launcher: `scripts/diagnostics/run_n2_symm_seed_scan.py`,
 `batch/diagnostics/n2_symm_seed_scan.slurm`.
 
+## Cluster series: all four states inside chemical accuracy
+
+Group cluster, `amd-cpu`, Slurm job 20910 plus two validation jobs, commit
+`1db8aaa`, one thread. Different library versions from local: Python 3.10.19,
+NumPy 1.26.4, SciPy 1.15.3, PySCF 2.12.0, against 3.12.3, 2.5.3, 1.18.1, 2.14.0.
+
+**Validation first.** The Hamiltonian layer is identical to local at the printed
+precision: RHF energy to all 12 digits, `ecore`, `orbsym`, the reference against
+the bundle to `5e-8 mH`, and the seed's projections to `1e-4`. The iterative
+dynamics are not: on two converged overlap points the per-state errors differ by
+up to `0.12 mH` and `D` by up to `107`, while the weighted error agrees to
+`0.06 mH` or better. The likely cause, not yet verified, is the hard threshold:
+a singular value near `eps` kept on one machine and dropped on the other, then
+amplified over twelve outer iterations. So this series stands on its own and is
+anchored to local by the overlap points rather than spliced into the local curve.
+
+| `eps` | `D` | weighted | S0 `Ag` | S1 `B1u` | S2 `B2g` | S3 `B3g` | split | block 9 | wall | peak |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3e-3 | 3299 | `2.235` | `1.075` | `3.643` | `1.991` | `2.233` | `0.241` | `8x6` | 884 s | 2.2 GB |
+| 2e-3 | 4779 | `1.552` | `0.799` | `2.592` | `1.301` | `1.515` | `0.214` | `9x7` | 1667 s | 3.2 GB |
+| 1e-3 | 6805 | **`0.906`** | `0.303` | `1.706` | `0.746` | `0.870` | `0.124` | `10x8` | 2918 s | 4.8 GB |
+| **5e-4** | 9887 | **`0.524`** | **`0.129`** | **`0.997`** | **`0.464`** | **`0.506`** | `0.042` | `10x8` | 5778 s | 9.1 GB |
+
+**At `eps = 5e-4` every state is inside chemical accuracy**, the worst being
+`B1u` at `0.997 mH`. Convergence is regular: each halving of `eps` multiplies the
+weighted error by `0.58`, roughly `eps^0.79`. The degenerate splitting falls
+monotonically toward zero, an independent consistency check, and block 9 reaches
+its full rank `10 x 8` from `1e-3`.
+
+A fifth point, 14 steps at `1e-3`, returned `321 mH` on the ground state and did
+not converge. It is invalid: it was produced by the Lanczos orthogonality defect
+fixed in `c4c953d` (`docs/development/lanczos_seed_orthogonality_defect.md`).
+
+**This is an accuracy result, not a performance result.** At `eps = 5e-4` the
+embedded dimension is `62 percent` of the determinant count, and the method is
+several thousand times slower than exact CASCI on the same four states. See
+`docs/development/seed_cost_versus_exact_solve.md`.
+
+Summary: `results/symm_seed/n2_cluster_job20910.json`.
+
 ## The candidate fix is in the record, not in a new construction
 
 | Job | Space | `eps` | `D` | grid ceiling | Error | Downfolding |
